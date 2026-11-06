@@ -125,6 +125,7 @@ joint coordinates.
 - A `Stiffness` on the released directions adds `diag(k)` on `s`: a torsion spring for a revolute joint, an axial spring for a prismatic one, or a 6-dof bushing for `'free'`.
 - A released joint without stiffness is a mechanism: `fem.modes` returns it with f = 0.
 - Joints must form a tree: each reference point is the B side of at most one joint, and B cannot be supported. Fix A or the joint coordinates instead.
+- **Posing.** `a.pose(joint, value)` sets the joint to a finite position: an angle in rad or an offset in m, relative to the pose the joint was created in. Everything on its B side moves rigidly: bodies, couplings, downstream joints and tied bodies. The next `a.system()` then linearises about the new pose. Sweeping a pose shows how the dynamics depend on the configuration. If the moving side is attached elsewhere too (a closed loop or a support), `pose` gives an error.
 
 | Type | Free in joint frame |
 |---|---|
@@ -208,6 +209,7 @@ out with f ≈ 0. Mode shapes are normalised so that `VᵀMV = I`.
 | `ns = a.tie(master, slave, Tol=, Stiffness=, Select=)` | Bonded tie, or elastic interface if `Stiffness` is given. `Tol` defaults to 0.1 × the median face edge of the finer surface. `Select`: selector restricting the slave nodes. Returns the number of tied nodes. |
 | `r = a.couple(body, sel, Name=, Point=)` | Rigid coupling (RBE2) of selected nodes of an elastic body to a new reference point; returns its name |
 | `j = a.joint(A, B, type, Point=, Axis=, Frame=, Free=, Stiffness=, Name=)` | Joint between reference points (rigid bodies, couplings, or `'ground'` for A); returns its name (§2.5). `Point` defaults to B's reference point, `Axis` to `[0 0 1]`. |
+| `a.pose(joint, value)` | Move a joint to a finite angle/offset (relative to its creation pose); B side moves rigidly (§2.5) |
 | `a.fix(id, sel, dirs)` | Support selected body nodes in `dirs ⊂ 1:3`, or a reference point (`dirs ⊂ 1:6`) or joint coordinates with `a.fix(id, [], dirs)`. |
 | `d = a.dof(id, sel, dirs)` | Global dof indices of body nodes, of a reference point `[ux uy uz rx ry rz]`, or of a joint's coordinates. |
 | `j = a.qdof(d)` | Positions of global dofs `d` in `q`, so `u(d) = q(j)`. `d` must be independent (not supported, not a tie slave). |
@@ -300,6 +302,6 @@ spread slave mass onto master nodes; elastic joints keep it diagonal.
 - `T` is formed explicitly: memory grows with the number of tie and rigid-body nodes. `craigBampton` forms the dense `V`.
 - Requires MATLAB R2022a or later and Gmsh 4.
 
-Verification: `tests/runTests.m` covers 32 checks, including Euler–Bernoulli, rigid-body
+Verification: `tests/runTests.m` covers 37 checks, including Euler–Bernoulli, rigid-body
 invariance, exact rigid inertia, tie and spring consistency, joints against 1-dof oscillators and
-hinged-beam solutions, couplings, mesh-free rigid bodies, Craig–Bampton accuracy and the MSH readers.
+hinged-beam solutions, couplings, posed joints against a double pendulum, mesh-free rigid bodies, Craig–Bampton accuracy and the MSH readers.

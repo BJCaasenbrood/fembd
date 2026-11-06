@@ -3,7 +3,9 @@
 %   torsion springs in the joints (e.g. motor/gearbox stiffness). The links
 %   are elastic, attached to the joints through rigid couplings (RBE2) on
 %   their end faces; set rigidLinks = true to make them rigid instead.
-%   The model is reduced to the two joint coordinates plus a few modes.
+%   The model is reduced to the two joint coordinates plus a few modes, and
+%   the arm is posed at different elbow angles (a.pose) to show how the
+%   dynamics depend on the configuration.
 %
 %   ground --(joint1)-- link1 --(joint2)-- link2
 
@@ -54,3 +56,24 @@ for k = 1:4
     a.plot(u, 0.03/max(abs(u(1:3*size(a.X, 1)))));
     title(sprintf('Mode %d: %.1f Hz', k, f(k)));  view(2);  axis off
 end
+
+% configuration dependence: pose the elbow and rebuild K, M at each angle.
+% pose() moves link 2 (and its coupling) rigidly about the elbow axis.
+angles = 0:15:90;  fa = zeros(numel(angles), 2);
+for k = 1:numel(angles)
+    a.pose(j2, deg2rad(angles(k)));
+    [Kp, Mp, Tp] = a.system();
+    [Vp, fp] = fem.modes(Kp, Mp, 6);
+    U = Tp*Vp;  nz = 3*size(a.X, 1);                      % in-plane: little z motion
+    inPlane = vecnorm(U(3:3:nz, :)) < 0.5*vecnorm(U(1:nz, :));
+    fi = fp(inPlane);  fa(k,:) = fi(1:2);
+end
+disp(table(angles', fa(:,1), fa(:,2), 'VariableNames', {'elbow_deg', 'inplane1_Hz', 'inplane2_Hz'}));
+
+a.pose(j1, deg2rad(30));  a.pose(j2, deg2rad(60));       % shoulder 30, elbow 60
+[Kp, Mp, Tp] = a.system();  [Vp, fp] = fem.modes(Kp, Mp, 1);
+figure('Color', 'w');
+u = Tp*Vp(:,1);
+a.plot(u, 0.03/max(abs(u(1:3*size(a.X, 1)))));
+title(sprintf('Shoulder 30^o, elbow 60^o: mode 1 at %.1f Hz', fp));  view(2);
+a.pose(j1, 0);  a.pose(j2, 0);                           % back to straight

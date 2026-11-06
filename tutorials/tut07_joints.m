@@ -94,7 +94,28 @@ b.joint('ground', 'cart', 'spherical', Point = [0 0 0]);
 [K, M] = b.system();  [~, fs] = fem.modes(K, M, 3);
 fprintf('spherical joint: %d dofs, frequencies %s Hz (mechanism)\n', size(K, 1), mat2str(fs', 3));
 
-%% 7. Rules
+%% 7. Posing joints
+% Joint coordinates are small motions about the current geometry. To
+% analyse another configuration, set the joint to a finite position with
+% |a.pose(joint, value)| (rad or m, relative to where the joint was
+% created). Everything on the B side moves rigidly, and a.system() then
+% gives K and M about the new pose. Here a rigid pendulum (a point mass on
+% an arm) hangs from a revolute joint with a torsion spring: its frequency
+% depends on the pose only through the inertia, so it stays the same.
+c = fem.Body.pointMass(1, [0.5 0 0], zeros(3), Name = 'bob');
+b = fem.Assembly();  b.add(c);
+b.joint('ground', 'bob', 'revolute', Point = [0 0 0], Axis = [0 0 1], ...
+        Stiffness = 10, Name = 'pivot');
+for ang = [0 45 90]
+    b.pose('pivot', deg2rad(ang));
+    [K, M] = b.system();
+    fprintf('pivot at %2d deg: bob at %s m, f = %.4f Hz\n', ang, ...
+            mat2str(c.Ref, 3), full(sqrt(K/M))/(2*pi));
+end
+% A prismatic joint is posed the same way, with an offset in metres. See
+% examples/demoSerialArm.m for an elbow-angle sweep of an elastic arm.
+
+%% 8. Rules
 % * Joints form a tree: every reference point is the B side of at most
 %   one joint. Closed loops (four-bar linkages) are not supported.
 % * The B side cannot be supported; support A or the joint coordinates.

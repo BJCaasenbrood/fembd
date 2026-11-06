@@ -16,7 +16,7 @@ properties
     Bodies = {}
     Links  = struct('slave', {}, 'master', {}, 'N', {}, 'n', {}, 'A', {}, 'k', {})
     Refs   = struct('Name', {}, 'body', {}, 'nodes', {}, 'x', {})   % reference points
-    Joints = struct('Name', {}, 'A', {}, 'B', {}, 'p', {}, 'R', {}, 'free', {}, 'k', {})
+    Joints = struct('Name', {}, 'A', {}, 'B', {}, 'p', {}, 'R', {}, 'free', {}, 'k', {}, 'value', {})
     Fixes  = struct('id', {}, 'nodes', {}, 'dirs', {})              % supports (u = 0)
 end
 
@@ -157,7 +157,7 @@ methods
         name = opts.Name;
         if isempty(name), name = sprintf('joint%d', numel(a.Joints) + 1); end
         a.Joints(end+1) = struct('Name', name, 'A', iA, 'B', iB, 'p', p(:)', 'R', R, ...
-            'free', free, 'k', opts.Stiffness(:).*ones(nnz(free), 1));
+            'free', free, 'k', opts.Stiffness(:).*ones(nnz(free), 1), 'value', zeros(nnz(free), 1));
     end
 
     function ns = tie(a, master, slave, opts)
@@ -331,6 +331,43 @@ methods
         M = T'*M*T;  M = (M + M')/2;
     end
 
+    function pose(a, name, value)
+    %POSE Move a joint to a finite position and rebuild about it.
+    %   a.pose(joint, value) sets the joint coordinates (rad for rotations,
+    %   m for translations, in the joint frame) relative to the configuration
+    %   in which the joint was created; pose(joint, 0) restores it. All parts
+    %   on the B side (bodies, couplings, downstream joints and tied bodies)
+    %   move rigidly. The bodies themselves are moved (they are handles).
+    %   K and M from a.system() are then linearised about the new pose. For
+    %   several rotations (spherical joint) value is a rotation vector.
+        [kind, k] = a.lookup(name, true);
+        assert(strcmp(kind, 'joint'), 'fem:pose', '%s is not a joint.', name);
+        J = a.Joints(k);  value = value(:);
+        assert(numel(value) == nnz(J.free), 'fem:pose', ...
+            '%s has %d joint coordinate(s).', J.Name, nnz(J.free));
+        [Rc, tc] = jointMotion(J, J.value);  [Rn, tn] = jointMotion(J, value);
+        Rd = Rn*Rc';  td = J.p(:) + tn - Rd*(J.p(:) + tc);  % x -> Rd*x + td
+        moving = a.subtree(k);
+        for i = find(moving), a.Bodies{i}.transform(Rd, td); end
+        for r = 1:numel(a.Refs)
+            if ~isempty(a.Refs(r).x) && moving(a.refBody(r))
+                a.Refs(r).x = (Rd*a.Refs(r).x(:) + td)';
+            end
+        end
+        for j = 1:numel(a.Joints)
+            Jj = a.Joints(j);
+            if j ~= k && Jj.A > 0 && moving(a.refBody(Jj.A))
+                a.Joints(j).p = (Rd*Jj.p(:) + td)';  a.Joints(j).R = Rd*Jj.R;
+            end
+        end
+        for l = 1:numel(a.Links)
+            if moving(a.nodeBody(a.Links(l).master(1)))
+                a.Links(l).n = a.Links(l).n*Rd';
+            end
+        end
+        a.Joints(k).value = value;
+    end
+
     function j = qdof(a, d)
     %QDOF Indices into q of global dofs d (e.g. from a.dof), so u(d) = q(j).
     %   The dofs must be independent, i.e. not fixed and not tie slaves.
@@ -383,6 +420,45 @@ methods (Access = private)
         end
         assert(isscalar(i), 'fem:Assembly', 'Body not found or ambiguous.');
         b = a.Bodies{i};  off = a.offsets;  off = off(i);
+    end
+
+    function moving = subtree(a, k)
+    % Bodies on the B side of joint k: connected through ties or child joints.
+        moving = false(1, numel(a.Bodies));  J = a.Joints(k);
+        moving(a.refBody(J.B)) = true;
+        E = zeros(numel(a.Links), 2);
+        for l = 1:numel(a.Links)
+            E(l,:) = [a.nodeBody(a.Links(l).master(1)), a.nodeBody(a.Links(l).slave(1))];
+        end
+        others = setdiff(1:numel(a.Joints), k);
+        grown = true;
+        while grown
+            old = moving;
+            moving(E(any(moving(E), 2), :)) = true;
+            for j = others
+                Jj = a.Joints(j);
+                if Jj.A > 0 && moving(a.refBody(Jj.A)), moving(a.refBody(Jj.B)) = true; end
+            end
+            grown = any(moving ~= old);
+        end
+        loop = (J.A > 0 && moving(a.refBody(J.A))) || any(arrayfun(@(j) ...
+            moving(a.refBody(a.Joints(j).B)) && (a.Joints(j).A == 0 || ...
+            ~moving(a.refBody(a.Joints(j).A))), others));
+        for f = a.Fixes
+            [kind, i] = a.lookup(f.id, isempty(f.nodes));
+            if strcmp(kind, 'ref'), i = a.refBody(i); end
+            loop = loop || (~strcmp(kind, 'joint') && moving(i));
+        end
+        assert(~loop, 'fem:pose', ['%s: the moving side is also attached elsewhere ' ...
+            '(closed loop or support), so it cannot be posed.'], J.Name);
+    end
+
+    function i = refBody(a, r)
+        i = find(cellfun(@(b) b == a.Refs(r).body, a.Bodies));
+    end
+
+    function i = nodeBody(a, g)
+        off = a.offsets;  i = find(g > off(1:end-1), 1, 'last');
     end
 
     function [kind, k] = lookup(a, id, whole)
@@ -448,4 +524,11 @@ methods (Access = private)
         G = sparse(rows(:), cols(:), vals(:), 3*numel(L.slave), a.nDof);
     end
 end
+end
+
+function [R, t] = jointMotion(J, v)
+% Finite rigid motion of a joint about its point: x -> R*(x - p) + p + t.
+s = zeros(6, 1);  s(J.free) = v;
+t = J.R*s(1:3);  w = J.R*s(4:6);
+R = expm([0 -w(3) w(2); w(3) 0 -w(1); -w(2) w(1) 0]);
 end

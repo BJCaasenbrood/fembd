@@ -174,6 +174,48 @@ check('Hinged beam: 0 Hz, clamped-free (z), pinned-free (y)', ...
       [f(1)/f(2), f(2:3)'], [0, beam(1.875104), beam(3.926602)], 3e-2);
 check('Joint coordinate is a dof of q', numel(a.qdof(a.dof(j))), 1, 0);
 
+% posing joints: rigid two-link arm at a 60 degree elbow vs the analytic
+% double-pendulum mass matrix (coordinates: shoulder angle, elbow angle)
+fem.boxSTL(fullfile(tmp, 'l1.stl'), [0 -0.01 -0.005],   [0.2 0.01 0.005]);
+fem.boxSTL(fullfile(tmp, 'l2.stl'), [0.2 -0.01 -0.005], [0.4 0.01 0.005]);
+a = fem.Assembly();
+a.add(fem.Body.rigidSurface(fullfile(tmp, 'l1.stl'), 2700));
+a.add(fem.Body.rigidSurface(fullfile(tmp, 'l2.stl'), 2700));
+kj = 200;
+a.joint('ground', 'l1', 'revolute', Point = [0 0 0],   Stiffness = kj, Name = 'shoulder');
+a.joint('l1', 'l2',     'revolute', Point = [0.2 0 0], Stiffness = kj, Name = 'elbow');
+X0 = a.X;  phi = pi/3;
+a.pose('elbow', phi);
+[Kr, Mr] = a.system();  [~, f] = fem.modes(Kr, Mr, 2);
+mL = 2700*0.2*0.02*0.01;  Ic = mL*(0.2^2 + 0.02^2)/12;  I2 = Ic + mL*0.1^2;
+Mq = [Ic + mL*0.1^2 + I2 + mL*0.2^2 + 2*mL*0.2*0.1*cos(phi), I2 + mL*0.2*0.1*cos(phi);
+      I2 + mL*0.2*0.1*cos(phi), I2];
+check('Posed rigid arm (60 deg elbow) vs analytic', f, sqrt(sort(eig(kj*eye(2), Mq)))/(2*pi), 1e-8);
+a.pose('shoulder', 0.7);
+[Kr, Mr] = a.system();  [~, f2] = fem.modes(Kr, Mr, 2);
+check('Posing the shoulder: frequencies invariant', f2, f, 1e-10);
+a.pose('shoulder', 0);  a.pose('elbow', 0);
+check('pose(joint, 0) restores the geometry', max(abs(a.X(:) - X0(:))), 0, 1e-14);
+
+% prismatic pose carries the downstream joint along
+a = fem.Assembly();
+a.add(fem.Body.rigidSurface(fullfile(tmp, 'l1.stl'), 2700, Name = 'slider'));
+a.add(fem.Body.pointMass(1, [0.3 0 0], 1e-3*eye(3)));
+a.joint('ground', 'slider', 'prismatic', Axis = [1 0 0], Name = 'rail');
+a.joint('slider', 'mass', 'revolute', Point = [0.3 0 0], Name = 'pin');
+a.pose('rail', 0.05);
+check('Prismatic pose moves bodies and child joints', ...
+      [a.Bodies{2}.Ref(1), a.Joints(2).p(1), a.Bodies{1}.Ref(1)], [0.35 0.35 0.15], 1e-7);   % STL is single precision
+
+% a closed loop (door on two hinges) cannot be posed
+a = fem.Assembly();  a.add(L);
+r1 = a.couple('left', @(X) X(:,1) < 1e-9 & X(:,3) < h/2);
+r2 = a.couple('left', @(X) X(:,1) < 1e-9 & X(:,3) > h/2);
+a.joint('ground', r1, 'revolute', Axis = [0 0 1]);
+a.joint('ground', r2, 'revolute', Axis = [0 0 1]);
+try, a.pose('joint1', 0.1); ok = false; catch e, ok = strcmp(e.identifier, 'fem:pose'); end
+check('Posing a closed loop gives an error', ok, true, 0);
+
 % MSH 4.1 reader vs 2.2
 geo = fullfile(tmp, 'b.geo');
 writelines(sprintf(['Merge "%s";\nClassifySurfaces{40*Pi/180,1,1,Pi};\nCreateGeometry;\n' ...
