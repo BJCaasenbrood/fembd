@@ -1,0 +1,195 @@
+function runTests()
+%RUNTESTS Verification of the fem package. Requires Gmsh (see fem.meshSTL).
+
+addpath(fileparts(fileparts(mfilename('fullpath'))));
+tmp = tempname;  mkdir(tmp);  cleanup = onCleanup(@() rmdir(tmp, 's'));
+steel = fem.material(210e9, 0.3, 7800);
+Lx = 1;  h = 0.05;
+
+% single body: mass, rigid-body invariance, node ordering
+fem.boxSTL(fullfile(tmp, 'beam.stl'), [0 0 0], [Lx h h]);
+for order = [1 2]
+    b = fem.Body(fullfile(tmp, 'beam.stl'), steel, Size = h/2, Order = order);
+    [K, M] = b.matrices();
+    e = repmat([1; 0; 0], b.nNode, 1);
+    check(sprintf('Tet%d mass', 4 + 6*(order == 2)), e'*M*e, steel.rho*Lx*h*h, 1e-6);   % STL is single precision
+    check(sprintf('Tet%d rigid translation', 4 + 6*(order == 2)), norm(K*e)/norm(K, 1), 0, 1e-10);
+    r = reshape([zeros(1, b.nNode); -b.X(:,3)'; b.X(:,2)'], [], 1);   % rotation about x
+    check(sprintf('Tet%d rigid rotation', 4 + 6*(order == 2)), norm(K*r)/norm(K, 1)/norm(r), 0, 1e-10);
+end
+mid = b.X(b.T(:, 5:10), :);
+cor = (b.X(b.T(:, [1 2 3 4 4 4]), :) + b.X(b.T(:, [2 3 1 1 3 2]), :))/2;
+check('Tet10 edge-node ordering', max(vecnorm(mid - cor, 2, 2)), 0, 1e-12);
+
+% cantilever: first bending frequency vs Euler-Bernoulli
+a = fem.Assembly();  a.add(b);
+a.fix(1, @(X) X(:,1) < 1e-9);
+[Kr, Mr] = a.system();
+[~, f] = fem.modes(Kr, Mr, 4);
+fEB = 1.875104^2/(2*pi)*sqrt(210e9*h^4/12/(7800*h^2*Lx^4));
+check('Cantilever f1 vs Euler-Bernoulli', f(1), fEB, 1e-2);
+fRef = f;
+
+% lumped (HRZ) mass
+[~, Ml] = b.matrices(Lumped = true);
+check('Lumped mass: diagonal, positive', nnz(Ml - diag(diag(Ml))) + any(diag(Ml) <= 0), 0, 0);
+check('Lumped mass: total', e'*Ml*e, steel.rho*Lx*h*h, 1e-6);
+[Kr, Mr] = a.system(Lumped = true);
+[~, f] = fem.modes(Kr, Mr, 4);
+check('Lumped cantilever vs consistent', f, fRef, 2e-2);
+
+% free body: six rigid-body modes
+a = fem.Assembly();  a.add(b);
+[Kr, Mr] = a.system();
+[~, f] = fem.modes(Kr, Mr, 7);
+check('Free body: 6 rigid modes', max(f(1:6))/f(7), 0, 1e-4);
+
+% two non-conforming halves, tied
+fem.boxSTL(fullfile(tmp, 'left.stl'),  [0 0 0],    [Lx/2 h h]);
+fem.boxSTL(fullfile(tmp, 'right.stl'), [Lx/2 0 0], [Lx h h]);
+L = fem.Body(fullfile(tmp, 'left.stl'),  steel, Size = h/2);
+R = fem.Body(fullfile(tmp, 'right.stl'), steel, Size = h/3);
+a = fem.Assembly();  a.add(L);  a.add(R);
+ns = a.tie('left', 'right');
+a.fix('left', @(X) X(:,1) < 1e-9);
+[Kr, Mr, T] = a.system();
+[V, f] = fem.modes(Kr, Mr, 4);
+check(sprintf('Tied halves (%d slave nodes) vs monolithic', ns), f, fRef, 5e-3);
+U = reshape(T*V(:,1), 3, [])';  lk = a.Links(1);
+Um = reshape(U(lk.master, :), [size(lk.master), 3]);
+gap = U(lk.slave, :) - squeeze(sum(lk.N.*Um, 2));
+check('Tie: interface gap / max displacement', max(abs(gap(:)))/max(abs(U(:))), 0, 1e-12);
+
+% Craig-Bampton: tip face as boundary, 20 fixed-interface modes
+ib = a.qdof(a.dof('right', @(X) X(:,1) > Lx - 1e-9));
+[Kc, Mc] = fem.craigBampton(Kr, Mr, ib, 20);
+[~, fc] = fem.modes(Kc, Mc, 4);
+check(sprintf('Craig-Bampton (%d+20 of %d dofs) vs full', numel(ib), size(Kr, 1)), fc, f, 1e-3);
+check('Craig-Bampton: K boundary/modal decoupled', ...
+      norm(Kc(1:numel(ib), numel(ib)+1:end))/norm(Kc), 0, 1e-8);
+
+% elastic interface with very high stiffness approaches the tie
+a.Links = a.Links([]);
+a.tie('left', 'right', Stiffness = 1e18*[1 1]);
+check('Spring interface area', sum(a.Links(1).A), h^2, 1e-6);
+[Kr, Mr] = a.system();
+[~, f] = fem.modes(Kr, Mr, 4);
+check('Stiff spring interface vs tie', f, fRef, 5e-3);
+
+% rigid bodies: exact 6x6 mass / inertia of a free rigid box
+Rb = fem.Body(fullfile(tmp, 'beam.stl'), struct('rho', 7800), Size = h, Order = 1, Rigid = true);
+a = fem.Assembly();  a.add(Rb);
+[Kr, Mr] = a.system();
+m = 7800*Lx*h*h;
+Mref = diag(m*[1 1 1 (2*h^2)/12 (Lx^2 + h^2)/12 (Lx^2 + h^2)/12]);
+check('Rigid box: K = 0, M = rigid mass/inertia', ...
+      [norm(Kr, 1), norm(full(Mr) - Mref)/m], [0 0], 1e-6);
+
+% beam with a rigid right half (slave given first: swapped to master)
+% vs a nearly rigid elastic right half
+Rr = fem.Body(fullfile(tmp, 'right.stl'), steel, Size = h/2, Rigid = true);
+Rs = fem.Body(fullfile(tmp, 'right.stl'), fem.material(210e9*1e5, 0.3, 7800), Size = h/2);
+right = {Rr, Rs};
+for k = 1:2
+    a = fem.Assembly();  a.add(L);  a.add(right{k});
+    a.tie('left', 2);
+    a.fix('left', @(X) X(:,1) < 1e-9);
+    [Kr, Mr] = a.system();
+    [~, fk(:,k)] = fem.modes(Kr, Mr, 4);   %#ok<AGROW>
+end
+check(sprintf('Rigid half (%d dofs) vs E x 1e5 half', size(Kr, 1)), fk(:,1), fk(:,2), 1e-3);
+
+% rigid body fixed via its reference dofs == clamping the tied face
+a = fem.Assembly();  a.add(L);  a.add(Rr);  a.tie(2, 1);
+a.fix(1, @(X) X(:,1) < 1e-9);  a.fix(2, [], 1:6);
+[Kr, Mr] = a.system();  [~, f1] = fem.modes(Kr, Mr, 4);
+a = fem.Assembly();  a.add(L);
+a.fix(1, @(X) X(:,1) < 1e-9 | X(:,1) > Lx/2 - 1e-9);
+[Kr, Mr] = a.system();  [~, f2] = fem.modes(Kr, Mr, 4);
+check('Fixed rigid body == clamped interface', f1, f2, 1e-10);
+fRig = fk(:,1);
+
+% mesh-free rigid bodies: mass properties from the STL surface
+Sb = fem.Body.rigidSurface(fullfile(tmp, 'beam.stl'), 7800);
+check('Rigid surface: mass and inertia of a box', [Sb.MassProps.m, diag(Sb.MassProps.J)'], ...
+      [m, diag(Mref(4:6, 4:6))'], 1e-6);
+fem.cylinderSTL(fullfile(tmp, 'cyl.stl'), [0 0], 0.1, 0, 0.5, 32);
+Sc = fem.Body.rigidSurface(fullfile(tmp, 'cyl.stl'), 1);
+check('Rigid surface: volume of a 32-gon prism', Sc.MassProps.m, 32/2*0.1^2*sin(2*pi/32)*0.5, 1e-6);
+
+% the rigid right half as surface only, and as a point mass + joint
+mR = 7800*(Lx/2)*h*h;  JR = mR/12*diag([2*h^2, (Lx/2)^2 + h^2, (Lx/2)^2 + h^2]);
+a = fem.Assembly();  a.add(L);  a.add(fem.Body.rigidSurface(fullfile(tmp, 'right.stl'), 7800));
+a.tie('left', 'right');  a.fix('left', @(X) X(:,1) < 1e-9);
+[Kr, Mr] = a.system();  [~, f] = fem.modes(Kr, Mr, 4);
+check(sprintf('Rigid surface (%d dofs) == meshed rigid body', size(Kr, 1)), f, fRig, 1e-8);
+a = fem.Assembly();  a.add(L);
+a.add(fem.Body.pointMass(mR, [3*Lx/4 h/2 h/2], JR, Name = 'tipmass'));
+r = a.couple('left', @(X) X(:,1) > Lx/2 - 1e-9);
+a.joint(r, 'tipmass', 'fixed');  a.fix('left', @(X) X(:,1) < 1e-9);
+[Kr, Mr] = a.system();  [~, f] = fem.modes(Kr, Mr, 4);
+check('Point mass + fixed joint == meshed rigid body', f, fRig, 1e-6);
+
+% joints: two rigid quarters joined by a 'fixed' joint == one rigid half
+fem.boxSTL(fullfile(tmp, 'q1.stl'), [Lx/2 0 0],   [3*Lx/4 h h]);
+fem.boxSTL(fullfile(tmp, 'q2.stl'), [3*Lx/4 0 0], [Lx h h]);
+Q1 = fem.Body(fullfile(tmp, 'q1.stl'), steel, Size = h, Order = 1, Rigid = true);
+Q2 = fem.Body(fullfile(tmp, 'q2.stl'), steel, Size = h, Order = 1, Rigid = true);
+a = fem.Assembly();  a.add(L);  a.add(Q1);  a.add(Q2);
+a.tie('left', 'q1');
+a.joint('q1', 'q2', 'fixed', Point = [3*Lx/4 h/2 h/2]);
+a.fix('left', @(X) X(:,1) < 1e-9);
+[Kr, Mr] = a.system();  [~, f] = fem.modes(Kr, Mr, 4);
+check('Fixed joint of two rigid parts == one rigid part', f, fRig, 1e-8);
+
+% revolute and prismatic joints to ground with springs: 1-dof oscillators
+I = m*(Lx^2 + h^2)/12 + m*(Lx/2)^2;                    % about a z-axis at x = 0
+a = fem.Assembly();  a.add(Rb);
+a.joint('ground', 'beam', 'revolute', Point = [0 h/2 h/2], Axis = [0 0 1], Stiffness = 1e3);
+[Kr, Mr] = a.system();
+check('Revolute joint + torsion spring: sqrt(k/I)', [size(Kr, 1), sqrt(Kr/Mr)], [1, sqrt(1e3/I)], 1e-6);
+a = fem.Assembly();  a.add(Rb);
+a.joint('ground', 'beam', 'prismatic', Axis = [1 1 0], Stiffness = 1e6);
+[Kr, Mr] = a.system();
+check('Prismatic joint + spring: sqrt(k/m)', [size(Kr, 1), sqrt(Kr/Mr)], [1, sqrt(1e6/m)], 1e-6);
+
+% coupling (RBE2) of the clamped face, grounded by a fixed joint == fix
+a = fem.Assembly();  a.add(L);
+r = a.couple('left', @(X) X(:,1) < 1e-9);
+a.joint('ground', r, 'fixed');
+[Kr, Mr] = a.system();  [~, f1] = fem.modes(Kr, Mr, 4);
+a = fem.Assembly();  a.add(L);  a.fix('left', @(X) X(:,1) < 1e-9);
+[Kr, Mr] = a.system();  [~, f2] = fem.modes(Kr, Mr, 4);
+check('Coupling + fixed joint to ground == clamp', f1, f2, 1e-10);
+
+% revolute joint on a coupled elastic end: pinned-free beam, one zero mode
+a = fem.Assembly();  a.add(L);
+r = a.couple('left', @(X) X(:,1) < 1e-9);
+j = a.joint('ground', r, 'revolute', Axis = [0 1 0]);
+[Kr, Mr] = a.system();  [~, f] = fem.modes(Kr, Mr, 3);
+beam = @(lam) lam^2/(2*pi)*sqrt(210e9*h^4/12/(7800*h^2*(Lx/2)^4));
+% about y the beam is pinned-free, about z still clamped-free; at L/h = 10
+% shear and rotary inertia lower the pinned-free mode ~2.4% below Euler-Bernoulli
+check('Hinged beam: 0 Hz, clamped-free (z), pinned-free (y)', ...
+      [f(1)/f(2), f(2:3)'], [0, beam(1.875104), beam(3.926602)], 3e-2);
+check('Joint coordinate is a dof of q', numel(a.qdof(a.dof(j))), 1, 0);
+
+% MSH 4.1 reader vs 2.2
+geo = fullfile(tmp, 'b.geo');
+writelines(sprintf(['Merge "%s";\nClassifySurfaces{40*Pi/180,1,1,Pi};\nCreateGeometry;\n' ...
+    'Surface Loop(1) = Surface{:};\nVolume(1) = {1};\n'], strrep(fullfile(tmp, 'beam.stl'), '\', '/')), geo);
+for v = ["22" "41"]
+    fem.gmsh(sprintf('"%s" -3 -order 2 -clmax %g -format msh%s -o "%s/b%s.msh" -v 0', ...
+        geo, h, v, tmp, v));
+end
+[X2, T2] = fem.readMsh(fullfile(tmp, 'b22.msh'));
+[X4, T4] = fem.readMsh(fullfile(tmp, 'b41.msh'));
+check('MSH 4.1 == MSH 2.2', norm(X2(T2(:)) - X4(T4(:))) + abs(numel(T2) - numel(T4)), 0, 1e-12);
+end
+
+function check(name, val, ref, tol)
+err = max(abs(val(:) - ref(:))./max(abs(ref(:)), 1));
+if isequal(ref, 0), err = max(abs(val(:))); end
+status = "PASS";  if err > tol, status = "FAIL"; end
+fprintf('%-4s  %-45s err = %.2e\n', status, name, err);
+end

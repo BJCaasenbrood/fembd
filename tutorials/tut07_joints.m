@@ -1,0 +1,102 @@
+%% Tutorial 7 - Couplings and joints
+% Joints connect reference points with chosen directions left free, such
+% as hinges, sliders and ball joints. A reference point is a rigid body,
+% or a patch of an elastic body made rigid by a coupling. This tutorial
+% covers:
+%
+% * couplings (RBE2) on elastic bodies
+% * joint types, joint axes and springs on the released directions
+% * joint coordinates: locking them, loading them, and mechanism modes
+
+addpath(fileparts(fileparts(mfilename('fullpath'))));
+out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
+alu = fem.material(70e9, 0.33, 2700);
+
+%% 1. An elastic door on two hinges
+% A 400 x 20 x 600 mm aluminium door, hinged along its x = 0 edge.
+fem.boxSTL(fullfile(out, 'door.stl'), [0 0 0], [400 20 600]);
+door = fem.Body(fullfile(out, 'door.stl'), alu, Size = 20, Scale = 1e-3);
+a = fem.Assembly();  a.add(door);
+
+%% 2. Couplings
+% |a.couple(body, sel)| makes the selected nodes follow a new 6-dof
+% reference point (at their centroid, or at Point) and returns its name.
+% Here the two hinge knuckles are 60 mm patches of the edge face.
+edge = @(X) X(:,1) < 1e-9;
+r1 = a.couple('door', @(X) edge(X) & X(:,3) < 0.06,  Name = 'hingeLow');
+r2 = a.couple('door', @(X) edge(X) & X(:,3) > 0.54,  Name = 'hingeHigh');
+disp({a.Refs.Name});
+
+%% 3. Revolute joints
+% |a.joint(A, B, type, ...)| connects B to A ('ground' is allowed for A).
+% The joint is placed at Point (default: B's reference point) and turns
+% about, or slides along, Axis (the local z of the joint frame). The free
+% directions become joint coordinates, which are new dofs. Stiffness puts
+% a spring on them: here a torsion spring (N m/rad) in the lower hinge.
+k = 20;
+j1 = a.joint('ground', r1, 'revolute', Axis = [0 0 1], Stiffness = k);
+j2 = a.joint('ground', r2, 'revolute', Axis = [0 0 1]);
+[K, M, T] = a.system();  [V, f] = fem.modes(K, M, 4);
+
+% The first mode is the door swinging against the spring. Check it against
+% a rigid door: f = sqrt(k/I)/(2 pi), with I the inertia about the hinge.
+m = 2700*0.4*0.02*0.6;
+I = m*(0.4^2 + 0.02^2)/12 + m*0.2^2;
+fprintf('swing mode: FE %.4f Hz, rigid door %.4f Hz\n', f(1), sqrt(k/I)/(2*pi));
+disp(table((1:4)', f, 'VariableNames', {'mode', 'f_Hz'}));
+
+figure('Color', 'w');
+for i = 1:2
+    subplot(1, 2, i);  u = T*V(:,i);
+    a.plot(u, 0.1/max(abs(u(1:3*size(a.X, 1)))));
+    title(sprintf('Mode %d: %.2f Hz', i, f(i)));  view(30, 20);
+end
+
+%% 4. Joint coordinates are dofs
+% |a.dof(joint)| gives the joint coordinates in the full vector u. You can
+% load them (a torque on a revolute joint), read them as outputs, or use
+% them as Craig-Bampton boundary dofs (tutorial 9). A 1 N m torque on the
+% lower hinge twists the door by about tau/k.
+tau = 1;
+fu = zeros(a.nDof, 1);  fu(a.dof(j1)) = tau;
+u = T*(K\(T'*fu));
+fprintf('hinge rotations: %.4f and %.4f rad (tau/k = %.4f)\n', u(a.dof(j1)), u(a.dof(j2)), tau/k);
+
+%% 5. Locking a joint
+% Supporting a joint coordinate locks the joint: a.fix(joint, []) (or
+% a.fix(joint, [], dirs) for some of its coordinates). With the lower hinge
+% locked, the door can only twist, so the swing mode disappears.
+a.fix(j1, []);
+[K, M] = a.system();  [~, fl] = fem.modes(K, M, 2);
+fprintf('lower hinge locked: f1 = %.2f Hz\n', fl(1));
+
+%% 6. Other joint types and mechanism modes
+% Types, with their free directions in the joint frame:
+%   fixed (none), revolute (rz), prismatic (uz), cylindrical (uz rz),
+%   spherical (rx ry rz), planar (ux uy rz), free (all six: a bushing
+%   when combined with Stiffness).
+% Any mask is possible with Free = [ux uy uz rx ry rz] (logical).
+% Free directions without stiffness are mechanisms: they show up as 0 Hz
+% modes. A ball joint (spherical) leaves three.
+fem.boxSTL(fullfile(out, 'cart.stl'), [0 0 0], [100 100 50]);
+cart = fem.Body(fullfile(out, 'cart.stl'), struct('rho', 7850), Size = 50, ...
+                Order = 1, Scale = 1e-3, Rigid = true);
+mc = 7850*0.1*0.1*0.05;
+
+b = fem.Assembly();  b.add(cart);
+b.joint('ground', 'cart', 'prismatic', Axis = [1 0 0], Stiffness = 1e5);
+[K, M] = b.system();
+fprintf('prismatic + spring: %d dof, f = %.3f Hz (sqrt(k/m): %.3f Hz)\n', ...
+        size(K, 1), full(sqrt(K/M))/(2*pi), sqrt(1e5/mc)/(2*pi));
+
+b = fem.Assembly();  b.add(cart);
+b.joint('ground', 'cart', 'spherical', Point = [0 0 0]);
+[K, M] = b.system();  [~, fs] = fem.modes(K, M, 3);
+fprintf('spherical joint: %d dofs, frequencies %s Hz (mechanism)\n', size(K, 1), mat2str(fs', 3));
+
+%% 7. Rules
+% * Joints form a tree: every reference point is the B side of at most
+%   one joint. Closed loops (four-bar linkages) are not supported.
+% * The B side cannot be supported; support A or the joint coordinates.
+% * Everything is linearised about the current configuration.
+% See examples/demoSerialArm.m for joints between two elastic bodies.
