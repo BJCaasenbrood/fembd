@@ -30,7 +30,7 @@ ib = a.qdof(a.dof('pillar', @(X) X(:,3) > 0.109));   % boundary dofs, indices in
 The toolbox calls the Gmsh executable (version 4). It uses `$GMSH` if that is set, otherwise
 `gmsh` on the PATH.
 - **Windows:** download the Windows 64-bit zip from https://gmsh.info, unzip it anywhere, then
-  `setenv('GMSH', 'C:\path\to\gmsh-4.x.x-Windows64\gmsh.exe')`. Paths with spaces are fine.
+  `setenv('GMSH', 'C:\path\to\gmsh-4.x.x-Windows64\gmsh.exe')`.
 - **Linux:** `sudo apt install gmsh` (or the gmsh.info binary). MATLAB's own `libstdc++` is hidden
   from Gmsh automatically.
 - **macOS:** install `Gmsh.app` in `/Applications` (found automatically), or `brew install gmsh`.

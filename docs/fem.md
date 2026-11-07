@@ -183,7 +183,7 @@ out with f ≈ 0. Mode shapes are normalised so that `VᵀMV = I`.
 | `mat = fem.material(E, nu, rho)` | Isotropic material: struct with `E, nu, rho, D`. Custom: `struct('D', D, 'rho', rho)`; a rigid body needs only `rho`. |
 | `[X, T] = fem.meshSTL(file, ...)` | Gmsh volume mesh of a closed STL. Options: `Size` (max element size, STL units), `Order` (1 or 2, default 2), `Remesh` (default true; false keeps the STL triangles), `FeatureAngle` (40°). |
 | `[X, T] = fem.readMsh(file)` | Read tets from an ASCII Gmsh `.msh` file, version 2.2 or 4.1. |
-| `[status, out] = fem.gmsh(args)` | Run Gmsh with an argument string. Uses `$GMSH`, otherwise `gmsh` on the PATH. Handles quoting on Windows and MATLAB's libraries on Linux. |
+| `[status, out] = fem.gmsh(args)` | Run Gmsh with an argument string. Uses `$GMSH`, otherwise `gmsh` on the PATH. On Linux, MATLAB's own libraries are hidden from Gmsh. |
 | `fem.boxSTL(file, lo, hi)`, `fem.cylinderSTL(file, c, r, z0, z1)` | Write simple test geometry as STL |
 | `[V, f] = fem.modes(K, M, n)` | Lowest `n` modes: shapes `V` (mass-normalised) and frequencies `f` (Hz). |
 | `[Kr, Mr, V, f] = fem.craigBampton(K, M, b, n)` | Craig–Bampton reduction. `b`: boundary dofs (indices into K). `n`: number of fixed-interface modes. `f`: their frequencies. |

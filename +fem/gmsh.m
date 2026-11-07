@@ -14,10 +14,7 @@ if isempty(exe)
     if ismac && isfile(app), exe = app; end
 end
 cmd = sprintf('"%s" %s', exe, args);
-if ispc
-    exe = strrep(exe, '/', '\');
-    cmd = sprintf('""%s" %s"', exe, args);    % cmd.exe strips the outer quotes
-elseif ~ismac            % Linux: hide MATLAB's own (older) libstdc++ from Gmsh
+if isunix && ~ismac      % Linux: hide MATLAB's own (older) libstdc++ from Gmsh
     lib = strsplit(getenv('LD_LIBRARY_PATH'), ':');
     lib = lib(~startsWith(lib, matlabroot));
     cmd = sprintf('LD_LIBRARY_PATH="%s" %s', strjoin(lib, ':'), cmd);
