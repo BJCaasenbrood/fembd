@@ -137,11 +137,32 @@ b.joint('ground', 'link3', 'revolute', Point = P{4});     % closes the loop
 fprintf('four-bar: %d dof, f = %.3f Hz, crank coordinate in q: %d\n', size(K, 1), ...
         full(sqrt(K/M))/(2*pi), numel(b.qdof(b.dof('crank'))));
 
-%% 9. Rules
+%% 9. Transmissions: a belt drive
+% |a.transmission| relates coordinates of different joints through the
+% stretch delta = sum_i c_i s_i: a spring with Stiffness, or exact without.
+% Here a motor rotor drives a rigid arm through a belt with ratio N = 3
+% (motor turns 3x): delta = theta_motor/N - theta_arm. The belt mode is
+% the two inertias oscillating against each other.
+Jm = 2e-4;  Ja = 0.05;  N = 3;  kBelt = 2e4;
+b = fem.Assembly();
+b.add(fem.Body.pointMass(0.1, [0.1 0 0], Jm*eye(3), Name = 'rotor'));
+b.add(fem.Body.pointMass(1e-9, [0 0 0], Ja*eye(3), Name = 'arm'));
+b.joint('ground', 'rotor', 'revolute', Point = [0.1 0 0], Name = 'motor');
+b.joint('ground', 'arm',   'revolute', Point = [0 0 0],   Name = 'axis');
+b.transmission({'motor', 'axis'}, [1/N -1], Stiffness = kBelt);
+[K, M] = b.system();  [~, fb] = fem.modes(K, M, 2);
+fprintf('belt mode: FE %.2f Hz, two-inertia formula %.2f Hz\n', fb(2), ...
+        sqrt(kBelt*(1/Ja + 1/(N^2*Jm)))/(2*pi));
+% Without Stiffness the belt is rigid (an ideal gear): one dof remains,
+% the motor angle, with the arm inertia reflected as Ja/N^2.
+
+%% 10. Rules
 % * Joints are processed in the order they are created; define driving
 %   joints first, so their coordinates stay independent.
 % * A joint whose B side is supported, or already follows another joint,
 %   or that closes a loop, becomes a cut joint (exact constraint rows).
 % * pose() cannot move closed loops yet (no loop-closure solver).
 % * Everything is linearised about the current configuration.
+% * Transmissions couple joint coordinates only; shaft loads from belt
+%   tension are not modelled.
 % See examples/demoSerialArm.m for joints between two elastic bodies.

@@ -13,7 +13,7 @@ first (see the main README).
 | 4 | [`tut04_ties`](tut04_ties.m) | Non-conforming parts, bonded ties, master and slave, `Tol`, partial bonding with `Select`, elastic interfaces. |
 | 5 | [`tut05_loadsStatics`](tut05_loadsStatics.m) | Dof layout, `dof` and `qdof`, supports, point loads, gravity, static solution, reactions. |
 | 6 | [`tut06_rigidBodies`](tut06_rigidBodies.m) | Rigid bodies: reference dofs, mass properties, rigid tip mass, supports, `RefPoint`. |
-| 7 | [`tut07_joints`](tut07_joints.m) | Couplings on elastic bodies, joint types and axes, joint springs, locking and loading joints, mechanism modes. |
+| 7 | [`tut07_joints`](tut07_joints.m) | Couplings on elastic bodies, joint types and axes, joint springs, locking and loading joints, mechanism modes, posing, closed loops, belt transmissions. |
 | 8 | [`tut08_dynamics`](tut08_dynamics.m) | Rayleigh damping, frequency response (direct and modal), Newmark time integration, state space. |
 | 9 | [`tut09_reduction`](tut09_reduction.m) | Guyan and Craig–Bampton reduction, convergence with the number of modes, recovering the full field, reduced state space. |
 

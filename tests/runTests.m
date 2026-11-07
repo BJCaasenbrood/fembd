@@ -245,6 +245,19 @@ a.joint('ground', 'bar', 'revolute', Point = [1 0 0]);
 [Kr, ~] = a.system();
 check('Bar hinged at both ends: no dofs', size(Kr, 1), 0, 0);
 
+% transmissions: motor rotor -> rz of a spherical joint, ratio N
+mL = 3;  cL = [0.17 0 0];  JL = 0.02*eye(3);  Jm = 1e-4;  N = 2;  kb = 169430;  kz = 500;
+% (centre of mass in the xy plane: rz is decoupled from the tilt directions)
+Js = JL(3,3) + mL*(cL(1)^2 + cL(2)^2);
+[~, Kr, Mr] = buildBelt(kb, N, mL, cL, JL, Jm, 0);              % elastic belt
+[~, f] = fem.modes(Kr, Mr, size(Kr, 1));                       % rigid, 2 tilt, belt mode
+check('Elastic transmission vs two-inertia drive mode', f(end), ...
+      sqrt(kb*(1/Js + 1/(N^2*Jm)))/(2*pi), 1e-8);
+[a, Kr, Mr] = buildBelt([], N, mL, cL, JL, Jm, kz);            % rigid gear
+[~, f] = fem.modes(Kr, Mr, 1);
+check('Rigid transmission: reflected inertia Js + N^2 Jm', f, sqrt(kz/(Js + N^2*Jm))/(2*pi), 1e-8);
+check('Rigid transmission: driver coordinate stays in q', numel(a.qdof(a.dof('motor'))), 1, 0);
+
 % MSH 4.1 reader vs 2.2
 geo = fullfile(tmp, 'b.geo');
 writelines(sprintf(['Merge "%s";\nClassifySurfaces{40*Pi/180,1,1,Pi};\nCreateGeometry;\n' ...
@@ -269,6 +282,18 @@ for i = order
     a.joint(J{i}{1}, J{i}{2}, 'revolute', Point = [J{i}{3} 0], Stiffness = k(i), ...
             Name = sprintf('j%d', i));
 end
+[K, M] = a.system();
+end
+
+function [a, K, M] = buildBelt(k, N, mL, cL, JL, Jm, kz)
+% Link on a spherical joint (stiff tilt, rz spring kz) driven by a motor rotor
+% on a revolute joint through a transmission theta_m/N - theta_s.
+a = fem.Assembly();
+a.add(fem.Body.pointMass(mL, cL, JL, Name = 'link'));
+a.add(fem.Body.pointMass(0.1, [0.1 0 0], Jm*eye(3), Name = 'rotor'));
+a.joint('ground', 'link', 'spherical', Point = [0 0 0], Stiffness = [1e5 1e5 kz], Name = 'shoulder');
+a.joint('ground', 'rotor', 'revolute', Point = [0.1 0 0], Axis = [0 0 1], Name = 'motor');
+a.transmission({'motor', 'shoulder'}, [1/N -1], Stiffness = k, Dirs = {1, 3});
 [K, M] = a.system();
 end
 

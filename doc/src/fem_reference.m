@@ -16,6 +16,7 @@
 % * <matlab:doc('fem.Assembly/tie') tie> - bonded tie or elastic interface
 % * <matlab:doc('fem.Assembly/couple') couple> - rigid coupling of nodes to a reference point
 % * <matlab:doc('fem.Assembly/joint') joint> - kinematic joint between reference points
+% * <matlab:doc('fem.Assembly/transmission') transmission> - elastic or rigid ratio between joints (belts, gears)
 % * <matlab:doc('fem.Assembly/pose') pose> - move a joint to a finite position
 % * <matlab:doc('fem.Assembly/fix') fix> - supports
 % * <matlab:doc('fem.Assembly/dof') dof> - global dof indices

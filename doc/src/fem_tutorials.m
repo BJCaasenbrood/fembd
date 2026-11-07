@@ -17,7 +17,7 @@
 % # <tut06_rigidBodies.html Rigid Bodies>: reference dofs, tip masses,
 %   |RefPoint|, mesh-free rigid bodies
 % # <tut07_joints.html Couplings and Joints>: joint types, springs, locking,
-%   mechanism modes, posing, closed loops
+%   mechanism modes, posing, closed loops, belt transmissions
 % # <tut08_dynamics.html Dynamics>: Rayleigh damping, frequency response,
 %   Newmark time integration, state space
 % # <tut09_reduction.html Model Reduction>: Guyan and Craig-Bampton,

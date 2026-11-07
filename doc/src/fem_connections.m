@@ -66,6 +66,22 @@
 % detects redundant constraints (planar loops in 3D). Define driving
 % joints first: their coordinates stay independent.
 %
+%% Transmissions
+%
+%   t = a.transmission(joints, c, Stiffness=, Dirs=, Name=)
+%
+% Relates coordinates of different joints, e.g. a belt, gear, cable or rack.
+% The "stretch" is delta = sum_i c_i s_i. With |Stiffness = k| it is a
+% spring on delta (an elastic belt); without stiffness it is the exact
+% constraint delta = 0 (an ideal gear), and the first joint listed keeps
+% its coordinate. |Dirs| selects the coordinate of each joint.
+%
+%   a.transmission({'motor', 'shoulder'}, [1/N -1], Stiffness = k, Dirs = {1, 3});
+%   a.transmission({'gear1', 'gear2'}, [r1 r2]);            % meshing gears
+%
+% The motor inertia is seen as N^2 J_m at the joint. Shaft loads from belt
+% tension are not modelled.
+%
 %% Posing joints
 %
 %   a.pose(joint, value)
