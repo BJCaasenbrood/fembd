@@ -216,6 +216,35 @@ a.joint('ground', r2, 'revolute', Axis = [0 0 1]);
 try, a.pose('joint1', 0.1); ok = false; catch e, ok = strcmp(e.identifier, 'fem:pose'); end
 check('Posing a closed loop gives an error', ok, true, 0);
 
+% closed loops: planar four-bar of point-mass links (revolute axes along z,
+% so the loop is also overconstrained in 3D). Reference: velocity analysis.
+O2 = [0 0];  A = [0.05 0.1];  B = [0.3 0.15];  O4 = [0.25 0];
+mk = [0.2 0.5 0.3];  Jz = [1e-4 4e-4 2e-4];  kj = 50;
+cs = {(O2 + A)/2, (A + B)/2, (B + O4)/2};
+perp = @(v) [-v(2), v(1)];
+vA = perp(A - O2);                                    % crank at 1 rad/s
+w34 = [perp(B - A)', -perp(B - O4)'] \ (-vA');        % [w3; w4]
+vc3 = vA + w34(1)*perp(cs{2} - A);
+Ieff = Jz(1) + mk(1)*norm(cs{1} - O2)^2 + mk(2)*norm(vc3)^2 + Jz(2)*w34(1)^2 ...
+     + (Jz(3) + mk(3)*norm(cs{3} - O4)^2)*w34(2)^2;
+fourbar = @(order, kSpring) buildFourbar(order, kSpring, mk, Jz, cs, O2, A, B, O4);
+[a, Kr, Mr] = fourbar([1 2 3 4], [kj 0 0 0]);
+check('Four-bar: 1 dof, spring on crank vs velocity analysis', ...
+      [size(Kr, 1), full(sqrt(Kr/Mr))/(2*pi)], [1, sqrt(kj/Ieff)/(2*pi)], 1e-8);
+check('Four-bar: crank coordinate stays independent', numel(a.qdof(a.dof('j1'))), 1, 0);
+[~, Kr, Mr] = fourbar([1 2 3 4], [0 0 0 kj]);         % spring in the cut joint
+check('Four-bar: spring on the cut joint (k w4^2)', full(sqrt(Kr/Mr))/(2*pi), ...
+      sqrt(kj*w34(2)^2/Ieff)/(2*pi), 1e-8);
+[~, Kr, Mr] = fourbar([4 3 2 1], [kj 0 0 0]);         % other joint is cut
+check('Four-bar: independent of joint order', full(sqrt(Kr/Mr))/(2*pi), sqrt(kj/Ieff)/(2*pi), 1e-8);
+
+% a bar hinged to ground at both ends is locked: no dofs remain
+a = fem.Assembly();  a.add(fem.Body.pointMass(1, [0.5 0 0], eye(3)*1e-2, Name = 'bar'));
+a.joint('ground', 'bar', 'revolute', Point = [0 0 0]);
+a.joint('ground', 'bar', 'revolute', Point = [1 0 0]);
+[Kr, ~] = a.system();
+check('Bar hinged at both ends: no dofs', size(Kr, 1), 0, 0);
+
 % MSH 4.1 reader vs 2.2
 geo = fullfile(tmp, 'b.geo');
 writelines(sprintf(['Merge "%s";\nClassifySurfaces{40*Pi/180,1,1,Pi};\nCreateGeometry;\n' ...
@@ -227,6 +256,20 @@ end
 [X2, T2] = fem.readMsh(fullfile(tmp, 'b22.msh'));
 [X4, T4] = fem.readMsh(fullfile(tmp, 'b41.msh'));
 check('MSH 4.1 == MSH 2.2', norm(X2(T2(:)) - X4(T4(:))) + abs(numel(T2) - numel(T4)), 0, 1e-12);
+end
+
+function [a, K, M] = buildFourbar(order, k, mk, Jz, cs, O2, A, B, O4)
+% Four-bar of point masses; joints added in the given order.
+a = fem.Assembly();
+for i = 1:3
+    a.add(fem.Body.pointMass(mk(i), [cs{i} 0], diag([1 1 1]*Jz(i)), Name = sprintf('link%d', i)));
+end
+J = {{'ground', 'link1', O2}, {'link1', 'link2', A}, {'link2', 'link3', B}, {'ground', 'link3', O4}};
+for i = order
+    a.joint(J{i}{1}, J{i}{2}, 'revolute', Point = [J{i}{3} 0], Stiffness = k(i), ...
+            Name = sprintf('j%d', i));
+end
+[K, M] = a.system();
 end
 
 function check(name, val, ref, tol)

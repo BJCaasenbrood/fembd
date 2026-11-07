@@ -110,8 +110,8 @@ methods
     function name = joint(a, A, B, type, opts)
     %JOINT Kinematic joint between reference points A and B (rigid bodies,
     %   couplings, or 'ground' for A). B follows A, except for the released
-    %   dofs, which become joint coordinates (a.dof(name)). Joints must form
-    %   a tree: each reference point is the B side of at most one joint.
+    %   dofs, which become joint coordinates (a.dof(name)). Joints that close
+    %   a kinematic loop are handled as cut joints (see constraints).
     %
     %   type      'fixed' (default), 'revolute', 'prismatic', 'cylindrical',
     %             'spherical', 'planar', 'free' (bushing, use Stiffness)
@@ -138,8 +138,6 @@ methods
         end
         iA = a.refIndex(A);  iB = a.refIndex(B);
         assert(iB > 0 && iA ~= iB, 'fem:joint', 'B must be a reference point other than A.');
-        assert(~any([a.Joints.B] == iB), 'fem:joint', ['%s is already the B side of a ' ...
-            'joint; swap A and B (closed loops are not supported).'], a.Refs(iB).Name);
         mask = struct('fixed', [0 0 0 0 0 0], 'revolute', [0 0 0 0 0 1], ...
             'prismatic', [0 0 1 0 0 0], 'cylindrical', [0 0 1 0 0 1], ...
             'spherical', [0 0 0 1 1 1], 'planar', [1 1 0 0 0 1], 'free', [1 1 1 1 1 1]);
@@ -267,6 +265,11 @@ methods
     %CONSTRAINTS Map u = T*q from independent dofs q to all dofs u, which
     %   eliminates rigid bodies, couplings, joints, rigid ties (slave dofs)
     %   and supports. I lists the independent dofs: u(I) = q.
+    %   Joints in a tree are eliminated master-slave (B follows A). A joint
+    %   that closes a loop (or whose B side already follows another joint or
+    %   is supported) is a cut joint: its constrained directions give rows
+    %   C*q = 0, removed by rank-revealing QR coordinate partitioning, which
+    %   also drops redundant rows (e.g. planar loops in 3D).
         n = a.nDof;  off = a.offsets;
         S = zeros(0, 1);  R = sparse(0, n);
         for k = 1:numel(a.Refs)                  % nodes following a reference point
@@ -279,15 +282,23 @@ methods
                            3*nn, n)];                                     %#ok<AGROW>
         end
         skew = @(v) [0 -v(3) v(2); v(3) 0 -v(1); -v(2) v(1) 0];
-        for k = 1:numel(a.Joints)                % q_B = P_B^-1 (P_A q_A + R E s)
-            J = a.Joints(k);  E = eye(6);  Rk = sparse(6, n);
+        fixed = a.fixedDofs();  cut = a.cutJoints(fixed);  Cc = sparse(0, n);
+        for k = 1:numel(a.Joints)
+            J = a.Joints(k);  E = eye(6);  Rh = blkdiag(J.R, J.R);
             Pinv = [eye(3), skew(J.p - a.refPoint(J.B)); zeros(3), eye(3)];
+            G = sparse(6, n);                    % relative motion at p: P_B q_B - P_A q_A
+            G(:, a.refDofs(J.B)) = inv(Pinv);
             if J.A > 0
-                PA = [eye(3), -skew(J.p - a.refPoint(J.A)); zeros(3), eye(3)];
-                Rk(:, a.refDofs(J.A)) = Pinv*PA;
+                G(:, a.refDofs(J.A)) = -[eye(3), -skew(J.p - a.refPoint(J.A)); zeros(3), eye(3)];
             end
-            Rk(:, a.jointDofs(k)) = Pinv*blkdiag(J.R, J.R)*E(:, J.free);
-            S = [S; a.refDofs(J.B)];  R = [R; Rk];                        %#ok<AGROW>
+            if ~cut(k)                           % q_B = P_B^-1 (P_A q_A + R E s)
+                Rk = -Pinv*G;  Rk(:, a.refDofs(J.B)) = 0;
+                Rk(:, a.jointDofs(k)) = Pinv*Rh*E(:, J.free);
+                S = [S; a.refDofs(J.B)];  R = [R; Rk];                    %#ok<AGROW>
+            else                                 % s = (R E)' G q,  (R E_c)' G q = 0
+                S = [S; a.jointDofs(k)];  R = [R; (Rh*E(:, J.free))'*G];  %#ok<AGROW>
+                Cc = [Cc; (Rh*E(:, ~J.free))'*G];                         %#ok<AGROW>
+            end
         end
         for L = a.Links(arrayfun(@(L) isempty(L.k), a.Links))
             s = reshape(3*L.slave' - [2; 1; 0], [], 1);
@@ -295,12 +306,6 @@ methods
             R = [R; sparse(1:numel(s), s, 1, numel(s), n) - a.gap(L)]; %#ok<AGROW>
         end
         [S, i] = unique(S, 'stable');  R = R(i,:);
-        fixed = a.fixedDofs();
-        for J = a.Joints
-            assert(~any(ismember(a.refDofs(J.B), fixed)), 'fem:constraints', ...
-                '%s is the B side of %s and cannot be supported; swap A and B.', ...
-                a.Refs(J.B).Name, J.Name);
-        end
         keep = ~ismember(S, fixed);  S = S(keep);  R = R(keep,:);
 
         % resolve chains (a slave that is master elsewhere)
@@ -315,6 +320,16 @@ methods
         I = setdiff((1:n)', [S; fixed]);
         [i, j, v] = find(R(:, I));
         T = sparse(I, 1:numel(I), 1, n, numel(I)) + sparse(S(i), j, v, n, numel(I));
+
+        if ~isempty(Cc)                          % closed loops: C q = 0
+            pr = inf(numel(I), 1);               % eliminate non-joint dofs first,
+            for k = find(~cut)                   % then later joints before earlier
+                pr(ismember(I, a.jointDofs(k))) = k;
+            end
+            [~, order] = sort(pr, 'descend');
+            [T2, keep] = partition(Cc*T, order);
+            T = T*T2;  I = I(keep);
+        end
     end
 
     function [K, M, T] = system(a, opts)
@@ -370,10 +385,13 @@ methods
 
     function j = qdof(a, d)
     %QDOF Indices into q of global dofs d (e.g. from a.dof), so u(d) = q(j).
-    %   The dofs must be independent, i.e. not fixed and not tie slaves.
+    %   The dofs must be independent: not supported, not dependent (tie
+    %   slaves, nodes of rigid bodies/couplings, B sides of joints), and not
+    %   eliminated by a closed loop.
         [~, I] = a.constraints();
         [ok, j] = ismember(d, I);
-        assert(all(ok), 'fem:qdof', 'Some dofs are fixed or tie slaves; use the master side.');
+        assert(all(ok), 'fem:qdof', ['Some dofs are supported, dependent, or ' ...
+            'eliminated by a closed loop.']);
     end
 
     function plot(a, u, scale)
@@ -420,6 +438,21 @@ methods (Access = private)
         end
         assert(isscalar(i), 'fem:Assembly', 'Body not found or ambiguous.');
         b = a.Bodies{i};  off = a.offsets;  off = off(i);
+    end
+
+    function cut = cutJoints(a, fixed)
+    % Joints that cannot be eliminated master-slave: their ends are already
+    % connected through earlier joints (loop), their B side already follows
+    % another joint, or their B side is supported. Ground is node 0.
+        nr = numel(a.Refs);  root = 0:nr;  isB = false(1, nr);
+        cut = false(1, numel(a.Joints));
+        for k = 1:numel(a.Joints)
+            J = a.Joints(k);  rA = J.A;  rB = J.B;
+            while root(rA+1) ~= rA, rA = root(rA+1); end
+            while root(rB+1) ~= rB, rB = root(rB+1); end
+            cut(k) = isB(J.B) || rA == rB || any(ismember(a.refDofs(J.B), fixed));
+            if ~cut(k), isB(J.B) = true;  root(rB+1) = rA; end
+        end
     end
 
     function moving = subtree(a, k)
@@ -531,4 +564,27 @@ function [R, t] = jointMotion(J, v)
 s = zeros(6, 1);  s(J.free) = v;
 t = J.R*s(1:3);  w = J.R*s(4:6);
 R = expm([0 -w(3) w(2); w(3) 0 -w(1); -w(2) w(1) 0]);
+end
+
+function [T2, keep] = partition(C, order)
+% Coordinate partitioning of C*q = 0: q = T2*q(keep). Dependent columns are
+% picked greedily in the given priority order, each only if it raises the
+% rank, so redundant rows (e.g. planar loops in 3D) are dropped. The
+% dependent dofs then follow by least squares (exact for consistent C).
+m = size(C, 2);
+C = C./max(vecnorm(C, 2, 2), eps);              % unit rows
+cols = order(any(C(:, order), 1));  cols = cols(:)';
+Cn = full(C(:, cols));  Cn = Cn./vecnorm(Cn);   % unit columns for rank tests
+tol = 1e-9;  target = rank(Cn, tol);  sel = [];
+for c = 1:numel(cols)
+    if numel(sel) == target, break, end
+    if rank(Cn(:, [sel c]), tol) > numel(sel), sel(end+1) = c; end %#ok<AGROW>
+end
+dep = cols(sel);  ind = cols(setdiff(1:numel(cols), sel));
+X = -full(C(:, dep))\full(C(:, ind));
+keep = setdiff(1:m, dep);
+[~, pos] = ismember(ind, keep);
+T2 = sparse(keep, 1:numel(keep), 1, m, numel(keep));
+[i, j, v] = find(X);
+T2 = T2 + sparse(dep(i), pos(j), v, m, numel(keep));
 end

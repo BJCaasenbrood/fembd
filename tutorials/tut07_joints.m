@@ -115,9 +115,33 @@ end
 % A prismatic joint is posed the same way, with an offset in metres. See
 % examples/demoSerialArm.m for an elbow-angle sweep of an elastic arm.
 
-%% 8. Rules
-% * Joints form a tree: every reference point is the B side of at most
-%   one joint. Closed loops (four-bar linkages) are not supported.
-% * The B side cannot be supported; support A or the joint coordinates.
+%% 8. Closed loops: a four-bar linkage
+% Joints may close kinematic loops. Here three point-mass links form a
+% planar four-bar with a torsion spring in the crank joint. The fourth
+% joint closes the loop and becomes a cut joint: its constraint is removed
+% by QR coordinate partitioning. The planar loop is overconstrained in 3D
+% (redundant out-of-plane rows), which is detected automatically. One dof
+% remains: the crank angle, because the crank joint was defined first.
+P = {[0 0 0], [0.05 0.1 0], [0.3 0.15 0], [0.25 0 0]};   % O2, A, B, O4
+mk = [0.2 0.5 0.3];  Jz = [1e-4 4e-4 2e-4];
+b = fem.Assembly();
+for i = 1:3
+    b.add(fem.Body.pointMass(mk(i), (P{i} + P{i+1})/2, Jz(i)*eye(3), ...
+          Name = sprintf('link%d', i)));
+end
+b.joint('ground', 'link1', 'revolute', Point = P{1}, Stiffness = 50, Name = 'crank');
+b.joint('link1',  'link2', 'revolute', Point = P{2});
+b.joint('link2',  'link3', 'revolute', Point = P{3});
+b.joint('ground', 'link3', 'revolute', Point = P{4});     % closes the loop
+[K, M] = b.system();
+fprintf('four-bar: %d dof, f = %.3f Hz, crank coordinate in q: %d\n', size(K, 1), ...
+        full(sqrt(K/M))/(2*pi), numel(b.qdof(b.dof('crank'))));
+
+%% 9. Rules
+% * Joints are processed in the order they are created; define driving
+%   joints first, so their coordinates stay independent.
+% * A joint whose B side is supported, or already follows another joint,
+%   or that closes a loop, becomes a cut joint (exact constraint rows).
+% * pose() cannot move closed loops yet (no loop-closure solver).
 % * Everything is linearised about the current configuration.
 % See examples/demoSerialArm.m for joints between two elastic bodies.

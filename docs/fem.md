@@ -124,8 +124,8 @@ joint coordinates.
 - The joint is exact: B's 6 dofs become dependent and `s` becomes independent dofs.
 - A `Stiffness` on the released directions adds `diag(k)` on `s`: a torsion spring for a revolute joint, an axial spring for a prismatic one, or a 6-dof bushing for `'free'`.
 - A released joint without stiffness is a mechanism: `fem.modes` returns it with f = 0.
-- Joints must form a tree: each reference point is the B side of at most one joint, and B cannot be supported. Fix A or the joint coordinates instead.
-- **Posing.** `a.pose(joint, value)` sets the joint to a finite position: an angle in rad or an offset in m, relative to the pose the joint was created in. Everything on its B side moves rigidly: bodies, couplings, downstream joints and tied bodies. The next `a.system()` then linearises about the new pose. Sweeping a pose shows how the dynamics depend on the configuration. If the moving side is attached elsewhere too (a closed loop or a support), `pose` gives an error.
+- **Closed loops** (e.g. four-bar linkages) are allowed in the linear model. Joints are processed in the order they were created. A joint becomes a *cut joint* if its two ends are already connected through earlier joints, if its B side already follows another joint, or if its B side is supported. Its released coordinates follow from the relative motion, `s = (R̂E)ᵀ(P_B q_B − P_A q_A)`, and its constrained directions give rows `C q = 0` (§2.6). Define driving joints first: earlier joints keep their coordinates independent where possible.
+- **Posing.** `a.pose(joint, value)` sets the joint to a finite position: an angle in rad or an offset in m, relative to the pose the joint was created in. Everything on its B side moves rigidly: bodies, couplings, downstream joints and tied bodies. The next `a.system()` then linearises about the new pose. Sweeping a pose shows how the dynamics depend on the configuration. If the moving side is attached elsewhere too (a closed loop or a support), `pose` gives an error: posing closed loops would need a loop-closure solve, which is not implemented yet.
 
 | Type | Free in joint frame |
 |---|---|
@@ -145,6 +145,15 @@ $$u = T q, \qquad T(I,:) = \text{identity}, \quad T(S,:) = R(:,I), \quad u_F = 0
 
 `R` holds the constraint coefficients after chains are resolved. The reduced matrices are
 `T'KT` and `T'MT`. `a.qdof(d)` converts global dofs `d` into positions in `q`.
+
+**Closed loops.** Cut joints give a few extra rows `C q = 0` in the coordinates of the tree. They
+are removed by *coordinate partitioning*:
+1. Normalise the rows of `C`.
+2. Choose dependent columns greedily: non-joint dofs first, then the coordinates of joints from the most recent to the earliest. A column is accepted only if it raises the rank. Redundant rows, such as the out-of-plane rows of a planar loop modelled in 3D, are dropped this way.
+3. Solve `q_d = −C_d^{+} C_i q_i` by least squares, which is exact for consistent `C`.
+
+This gives `q = T₂ q'` and `T = T_tree T₂`. The result stays sparse and exact, and K and M stay
+symmetric positive (semi)definite, so all downstream tools work unchanged.
 
 ### 2.7 Craig–Bampton reduction
 Partition the dofs of `K_q, M_q` into boundary dofs `b` and interior dofs `i`:
@@ -297,11 +306,11 @@ spread slave mass onto master nodes; elastic joints keep it diagonal.
 - Ties project onto the flat corner triangle of each master face. On curved Tet10 interfaces the error is about the chord height.
 - If curved Tet10 edge nodes invert an element (coarse mesh, small radius), `meshSTL` re-meshes with straight-sided Tet10 and warns. A smaller `Size` keeps the curved geometry.
 - STL surfaces must be closed and watertight for `Remesh = true`. Only ASCII `.msh` files are read.
-- Joints must form a tree; closed kinematic loops (e.g. four-bar linkages) are not supported yet. Ties may close loops.
+- Closed kinematic loops are supported in the linear model, but `pose` cannot move them (no loop-closure solver yet). Near singular poses (e.g. a four-bar at dead centre) the partitioning becomes ill-conditioned, as the mechanism itself does.
 - Couplings are rigid (RBE2) and stiffen the coupled patch. A distributing coupling (RBE3) is not available.
 - `T` is formed explicitly: memory grows with the number of tie and rigid-body nodes. `craigBampton` forms the dense `V`.
 - Requires MATLAB R2022a or later and Gmsh 4.
 
 Verification: `tests/runTests.m` covers 37 checks, including Euler–Bernoulli, rigid-body
-invariance, exact rigid inertia, tie and spring consistency, joints against 1-dof oscillators and
+invariance, exact rigid inertia, tie and spring consistency, joints against 1-dof oscillators, a four-bar against velocity analysis, and
 hinged-beam solutions, couplings, posed joints against a double pendulum, mesh-free rigid bodies, Craig–Bampton accuracy and the MSH readers.
