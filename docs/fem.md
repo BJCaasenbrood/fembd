@@ -143,10 +143,13 @@ joint coordinates.
 - **Elastic** (`Stiffness = k`): a spring on `δ`, adding `K += k g gᵀ` with `g` the row of coefficients.
 - **Rigid** (no stiffness): the exact constraint `δ = 0`, removed by the coordinate partitioning of §2.6. The first joint listed (the driver) keeps its coordinate.
 
-`Dirs` selects the coordinate of each joint. For example, a motor (revolute) driving the rz of a spherical
-joint with ratio `N = θ_motor/θ_joint`:
+Each entry is a joint (`Dirs`: its joint coordinate) or a reference point, i.e. a rigid body or
+coupling (`Dirs`: 1:6 = `[ux uy uz rx ry rz]`, absolute). For example, a motor (revolute) driving the
+rz of a spherical joint with ratio `N = θ_motor/θ_joint`, or a base-mounted motor driving the
+*absolute* rotation of a link through a belt:
 ```matlab
 a.transmission({'motor', 'shoulder'}, [1/N -1], Stiffness = k, Dirs = {1, 3});
+a.transmission({'motor', 'lower'},    [1/N -1], Stiffness = k, Dirs = {1, 6});
 ```
 The belt torque `k δ` acts on each joint in proportion to its coefficient, and the motor inertia is seen as
 `N² J_m` at the joint. Shaft loads from belt tension are not modelled.
@@ -232,7 +235,7 @@ out with f ≈ 0. Mode shapes are normalised so that `VᵀMV = I`.
 | `ns = a.tie(master, slave, Tol=, Stiffness=, Select=)` | Bonded tie, or elastic interface if `Stiffness` is given. `Tol` defaults to 0.1 × the median face edge of the finer surface. `Select`: selector restricting the slave nodes. Returns the number of tied nodes. |
 | `r = a.couple(body, sel, Name=, Point=)` | Rigid coupling (RBE2) of selected nodes of an elastic body to a new reference point; returns its name |
 | `j = a.joint(A, B, type, Point=, Axis=, Frame=, Free=, Stiffness=, Name=)` | Joint between reference points (rigid bodies, couplings, or `'ground'` for A); returns its name (§2.5). `Point` defaults to B's reference point, `Axis` to `[0 0 1]`. |
-| `t = a.transmission(joints, c, Stiffness=, Dirs=, Name=)` | Elastic or rigid ratio between joint coordinates, `δ = Σ cᵢ sᵢ` (§2.5b) |
+| `t = a.transmission(ids, c, Stiffness=, Dirs=, Name=)` | Elastic or rigid ratio between joint coordinates or reference-point dofs, `δ = Σ cᵢ sᵢ` (§2.5b) |
 | `a.pose(joint, value)` | Move a joint to a finite angle/offset (relative to its creation pose); B side moves rigidly (§2.5) |
 | `a.fix(id, sel, dirs)` | Support selected body nodes in `dirs ⊂ 1:3`, or a reference point (`dirs ⊂ 1:6`) or joint coordinates with `a.fix(id, [], dirs)`. |
 | `d = a.dof(id, sel, dirs)` | Global dof indices of body nodes, of a reference point `[ux uy uz rx ry rz]`, or of a joint's coordinates. |

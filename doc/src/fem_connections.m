@@ -68,15 +68,17 @@
 %
 %% Transmissions
 %
-%   t = a.transmission(joints, c, Stiffness=, Dirs=, Name=)
+%   t = a.transmission(ids, c, Stiffness=, Dirs=, Name=)
 %
-% Relates coordinates of different joints, e.g. a belt, gear, cable or rack.
-% The "stretch" is delta = sum_i c_i s_i. With |Stiffness = k| it is a
-% spring on delta (an elastic belt); without stiffness it is the exact
-% constraint delta = 0 (an ideal gear), and the first joint listed keeps
-% its coordinate. |Dirs| selects the coordinate of each joint.
+% Relates coordinates, e.g. through a belt, gear, cable or rack. Each entry
+% is a joint (|Dirs|: its joint coordinate) or a rigid body or coupling
+% (|Dirs|: 1:6, absolute [ux uy uz rx ry rz]). The "stretch" is
+% delta = sum_i c_i s_i. With |Stiffness = k| it is a spring on delta (an
+% elastic belt); without stiffness it is the exact constraint delta = 0 (an
+% ideal gear), and the first entry keeps its coordinate.
 %
 %   a.transmission({'motor', 'shoulder'}, [1/N -1], Stiffness = k, Dirs = {1, 3});
+%   a.transmission({'motor', 'lower'}, [1/N -1], Stiffness = k, Dirs = {1, 6});   % base-mounted drive
 %   a.transmission({'gear1', 'gear2'}, [r1 r2]);            % meshing gears
 %
 % The motor inertia is seen as N^2 J_m at the joint. Shaft loads from belt

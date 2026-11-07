@@ -17,7 +17,7 @@ properties
     Links  = struct('slave', {}, 'master', {}, 'N', {}, 'n', {}, 'A', {}, 'k', {})
     Refs   = struct('Name', {}, 'body', {}, 'nodes', {}, 'x', {})   % reference points
     Joints = struct('Name', {}, 'A', {}, 'B', {}, 'p', {}, 'R', {}, 'free', {}, 'k', {}, 'value', {})
-    Transmissions = struct('Name', {}, 'joints', {}, 'dirs', {}, 'c', {}, 'k', {})
+    Transmissions = struct('Name', {}, 'kind', {}, 'idx', {}, 'dirs', {}, 'c', {}, 'k', {})
     Inputs  = struct('Name', {}, 'id', {}, 'nodes', {}, 'dirs', {})                % actuators, loads
     Outputs = struct('Name', {}, 'id', {}, 'nodes', {}, 'dirs', {}, 'type', {})    % sensors
     Fixes  = struct('id', {}, 'nodes', {}, 'dirs', {})              % supports (u = 0)
@@ -337,8 +337,7 @@ methods
                 pr(ismember(I, a.jointDofs(k))) = k;
             end
             for t = a.Transmissions(arrayfun(@(t) isempty(t.k), a.Transmissions))
-                dk = a.jointDofs(t.joints(1));   % keep the driver of rigid transmissions
-                pr(I == dk(t.dirs(1))) = 0;
+                pr(I == a.transmissionDof(t, 1)) = 0;   % keep the driver of rigid transmissions
             end
             [~, order] = sort(pr, 'descend');
             [T2, keep] = partition(Cc*T, order);
@@ -360,48 +359,55 @@ methods
         M = T'*M*T;  M = (M + M')/2;
     end
 
-    function name = transmission(a, joints, coeffs, opts)
-    %TRANSMISSION Belt, gear or cable ratio between joint coordinates.
-    %   a.transmission(joints, c) relates coordinates s_i of the given joints
-    %   through the "stretch" delta = sum_i c_i s_i:
+    function name = transmission(a, ids, coeffs, opts)
+    %TRANSMISSION Belt, gear or cable ratio between coordinates.
+    %   a.transmission(ids, c) relates coordinates s_i through the "stretch"
+    %   delta = sum_i c_i s_i:
     %     Stiffness = k   elastic: a spring k on delta (belt, compliant drive)
     %     (none)          rigid: delta = 0 exactly (ideal gear or belt)
-    %   Dirs picks the coordinate of each joint (default 1), e.g. {1, 3} for
-    %   a revolute motor and rz of a spherical joint. In a rigid transmission
-    %   the first joint (the driver) keeps its coordinate; another one is
-    %   eliminated. Returns the name (option Name, default 'transmission<k>').
+    %   Each entry of ids is a joint (Dirs: its joint coordinate) or a
+    %   reference point, i.e. a rigid body or coupling (Dirs: 1:6 =
+    %   [ux uy uz rx ry rz], absolute). Dirs defaults to 1 for each entry.
+    %   In a rigid transmission the first entry (the driver) keeps its
+    %   coordinate; another one is eliminated. Returns the name (option
+    %   Name, default 'transmission<k>').
     %
-    %   Examples (ratio N = theta_motor/theta_joint):
+    %   Examples (ratio N = theta_motor/theta_driven):
     %     a.transmission({'motor', 'shoulder'}, [1/N -1], Stiffness = k, Dirs = {1, 3})
+    %     a.transmission({'motor', 'lower'}, [1/N -1], Stiffness = k, Dirs = {1, 6})
+    %         % base-mounted motor driving the absolute rotation of a link
     %     a.transmission({'gear1', 'gear2'}, [r1 r2])        % meshing gears
     %     a.transmission({'pinion', 'rack'}, [r -1])         % rack and pinion
         arguments
             a
-            joints (1,:) cell
+            ids (1,:) cell
             coeffs (1,:) double
             opts.Dirs = []
             opts.Stiffness double = []
             opts.Name (1,:) char = ''
         end
-        nj = numel(joints);
-        assert(numel(coeffs) == nj, 'fem:transmission', 'One coefficient per joint.');
+        nj = numel(ids);
+        assert(numel(coeffs) == nj, 'fem:transmission', 'One coefficient per entry.');
         dirs = ones(1, nj);
         if iscell(opts.Dirs), dirs = [opts.Dirs{:}];
         elseif ~isempty(opts.Dirs), dirs = opts.Dirs(:)'; end
-        assert(numel(dirs) == nj, 'fem:transmission', 'One entry of Dirs per joint.');
-        idx = zeros(1, nj);
+        assert(numel(dirs) == nj, 'fem:transmission', 'One entry of Dirs per coordinate.');
+        kind = cell(1, nj);  idx = zeros(1, nj);
         for i = 1:nj
-            [kind, idx(i)] = a.lookup(joints{i}, true);
-            assert(strcmp(kind, 'joint'), 'fem:transmission', '%s is not a joint.', joints{i});
-            assert(dirs(i) >= 1 && dirs(i) <= nnz(a.Joints(idx(i)).free), 'fem:transmission', ...
-                '%s has %d joint coordinate(s).', joints{i}, nnz(a.Joints(idx(i)).free));
+            [kind{i}, idx(i)] = a.lookup(ids{i}, true);
+            assert(ismember(kind{i}, {'joint', 'ref'}), 'fem:transmission', ...
+                '%s is not a joint, rigid body or coupling.', string(ids{i}));
+            nd = 6;
+            if strcmp(kind{i}, 'joint'), nd = nnz(a.Joints(idx(i)).free); end
+            assert(dirs(i) >= 1 && dirs(i) <= nd, 'fem:transmission', ...
+                '%s has %d coordinate(s).', string(ids{i}), nd);
         end
         assert(isempty(opts.Stiffness) || isscalar(opts.Stiffness), 'fem:transmission', ...
             'Stiffness must be a scalar (or empty for a rigid transmission).');
         name = opts.Name;
         if isempty(name), name = sprintf('transmission%d', numel(a.Transmissions) + 1); end
-        a.Transmissions(end+1) = struct('Name', name, 'joints', idx, 'dirs', dirs, ...
-                                        'c', coeffs, 'k', opts.Stiffness);
+        a.Transmissions(end+1) = struct('Name', name, 'kind', {kind}, 'idx', idx, ...
+                                        'dirs', dirs, 'c', coeffs, 'k', opts.Stiffness);
     end
 
     function pose(a, name, value)
@@ -745,11 +751,15 @@ methods (Access = private)
 
     function g = transmissionRow(a, t)
     % Row g with delta = g*u for a transmission t.
-        d = zeros(size(t.joints));
-        for i = 1:numel(t.joints)
-            dk = a.jointDofs(t.joints(i));  d(i) = dk(t.dirs(i));
-        end
+        d = arrayfun(@(i) a.transmissionDof(t, i), 1:numel(t.idx));
         g = sparse(1, d, t.c, 1, a.nDof);
+    end
+
+    function d = transmissionDof(a, t, i)
+    % Global dof of entry i of transmission t (joint coordinate or ref dof).
+        if strcmp(t.kind{i}, 'joint'), dk = a.jointDofs(t.idx(i));
+        else, dk = a.refDofs(t.idx(i)); end
+        d = dk(t.dirs(i));
     end
 
     function d = jointDofs(a, k)

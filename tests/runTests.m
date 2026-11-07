@@ -258,6 +258,14 @@ check('Elastic transmission vs two-inertia drive mode', f(end), ...
 check('Rigid transmission: reflected inertia Js + N^2 Jm', f, sqrt(kz/(Js + N^2*Jm))/(2*pi), 1e-8);
 check('Rigid transmission: driver coordinate stays in q', numel(a.qdof(a.dof('motor'))), 1, 0);
 
+% transmissions on reference points (absolute rotations of rigid bodies)
+f1 = refBelt(1, 6, kb);  f2 = refBelt(0, 1, kb);      % link rz vs its joint coordinate
+check('Transmission on a rigid body rz == on its joint', f1, f2, 1e-10);
+f1 = refBelt(1, 6, []);  f2 = refBelt(0, 1, []);
+check('Rigid transmission on a rigid body rz == on its joint', f1, f2, 1e-10);
+f1 = elbowBelt(true, kb);  f2 = elbowBelt(false, kb);  % base-mounted elbow drive
+check('Base-mounted elbow belt: absolute rz == shoulder + elbow', f1, f2, 1e-10);
+
 % inputs, outputs and state space: cantilever, tip force -> tip deflection
 a = fem.Assembly();  a.add(L);  a.fix('left', @(X) X(:,1) < 1e-9);
 a.input('Fz', 'left', @(X) X(:,1) > Lx/2 - 1e-9, 3);
@@ -321,6 +329,37 @@ a.joint('ground', 'link', 'spherical', Point = [0 0 0], Stiffness = [1e5 1e5 kz]
 a.joint('ground', 'rotor', 'revolute', Point = [0.1 0 0], Axis = [0 0 1], Name = 'motor');
 a.transmission({'motor', 'shoulder'}, [1/N -1], Stiffness = k, Dirs = {1, 3});
 [K, M] = a.system();
+end
+
+function f = refBelt(onBody, dir, k)
+% Motor driving a link on a revolute joint, via the link's rz or the joint.
+a = fem.Assembly();
+a.add(fem.Body.pointMass(2, [0.2 0 0], 0.01*eye(3), Name = 'link'));
+a.add(fem.Body.pointMass(0.1, [0.5 0 0], 1e-4*eye(3), Name = 'rotor'));
+a.joint('ground', 'link',  'revolute', Point = [0 0 0], Stiffness = 300, Name = 'axis');
+a.joint('ground', 'rotor', 'revolute', Point = [0.5 0 0], Name = 'motor');
+ids = {'motor', 'axis'};  if onBody, ids{2} = 'link'; end
+a.transmission(ids, [1/3 -1], Stiffness = k, Dirs = {1, dir});
+[K, M] = a.system();  [~, f] = fem.modes(K, M, size(K, 1));
+end
+
+function f = elbowBelt(absolute, k)
+% Two-link arm (spherical joints, free rz) with the elbow driven from the
+% base: via the lower link's absolute rz, or via shoulder + elbow coordinates.
+a = fem.Assembly();
+a.add(fem.Body.pointMass(3, [0.17 0 0], 0.02*eye(3), Name = 'upper'));
+a.add(fem.Body.pointMass(2, [0.5 0 0],  0.01*eye(3), Name = 'lower'));
+a.add(fem.Body.pointMass(0.1, [0 0.1 0], 2e-4*eye(3), Name = 'rotor'));
+tilt = [1e5 1e5 0];
+a.joint('ground', 'upper', 'spherical', Point = [0 0 0],    Stiffness = tilt + [0 0 400], Name = 'shoulder');
+a.joint('upper',  'lower', 'spherical', Point = [0.34 0 0], Stiffness = tilt, Name = 'elbow');
+a.joint('ground', 'rotor', 'revolute',  Point = [0 0.1 0],  Name = 'motor2');
+if absolute
+    a.transmission({'motor2', 'lower'}, [1/4 -1], Stiffness = k, Dirs = {1, 6});
+else
+    a.transmission({'motor2', 'shoulder', 'elbow'}, [1/4 -1 -1], Stiffness = k, Dirs = {1, 3, 3});
+end
+[K, M] = a.system();  [~, f] = fem.modes(K, M, size(K, 1));
 end
 
 function check(name, val, ref, tol)
