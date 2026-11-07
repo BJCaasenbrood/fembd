@@ -1,0 +1,279 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<META http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      -->
+<title>demoSerialArm</title>
+<meta name="generator" content="MATLAB 24.1">
+<link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
+<meta name="DC.date" content="2026-11-07">
+<meta name="DC.source" content="demoSerialArm.m">
+<style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; }
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+span.typesection { color:#A0522D }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style>
+</head>
+<body>
+<div class="content">
+<pre class="codeinput">
+<span class="comment">%DEMOSERIALARM Two-link arm with revolute joints (couplings and joints).</span>
+<span class="comment">%   Two aluminium links are hinged to ground and to each other about z, with</span>
+<span class="comment">%   torsion springs in the joints (e.g. motor/gearbox stiffness). The links</span>
+<span class="comment">%   are elastic, attached to the joints through rigid couplings (RBE2) on</span>
+<span class="comment">%   their end faces; set rigidLinks = true to make them rigid instead.</span>
+<span class="comment">%   The model is reduced to the two joint coordinates plus a few modes, and</span>
+<span class="comment">%   the arm is posed at different elbow angles (a.pose) to show how the</span>
+<span class="comment">%   dynamics depend on the configuration.</span>
+<span class="comment">%</span>
+<span class="comment">%   ground --(joint1)-- link1 --(joint2)-- link2</span>
+
+rigidLinks = false;
+
+addpath(fileparts(fileparts(mfilename(<span class="string">'fullpath'</span>))));
+out = fullfile(tempdir, <span class="string">'femArm'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
+
+<span class="comment">% geometry (mm): links along x, 200 x 20 x 10</span>
+fem.boxSTL(fullfile(out, <span class="string">'link1.stl'</span>), [0 -10 -5],   [200 10 5]);
+fem.boxSTL(fullfile(out, <span class="string">'link2.stl'</span>), [200 -10 -5], [400 10 5]);
+alu = fem.material(70e9, 0.33, 2700);
+opt = {<span class="string">'Scale'</span>, 1e-3, <span class="string">'Size'</span>, 5, <span class="string">'Rigid'</span>, rigidLinks};
+link1 = fem.Body(fullfile(out, <span class="string">'link1.stl'</span>), alu, opt{:});
+link2 = fem.Body(fullfile(out, <span class="string">'link2.stl'</span>), alu, opt{:});
+
+a = fem.Assembly();
+a.add(link1);  a.add(link2);
+
+<span class="comment">% joint attachment points: the rigid body itself, or a coupling of an end face</span>
+<span class="keyword">if</span> rigidLinks
+    [p1, p2a, p2b] = deal(<span class="string">'link1'</span>, <span class="string">'link1'</span>, <span class="string">'link2'</span>);
+<span class="keyword">else</span>
+    p1  = a.couple(<span class="string">'link1'</span>, @(X) X(:,1) &lt; 1e-9);          <span class="comment">% hub of link 1</span>
+    p2a = a.couple(<span class="string">'link1'</span>, @(X) X(:,1) &gt; 0.2 - 1e-9);    <span class="comment">% elbow, link 1 side</span>
+    p2b = a.couple(<span class="string">'link2'</span>, @(X) X(:,1) &lt; 0.2 + 1e-9);    <span class="comment">% elbow, link 2 side</span>
+<span class="keyword">end</span>
+kj = 200;                                                 <span class="comment">% joint stiffness, Nm/rad</span>
+j1 = a.joint(<span class="string">'ground'</span>, p1, <span class="string">'revolute'</span>, Point = [0 0 0],   Axis = [0 0 1], Stiffness = kj);
+j2 = a.joint(p2a, p2b,     <span class="string">'revolute'</span>, Point = [0.2 0 0], Axis = [0 0 1], Stiffness = kj);
+
+[K, M, T] = a.system();
+[V, f] = fem.modes(K, M, 6);
+fprintf(<span class="string">'%d dofs after constraints\n'</span>, size(K, 1));
+disp(table((1:6)', f, <span class="string">'VariableNames'</span>, {<span class="string">'mode'</span>, <span class="string">'f_Hz'</span>}));
+
+<span class="comment">% actuator-level model: joint coordinates as boundary + 4 elastic modes</span>
+ib = a.qdof([a.dof(j1); a.dof(j2)]);
+[Kc, Mc, Vc] = fem.craigBampton(K, M, ib, 4);
+[~, fc] = fem.modes(Kc, Mc, 4);
+fprintf(<span class="string">'Craig-Bampton (%d dofs): %s Hz\n'</span>, size(Kc, 1), mat2str(fc', 4));
+disp(<span class="string">'Joint-space stiffness (Nm/rad):'</span>);  disp(Kc(1:2, 1:2));
+
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
+<span class="keyword">for</span> k = 1:4
+    subplot(2, 2, k);
+    u = T*V(:,k);
+    a.plot(u, 0.03/max(abs(u(1:3*size(a.X, 1)))));
+    title(sprintf(<span class="string">'Mode %d: %.1f Hz'</span>, k, f(k)));  view(2);  axis <span class="string">off</span>
+<span class="keyword">end</span>
+
+<span class="comment">% configuration dependence: pose the elbow and rebuild K, M at each angle.</span>
+<span class="comment">% pose() moves link 2 (and its coupling) rigidly about the elbow axis.</span>
+angles = 0:15:90;  fa = zeros(numel(angles), 2);
+<span class="keyword">for</span> k = 1:numel(angles)
+    a.pose(j2, deg2rad(angles(k)));
+    [Kp, Mp, Tp] = a.system();
+    [Vp, fp] = fem.modes(Kp, Mp, 6);
+    U = Tp*Vp;  nz = 3*size(a.X, 1);                      <span class="comment">% in-plane: little z motion</span>
+    inPlane = vecnorm(U(3:3:nz, :)) &lt; 0.5*vecnorm(U(1:nz, :));
+    fi = fp(inPlane);  fa(k,:) = fi(1:2);
+<span class="keyword">end</span>
+disp(table(angles', fa(:,1), fa(:,2), <span class="string">'VariableNames'</span>, {<span class="string">'elbow_deg'</span>, <span class="string">'inplane1_Hz'</span>, <span class="string">'inplane2_Hz'</span>}));
+
+a.pose(j1, deg2rad(30));  a.pose(j2, deg2rad(60));       <span class="comment">% shoulder 30, elbow 60</span>
+[Kp, Mp, Tp] = a.system();  [Vp, fp] = fem.modes(Kp, Mp, 1);
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
+u = Tp*Vp(:,1);
+a.plot(u, 0.03/max(abs(u(1:3*size(a.X, 1)))));
+title(sprintf(<span class="string">'Shoulder 30^o, elbow 60^o: mode 1 at %.1f Hz'</span>, fp));  view(2);
+a.pose(j1, 0);  a.pose(j2, 0);                           <span class="comment">% back to straight</span>
+</pre>
+<pre class="codeoutput">22454 dofs after constraints
+    mode     f_Hz 
+    ____    ______
+
+     1      19.625
+     2      51.599
+     3      128.65
+     4      323.29
+     5      898.09
+     6      1336.2
+
+Craig-Bampton (6 dofs): [19.63 51.6 128.6 323.3] Hz
+Joint-space stiffness (Nm/rad):
+  200.0000   -0.0000
+   -0.0000  200.0000
+
+    elbow_deg    inplane1_Hz    inplane2_Hz
+    _________    ___________    ___________
+
+        0          19.625         128.65   
+       15          19.763         122.77   
+       30          20.186         109.33   
+       45          20.918         94.903   
+       60          22.001         82.692   
+       75          23.495         73.274   
+       90          25.479         66.345   
+
+</pre>
+<img vspace="5" hspace="5" src="demoSerialArm_01.png" alt=""> <img vspace="5" hspace="5" src="demoSerialArm_02.png" alt=""> <p class="footer">
+<br>
+<a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2024a</a>
+<br>
+</p>
+</div>
+<!--
+##### SOURCE BEGIN #####
+%DEMOSERIALARM Two-link arm with revolute joints (couplings and joints).
+%   Two aluminium links are hinged to ground and to each other about z, with
+%   torsion springs in the joints (e.g. motor/gearbox stiffness). The links
+%   are elastic, attached to the joints through rigid couplings (RBE2) on
+%   their end faces; set rigidLinks = true to make them rigid instead.
+%   The model is reduced to the two joint coordinates plus a few modes, and
+%   the arm is posed at different elbow angles (a.pose) to show how the
+%   dynamics depend on the configuration.
+%
+%   ground REPLACE_WITH_DASH_DASH(joint1)REPLACE_WITH_DASH_DASH link1 REPLACE_WITH_DASH_DASH(joint2)REPLACE_WITH_DASH_DASH link2
+
+rigidLinks = false;
+
+addpath(fileparts(fileparts(mfilename('fullpath'))));
+out = fullfile(tempdir, 'femArm');  if ~isfolder(out), mkdir(out); end
+
+% geometry (mm): links along x, 200 x 20 x 10
+fem.boxSTL(fullfile(out, 'link1.stl'), [0 -10 -5],   [200 10 5]);
+fem.boxSTL(fullfile(out, 'link2.stl'), [200 -10 -5], [400 10 5]);
+alu = fem.material(70e9, 0.33, 2700);
+opt = {'Scale', 1e-3, 'Size', 5, 'Rigid', rigidLinks};
+link1 = fem.Body(fullfile(out, 'link1.stl'), alu, opt{:});
+link2 = fem.Body(fullfile(out, 'link2.stl'), alu, opt{:});
+
+a = fem.Assembly();
+a.add(link1);  a.add(link2);
+
+% joint attachment points: the rigid body itself, or a coupling of an end face
+if rigidLinks
+    [p1, p2a, p2b] = deal('link1', 'link1', 'link2');
+else
+    p1  = a.couple('link1', @(X) X(:,1) < 1e-9);          % hub of link 1
+    p2a = a.couple('link1', @(X) X(:,1) > 0.2 - 1e-9);    % elbow, link 1 side
+    p2b = a.couple('link2', @(X) X(:,1) < 0.2 + 1e-9);    % elbow, link 2 side
+end
+kj = 200;                                                 % joint stiffness, Nm/rad
+j1 = a.joint('ground', p1, 'revolute', Point = [0 0 0],   Axis = [0 0 1], Stiffness = kj);
+j2 = a.joint(p2a, p2b,     'revolute', Point = [0.2 0 0], Axis = [0 0 1], Stiffness = kj);
+
+[K, M, T] = a.system();
+[V, f] = fem.modes(K, M, 6);
+fprintf('%d dofs after constraints\n', size(K, 1));
+disp(table((1:6)', f, 'VariableNames', {'mode', 'f_Hz'}));
+
+% actuator-level model: joint coordinates as boundary + 4 elastic modes
+ib = a.qdof([a.dof(j1); a.dof(j2)]);
+[Kc, Mc, Vc] = fem.craigBampton(K, M, ib, 4);
+[~, fc] = fem.modes(Kc, Mc, 4);
+fprintf('Craig-Bampton (%d dofs): %s Hz\n', size(Kc, 1), mat2str(fc', 4));
+disp('Joint-space stiffness (Nm/rad):');  disp(Kc(1:2, 1:2));
+
+figure('Color', 'w');
+for k = 1:4
+    subplot(2, 2, k);
+    u = T*V(:,k);
+    a.plot(u, 0.03/max(abs(u(1:3*size(a.X, 1)))));
+    title(sprintf('Mode %d: %.1f Hz', k, f(k)));  view(2);  axis off
+end
+
+% configuration dependence: pose the elbow and rebuild K, M at each angle.
+% pose() moves link 2 (and its coupling) rigidly about the elbow axis.
+angles = 0:15:90;  fa = zeros(numel(angles), 2);
+for k = 1:numel(angles)
+    a.pose(j2, deg2rad(angles(k)));
+    [Kp, Mp, Tp] = a.system();
+    [Vp, fp] = fem.modes(Kp, Mp, 6);
+    U = Tp*Vp;  nz = 3*size(a.X, 1);                      % in-plane: little z motion
+    inPlane = vecnorm(U(3:3:nz, :)) < 0.5*vecnorm(U(1:nz, :));
+    fi = fp(inPlane);  fa(k,:) = fi(1:2);
+end
+disp(table(angles', fa(:,1), fa(:,2), 'VariableNames', {'elbow_deg', 'inplane1_Hz', 'inplane2_Hz'}));
+
+a.pose(j1, deg2rad(30));  a.pose(j2, deg2rad(60));       % shoulder 30, elbow 60
+[Kp, Mp, Tp] = a.system();  [Vp, fp] = fem.modes(Kp, Mp, 1);
+figure('Color', 'w');
+u = Tp*Vp(:,1);
+a.plot(u, 0.03/max(abs(u(1:3*size(a.X, 1)))));
+title(sprintf('Shoulder 30^o, elbow 60^o: mode 1 at %.1f Hz', fp));  view(2);
+a.pose(j1, 0);  a.pose(j2, 0);                           % back to straight
+
+##### SOURCE END #####
+-->
+</body>
+</html>

@@ -39,6 +39,7 @@ Put the `setenv` line in `startup.m` to keep it across sessions. Run `fem.gmsh('
 check the setup.
 
 ## Documentation
+- **In the MATLAB Help browser:** once the toolbox folder is on the path, the documentation appears under *Supplemental Software*. Open a function's reference page with `doc fem.Assembly`, `doc fem.Body`, etc. The pages are prebuilt in `doc/html`; after editing `doc/src`, the tutorials or the examples, rebuild them with `cd doc; buildDocs`, which runs the tutorials and needs Gmsh.
 - **Tutorials:** [`tutorials/`](tutorials/README.md), nine runnable scripts from a first model to joints, dynamics and Craig–Bampton reduction.
 - **Manual:** [`docs/fem.md`](docs/fem.md) covers the workflow, formulation (elements, ties, elastic joints, rigid bodies, constraint elimination, Craig–Bampton), the API, recipes (loads, gravity, FRF, state space) and limitations.
 - **In MATLAB:** `help fem`, `help fem.Assembly/tie`, etc.

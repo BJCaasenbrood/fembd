@@ -4,5 +4,7 @@
 *.mex*
 slprj/
 
-# publish() output
-html/
+# publish() output (except the built documentation in doc/html)
+/html/
+tutorials/html/
+examples/html/

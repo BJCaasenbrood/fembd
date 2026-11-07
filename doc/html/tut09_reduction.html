@@ -1,0 +1,268 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<META http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      -->
+<title>tut09_reduction</title>
+<meta name="generator" content="MATLAB 24.1">
+<link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
+<meta name="DC.date" content="2026-11-07">
+<meta name="DC.source" content="tut09_reduction.m">
+<style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; }
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+span.typesection { color:#A0522D }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style>
+</head>
+<body>
+<div class="content">
+<h2>Contents</h2>
+<div>
+<ul>
+<li>
+<a href="#1">Tutorial 9 - Model reduction: Guyan and Craig-Bampton</a>
+</li>
+<li>
+<a href="#2">1. Boundary dofs</a>
+</li>
+<li>
+<a href="#3">2. Guyan reduction</a>
+</li>
+<li>
+<a href="#4">3. Craig-Bampton: accuracy vs number of modes</a>
+</li>
+<li>
+<a href="#5">4. Recovering the full field</a>
+</li>
+<li>
+<a href="#6">5. State space of the reduced model</a>
+</li>
+</ul>
+</div>
+<h2 id="1">Tutorial 9 - Model reduction: Guyan and Craig-Bampton</h2>
+<p>Craig-Bampton reduction keeps some boundary dofs (interfaces, actuators, sensors) as physical coordinates, and represents the rest of the structure by a few fixed-interface modes. The result is a small, accurate model for control design, multibody simulation, or coupling to other models. This tutorial covers:</p>
+<div>
+<ul>
+<li>Guyan (static) reduction</li>
+<li>Craig-Bampton accuracy vs the number of modes</li>
+<li>recovering the full displacement field</li>
+<li>state-space models from the reduced matrices</li>
+</ul>
+</div>
+<pre class="codeinput">addpath(fileparts(fileparts(mfilename(<span class="string">'fullpath'</span>))));
+out = fullfile(tempdir, <span class="string">'femTutorials'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
+fem.boxSTL(fullfile(out, <span class="string">'beam.stl'</span>), [0 0 0], [1000 50 50]);
+beam = fem.Body(fullfile(out, <span class="string">'beam.stl'</span>), fem.material(210e9, 0.3, 7850), <span class="keyword">...</span>
+                Size = 25, Scale = 1e-3);
+</pre>
+<h2 id="2">1. Boundary dofs</h2>
+<p>A coupling on the tip face gives the beam an interface with 6 dofs, like a flange. Its reference dofs, mapped into q, are the boundary.</p>
+<pre class="codeinput">a = fem.Assembly();  a.add(beam);  a.fix(<span class="string">'beam'</span>, @(X) X(:,1) &lt; 1e-9);
+tip = a.couple(<span class="string">'beam'</span>, @(X) X(:,1) &gt; 1 - 1e-9, Name = <span class="string">'tip'</span>);
+[K, M, T] = a.system();
+ib = a.qdof(a.dof(<span class="string">'tip'</span>));                      <span class="comment">% [ux uy uz rx ry rz] of the tip</span>
+[~, f] = fem.modes(K, M, 8);
+fprintf(<span class="string">'full model: %d dofs\n'</span>, size(K, 1));
+</pre>
+<pre class="codeoutput">full model: 6774 dofs
+</pre>
+<h2 id="3">2. Guyan reduction</h2>
+<p>n = 0 keeps only the boundary dofs. The rest of the structure follows statically (constraint modes). The static response at the boundary is exact, but frequencies are overestimated because the interior inertia is only approximated.</p>
+<pre class="codeinput">[Kg, Mg, Vg] = fem.craigBampton(K, M, ib, 0);
+b = zeros(size(K, 1), 1);  b(ib(3)) = 1;        <span class="comment">% 1 N in z at the tip</span>
+bg = Vg'*b;                                     <span class="comment">% load in reduced coordinates</span>
+fprintf(<span class="string">'static tip deflection: full %.6e m, Guyan %.6e m\n'</span>, b'*(K\b), bg'*(Kg\bg));
+<span class="comment">% The frequency errors of Guyan reduction are in the n = 0 column below.</span>
+</pre>
+<pre class="codeoutput">static tip deflection: full 3.038926e-06 m, Guyan 3.038926e-06 m
+</pre>
+<h2 id="4">3. Craig-Bampton: accuracy vs number of modes</h2>
+<p>Adding n fixed-interface modes (eta) makes the low frequencies converge quickly. The reduced coordinates are x = [u_b; eta], and q ~ Vc*x.</p>
+<pre class="codeinput">nModes = [0 2 5 10];  err = zeros(4, numel(nModes));
+<span class="keyword">for</span> k = 1:numel(nModes)
+    [Kc, Mc] = fem.craigBampton(K, M, ib, nModes(k));
+    [~, fc] = fem.modes(Kc, Mc, 4);
+    err(:,k) = 100*(fc./f(1:4) - 1);
+<span class="keyword">end</span>
+disp(array2table(err, <span class="string">'VariableNames'</span>, compose(<span class="string">'n=%d'</span>, nModes), <span class="keyword">...</span>
+     <span class="string">'RowNames'</span>, compose(<span class="string">'mode %d error %%'</span>, 1:4)));
+</pre>
+<pre class="codeoutput">                        n=0        n=2          n=5          n=10   
+                      _______    ________    _________    __________
+
+    mode 1 error %    0.48772    0.038032    0.0021781    0.00079942
+    mode 2 error %    0.48712    0.037938     0.006821    0.00079574
+    mode 3 error %     58.151     0.45466     0.047034      0.020668
+    mode 4 error %     58.119     0.45249      0.12859      0.020548
+
+</pre>
+<h2 id="5">4. Recovering the full field</h2>
+<p>A reduced solution x maps back to the full displacements: u = T*Vc*x.</p>
+<pre class="codeinput">[Kc, Mc, Vc] = fem.craigBampton(K, M, ib, 10);
+[Xc, fc] = fem.modes(Kc, Mc, 1);
+u = T*Vc*Xc(:,1);
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);  a.plot(u, 0.1/max(abs(u(1:3*size(a.X, 1)))));
+title(sprintf(<span class="string">'Mode 1 from the %d-dof CB model: %.2f Hz'</span>, size(Kc, 1), fc));
+</pre>
+<img vspace="5" hspace="5" src="tut09_reduction_01.png" alt=""> <h2 id="6">5. State space of the reduced model</h2>
+<p>The reduced matrices are small and dense, so the standard first-order form is fine. Input: z force at the tip; output: z displacement there.</p>
+<pre class="codeinput">nr = size(Kc, 1);  Dc = 1e-5*Kc;                <span class="comment">% stiffness-proportional damping</span>
+A = [zeros(nr), eye(nr); -Mc\Kc, -Mc\Dc];
+B = [zeros(nr, 1); Mc\((1:nr)' == 3)];
+C = [(1:nr) == 3, zeros(1, nr)];
+fHz = logspace(0, 3, 300);
+H  = arrayfun(@(w) C*((2i*pi*w*eye(2*nr) - A)\B), fHz);
+Hf = arrayfun(@(w) b'*((K + 2i*pi*w*1e-5*K - (2*pi*w)^2*M)\b), fHz);
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
+loglog(fHz, abs(Hf), fHz, abs(H), <span class="string">'--'</span>);  grid <span class="string">on</span>
+xlabel(<span class="string">'frequency (Hz)'</span>);  ylabel(<span class="string">'|u_z/F_z| (m/N)'</span>);
+legend(sprintf(<span class="string">'full (%d dofs)'</span>, size(K, 1)), sprintf(<span class="string">'Craig-Bampton (%d dofs)'</span>, nr));
+<span class="comment">% With the Control System Toolbox: sys = ss(A, B, C, 0); bode(sys)</span>
+</pre>
+<img vspace="5" hspace="5" src="tut09_reduction_02.png" alt=""> <p class="footer">
+<br>
+<a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2024a</a>
+<br>
+</p>
+</div>
+<!--
+##### SOURCE BEGIN #####
+%% Tutorial 9 - Model reduction: Guyan and Craig-Bampton
+% Craig-Bampton reduction keeps some boundary dofs (interfaces,
+% actuators, sensors) as physical coordinates, and represents the rest of
+% the structure by a few fixed-interface modes. The result is a small,
+% accurate model for control design, multibody simulation, or coupling to
+% other models. This tutorial covers:
+%
+% * Guyan (static) reduction
+% * Craig-Bampton accuracy vs the number of modes
+% * recovering the full displacement field
+% * state-space models from the reduced matrices
+
+addpath(fileparts(fileparts(mfilename('fullpath'))));
+out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
+fem.boxSTL(fullfile(out, 'beam.stl'), [0 0 0], [1000 50 50]);
+beam = fem.Body(fullfile(out, 'beam.stl'), fem.material(210e9, 0.3, 7850), ...
+                Size = 25, Scale = 1e-3);
+
+%% 1. Boundary dofs
+% A coupling on the tip face gives the beam an interface with 6 dofs, like
+% a flange. Its reference dofs, mapped into q, are the boundary.
+a = fem.Assembly();  a.add(beam);  a.fix('beam', @(X) X(:,1) < 1e-9);
+tip = a.couple('beam', @(X) X(:,1) > 1 - 1e-9, Name = 'tip');
+[K, M, T] = a.system();
+ib = a.qdof(a.dof('tip'));                      % [ux uy uz rx ry rz] of the tip
+[~, f] = fem.modes(K, M, 8);
+fprintf('full model: %d dofs\n', size(K, 1));
+
+%% 2. Guyan reduction
+% n = 0 keeps only the boundary dofs. The rest of the structure follows
+% statically (constraint modes). The static response at the boundary is
+% exact, but frequencies are overestimated because the interior inertia is
+% only approximated.
+[Kg, Mg, Vg] = fem.craigBampton(K, M, ib, 0);
+b = zeros(size(K, 1), 1);  b(ib(3)) = 1;        % 1 N in z at the tip
+bg = Vg'*b;                                     % load in reduced coordinates
+fprintf('static tip deflection: full %.6e m, Guyan %.6e m\n', b'*(K\b), bg'*(Kg\bg));
+% The frequency errors of Guyan reduction are in the n = 0 column below.
+
+%% 3. Craig-Bampton: accuracy vs number of modes
+% Adding n fixed-interface modes (eta) makes the low frequencies converge
+% quickly. The reduced coordinates are x = [u_b; eta], and q ~ Vc*x.
+nModes = [0 2 5 10];  err = zeros(4, numel(nModes));
+for k = 1:numel(nModes)
+    [Kc, Mc] = fem.craigBampton(K, M, ib, nModes(k));
+    [~, fc] = fem.modes(Kc, Mc, 4);
+    err(:,k) = 100*(fc./f(1:4) - 1);
+end
+disp(array2table(err, 'VariableNames', compose('n=%d', nModes), ...
+     'RowNames', compose('mode %d error %%', 1:4)));
+
+%% 4. Recovering the full field
+% A reduced solution x maps back to the full displacements: u = T*Vc*x.
+[Kc, Mc, Vc] = fem.craigBampton(K, M, ib, 10);
+[Xc, fc] = fem.modes(Kc, Mc, 1);
+u = T*Vc*Xc(:,1);
+figure('Color', 'w');  a.plot(u, 0.1/max(abs(u(1:3*size(a.X, 1)))));
+title(sprintf('Mode 1 from the %d-dof CB model: %.2f Hz', size(Kc, 1), fc));
+
+%% 5. State space of the reduced model
+% The reduced matrices are small and dense, so the standard first-order
+% form is fine. Input: z force at the tip; output: z displacement there.
+nr = size(Kc, 1);  Dc = 1e-5*Kc;                % stiffness-proportional damping
+A = [zeros(nr), eye(nr); -Mc\Kc, -Mc\Dc];
+B = [zeros(nr, 1); Mc\((1:nr)' == 3)];
+C = [(1:nr) == 3, zeros(1, nr)];
+fHz = logspace(0, 3, 300);
+H  = arrayfun(@(w) C*((2i*pi*w*eye(2*nr) - A)\B), fHz);
+Hf = arrayfun(@(w) b'*((K + 2i*pi*w*1e-5*K - (2*pi*w)^2*M)\b), fHz);
+figure('Color', 'w');
+loglog(fHz, abs(Hf), fHz, abs(H), 'REPLACE_WITH_DASH_DASH');  grid on
+xlabel('frequency (Hz)');  ylabel('|u_z/F_z| (m/N)');
+legend(sprintf('full (%d dofs)', size(K, 1)), sprintf('Craig-Bampton (%d dofs)', nr));
+% With the Control System Toolbox: sys = ss(A, B, C, 0); bode(sys)
+
+##### SOURCE END #####
+-->
+</body>
+</html>

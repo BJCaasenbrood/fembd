@@ -1,5 +1,5 @@
 % FEM  Linear-elastic finite elements for STL assemblies
-%   Manual: docs/fem.md    Tutorials: tutorials/README.md
+%   Documentation: Help browser, Supplemental Software    Manual: docs/fem.md
 %
 % Model
 %   Body          - Elastic or rigid body: Gmsh Tet4/Tet10 mesh, material, K and M
@@ -16,6 +16,7 @@
 %   gmsh          - Run the Gmsh executable ($GMSH or gmsh on the PATH)
 %   boxSTL        - Write an axis-aligned box as STL
 %   cylinderSTL   - Write a z-aligned cylinder as STL
+
 %
 % Example
 %   steel = fem.material(210e9, 0.3, 7850);

@@ -1,0 +1,242 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<META http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      -->
+<title>Connections: Ties, Couplings and Joints</title>
+<meta name="generator" content="MATLAB 24.1">
+<link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
+<meta name="DC.date" content="2026-11-07">
+<meta name="DC.source" content="fem_connections.m">
+<style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; }
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+span.typesection { color:#A0522D }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style>
+</head>
+<body>
+<div class="content">
+<h1>Connections: Ties, Couplings and Joints</h1>
+<!--introduction-->
+<p>Bodies are meshed separately, so their meshes do not match at interfaces. They are connected by ties (surface to surface), couplings (a rigid patch on an elastic body) and joints (between reference points).</p>
+<!--/introduction-->
+<h2>Contents</h2>
+<div>
+<ul>
+<li>
+<a href="#1">Bonded ties</a>
+</li>
+<li>
+<a href="#2">Elastic interfaces</a>
+</li>
+<li>
+<a href="#3">Couplings</a>
+</li>
+<li>
+<a href="#4">Joints</a>
+</li>
+<li>
+<a href="#5">Closed loops</a>
+</li>
+<li>
+<a href="#6">Posing joints</a>
+</li>
+<li>
+<a href="#7">See also</a>
+</li>
+</ul>
+</div>
+<h2 id="1">Bonded ties</h2>
+<pre class="language-matlab">ns = a.tie(master, slave, Tol=, Stiffness=, Select=)
+</pre>
+<p>Slave surface nodes within <tt>Tol</tt> of the master surface are constrained to the point of the master face they touch:</p>
+<p>
+<img src="fem_connections_eq09945742923315576267.png" alt="$$u_s = \sum_j N_j(\xi)\, u_{m,j}$$" style="width:144px;height:42px;"></p>
+<p>The constraint is exact and is removed in T. Use the finer mesh as slave. <tt>Tol</tt> defaults to 10% of the median face edge of the finer surface; <tt>Select</tt> restricts the slave nodes (e.g. partial bonding). A rigid body is always made the master. See <a href="tut04_ties.html">Tutorial 4</a>.</p>
+<h2 id="2">Elastic interfaces</h2>
+<p>With <tt>Stiffness = [kn kt]</tt> (N/m^3, per unit area, normal and tangential) the slave nodes are connected by distributed springs instead: a glue layer, rubber pad or contact stiffness. A scalar sets kn = kt.</p>
+<h2 id="3">Couplings</h2>
+<pre class="language-matlab">r = a.couple(body, sel, Name=, Point=)
+</pre>
+<p>A coupling (like Nastran's RBE2) makes the selected nodes of an elastic body follow a new 6-dof reference point (at their centroid, or <tt>Point</tt>), e.g. a bearing bore or an end face. It returns the reference name, which can be used in joints, supports and <tt>a.dof</tt>.</p>
+<h2 id="4">Joints</h2>
+<pre class="language-matlab">j = a.joint(A, B, type, Point=, Axis=, Frame=, Free=, Stiffness=, Name=)
+</pre>
+<p>A joint connects reference point B (a rigid body or a coupling) to A, which may be <tt>'ground'</tt>. B follows A except for the released directions, which become joint coordinates: ordinary dofs that can be loaded, supported (locked), used as outputs or as Craig-Bampton boundary dofs. <tt>Stiffness</tt> adds springs on them.</p>
+<p>
+<table border="1" cellpadding="4" style="border-collapse:collapse">
+<tr><th>Type</th><th>Free in the joint frame</th></tr>
+<tr><td>fixed</td><td>none</td></tr>
+<tr><td>revolute</td><td>rz (about Axis)</td></tr>
+<tr><td>prismatic</td><td>uz (along Axis)</td></tr>
+<tr><td>cylindrical</td><td>uz, rz</td></tr>
+<tr><td>spherical</td><td>rx, ry, rz</td></tr>
+<tr><td>planar</td><td>ux, uy, rz (in the plane normal to Axis)</td></tr>
+<tr><td>free</td><td>all six: a bushing, with Stiffness</td></tr>
+</table>
+</p>
+<p>
+<tt>Free</tt> gives any other mask [ux uy uz rx ry rz]. Released directions without stiffness are mechanisms: they appear as 0 Hz modes.</p>
+<h2 id="5">Closed loops</h2>
+<p>Joints may close kinematic loops (e.g. a four-bar linkage). Joints are processed in creation order; a joint that closes a loop, or whose B side already follows another joint or is supported, becomes a cut joint. Its constraint is removed exactly by QR coordinate partitioning, which also detects redundant constraints (planar loops in 3D). Define driving joints first: their coordinates stay independent.</p>
+<h2 id="6">Posing joints</h2>
+<pre class="language-matlab">a.pose(joint, value)
+</pre>
+<p>Sets a joint to a finite angle (rad) or offset (m), relative to the pose in which it was created, and moves everything on its B side rigidly. The next <tt>a.system()</tt> is linearised about the new pose. Posing a closed loop is not supported yet. See <a href="tut07_joints.html">Tutorial 7</a> and the <a href="demoSerialArm.html">two-link arm example</a>.</p>
+<h2 id="7">See also</h2>
+<p>
+<a href="matlab:doc('fem.Assembly')">fem.Assembly</a>, <a href="fem_system.html">Dofs, Supports, Loads and the System</a>
+</p>
+<p class="footer">
+<br>
+<a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2024a</a>
+<br>
+</p>
+</div>
+<!--
+##### SOURCE BEGIN #####
+%% Connections: Ties, Couplings and Joints
+% Bodies are meshed separately, so their meshes do not match at
+% interfaces. They are connected by ties (surface to surface), couplings
+% (a rigid patch on an elastic body) and joints (between reference
+% points).
+%
+%% Bonded ties
+%
+%   ns = a.tie(master, slave, Tol=, Stiffness=, Select=)
+%
+% Slave surface nodes within |Tol| of the master surface are constrained
+% to the point of the master face they touch:
+%
+% $$u_s = \sum_j N_j(\xi)\, u_{m,j}$$
+%
+% The constraint is exact and is removed in T. Use the finer mesh as
+% slave. |Tol| defaults to 10% of the median face edge of the finer
+% surface; |Select| restricts the slave nodes (e.g. partial bonding). A
+% rigid body is always made the master. See <tut04_ties.html Tutorial 4>.
+%
+%% Elastic interfaces
+% With |Stiffness = [kn kt]| (N/m^3, per unit area, normal and tangential)
+% the slave nodes are connected by distributed springs instead: a glue
+% layer, rubber pad or contact stiffness. A scalar sets kn = kt.
+%
+%% Couplings
+%
+%   r = a.couple(body, sel, Name=, Point=)
+%
+% A coupling (like Nastran's RBE2) makes the selected nodes of an elastic
+% body follow a new 6-dof reference point (at their centroid, or
+% |Point|), e.g. a bearing bore or an end face. It returns the reference
+% name, which can be used in joints, supports and |a.dof|.
+%
+%% Joints
+%
+%   j = a.joint(A, B, type, Point=, Axis=, Frame=, Free=, Stiffness=, Name=)
+%
+% A joint connects reference point B (a rigid body or a coupling) to A,
+% which may be |'ground'|. B follows A except for the released
+% directions, which become joint coordinates: ordinary dofs that can be
+% loaded, supported (locked), used as outputs or as Craig-Bampton
+% boundary dofs. |Stiffness| adds springs on them.
+%
+% <html>
+% <table border="1" cellpadding="4" style="border-collapse:collapse">
+% <tr><th>Type</th><th>Free in the joint frame</th></tr>
+% <tr><td>fixed</td><td>none</td></tr>
+% <tr><td>revolute</td><td>rz (about Axis)</td></tr>
+% <tr><td>prismatic</td><td>uz (along Axis)</td></tr>
+% <tr><td>cylindrical</td><td>uz, rz</td></tr>
+% <tr><td>spherical</td><td>rx, ry, rz</td></tr>
+% <tr><td>planar</td><td>ux, uy, rz (in the plane normal to Axis)</td></tr>
+% <tr><td>free</td><td>all six: a bushing, with Stiffness</td></tr>
+% </table>
+% </html>
+%
+% |Free| gives any other mask [ux uy uz rx ry rz]. Released directions
+% without stiffness are mechanisms: they appear as 0 Hz modes.
+%
+%% Closed loops
+% Joints may close kinematic loops (e.g. a four-bar linkage). Joints are
+% processed in creation order; a joint that closes a loop, or whose B side
+% already follows another joint or is supported, becomes a cut joint. Its
+% constraint is removed exactly by QR coordinate partitioning, which also
+% detects redundant constraints (planar loops in 3D). Define driving
+% joints first: their coordinates stay independent.
+%
+%% Posing joints
+%
+%   a.pose(joint, value)
+%
+% Sets a joint to a finite angle (rad) or offset (m), relative to the pose
+% in which it was created, and moves everything on its B side rigidly.
+% The next |a.system()| is linearised about the new pose. Posing a closed
+% loop is not supported yet. See <tut07_joints.html Tutorial 7> and the
+% <demoSerialArm.html two-link arm example>.
+%
+%% See also
+% <matlab:doc('fem.Assembly') fem.Assembly>, <fem_system.html Dofs, Supports, Loads and the System>
+
+##### SOURCE END #####
+-->
+</body>
+</html>

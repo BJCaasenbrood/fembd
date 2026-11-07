@@ -1,0 +1,221 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<META http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      -->
+<title>demoAssembly</title>
+<meta name="generator" content="MATLAB 24.1">
+<link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
+<meta name="DC.date" content="2026-11-07">
+<meta name="DC.source" content="demoAssembly.m">
+<style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; }
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+span.typesection { color:#A0522D }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style>
+</head>
+<body>
+<div class="content">
+<pre class="codeinput">
+<span class="comment">%DEMOASSEMBLY Modal analysis of a three-part STL assembly.</span>
+<span class="comment">%   An elastic base plate and pillar, meshed separately (non-conforming), and</span>
+<span class="comment">%   a rigid top plate (payload) are connected, clamped at the bottom, and</span>
+<span class="comment">%   reduced to K, M for dynamic analysis. Requires Gmsh (set GMSH if needed).</span>
+
+addpath(fileparts(fileparts(mfilename(<span class="string">'fullpath'</span>))));
+out = fullfile(tempdir, <span class="string">'femDemo'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
+
+<span class="comment">% geometry in mm, written as STL files (stand-in for a CAD export)</span>
+fem.boxSTL(fullfile(out, <span class="string">'base.stl'</span>), [-40 -40 0], [40 40 10]);
+fem.cylinderSTL(fullfile(out, <span class="string">'pillar.stl'</span>), [0 0], 8, 10, 110);
+fem.boxSTL(fullfile(out, <span class="string">'top.stl'</span>),  [-25 -25 110], [25 25 116]);
+
+<span class="comment">% bodies: mesh with Gmsh, mm -&gt; m, assign materials</span>
+steel = fem.material(210e9, 0.30, 7850);
+alu   = fem.material(70e9,  0.33, 2700);
+base   = fem.Body(fullfile(out, <span class="string">'base.stl'</span>),   steel, Size = 8, Scale = 1e-3);
+pillar = fem.Body(fullfile(out, <span class="string">'pillar.stl'</span>), alu,   Size = 3, Scale = 1e-3);
+top    = fem.Body(fullfile(out, <span class="string">'top.stl'</span>),    steel, Size = 6, Scale = 1e-3, Rigid = true);
+
+<span class="comment">% assembly: connections and boundary conditions</span>
+a = fem.Assembly();
+a.add(base);  a.add(pillar);  a.add(top);
+a.tie(<span class="string">'base'</span>, <span class="string">'pillar'</span>);                    <span class="comment">% bonded (finer mesh as slave)</span>
+a.tie(<span class="string">'pillar'</span>, <span class="string">'top'</span>, Stiffness = 1e13);   <span class="comment">% elastic joint to the rigid plate, N/m^3</span>
+a.fix(<span class="string">'base'</span>, @(X) X(:,3) &lt; 1e-9);          <span class="comment">% clamp bottom face</span>
+
+tic;  [K, M, T] = a.system();  t = toc;
+fprintf(<span class="string">'%d dofs (%d after constraints), assembled in %.1f s\n'</span>, a.nDof, size(K, 1), t);
+
+<span class="comment">% natural frequencies and modes</span>
+[V, f] = fem.modes(K, M, 6);
+
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
+<span class="keyword">for</span> k = 1:4
+    subplot(1, 4, k);
+    u = T*V(:,k);                            <span class="comment">% node dofs, then rigid-body dofs</span>
+    a.plot(u, 0.03/max(abs(u(1:3*size(a.X, 1)))));
+    title(sprintf(<span class="string">'Mode %d: %.0f Hz'</span>, k, f(k)));  axis <span class="string">off</span>
+<span class="keyword">end</span>
+
+<span class="comment">% Craig-Bampton model: the 6 dofs of the rigid top plate (at its centroid)</span>
+<span class="comment">% are kept as boundary, plus 20 fixed-interface modes</span>
+ib = a.qdof(a.dof(<span class="string">'top'</span>));                   <span class="comment">% [ux uy uz rx ry rz], indices into q</span>
+[Kc, Mc, Vc] = fem.craigBampton(K, M, ib, 20);
+[~, fc] = fem.modes(Kc, Mc, 6);
+
+<span class="comment">% lumped-mass model, e.g. for explicit time integration</span>
+[Kl, Ml] = a.system(Lumped = true);
+[~, fl] = fem.modes(Kl, Ml, 6);
+disp(table((1:6)', f, fc, fl, <span class="string">'VariableNames'</span>, {<span class="string">'mode'</span>, <span class="string">'full_Hz'</span>, <span class="string">'CB_Hz'</span>, <span class="string">'lumped_Hz'</span>}));
+
+<span class="comment">% state space of the 26-dof CB model: vertical force in, vertical displacement out.</span>
+<span class="comment">% The full displacement field is u = T*Vc*x(1:nr).</span>
+nr = size(Kc, 1);  Dc = 1e-5*Kc + 1*Mc;      <span class="comment">% Rayleigh damping</span>
+A  = [zeros(nr), eye(nr); -Mc\Kc, -Mc\Dc];
+Bu = [zeros(nr, 1); Mc\((1:nr)' == 3)];      <span class="comment">% x(3) is the plate's uz</span>
+Cy = [(1:nr) == 3, zeros(1, nr)];
+</pre>
+<pre class="codeoutput">31863 dofs (25104 after constraints), assembled in 0.7 s
+    mode    full_Hz    CB_Hz     lumped_Hz
+    ____    _______    ______    _________
+
+     1      335.24     335.24     335.16  
+     2      335.45     335.45     335.37  
+     3      909.41     909.41     907.13  
+     4      2474.7     2474.7     2464.2  
+     5      2477.9     2477.9     2467.6  
+     6      4942.3     4942.3     4942.2  
+
+</pre>
+<img vspace="5" hspace="5" src="demoAssembly_01.png" alt=""> <p class="footer">
+<br>
+<a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2024a</a>
+<br>
+</p>
+</div>
+<!--
+##### SOURCE BEGIN #####
+%DEMOASSEMBLY Modal analysis of a three-part STL assembly.
+%   An elastic base plate and pillar, meshed separately (non-conforming), and
+%   a rigid top plate (payload) are connected, clamped at the bottom, and
+%   reduced to K, M for dynamic analysis. Requires Gmsh (set GMSH if needed).
+
+addpath(fileparts(fileparts(mfilename('fullpath'))));
+out = fullfile(tempdir, 'femDemo');  if ~isfolder(out), mkdir(out); end
+
+% geometry in mm, written as STL files (stand-in for a CAD export)
+fem.boxSTL(fullfile(out, 'base.stl'), [-40 -40 0], [40 40 10]);
+fem.cylinderSTL(fullfile(out, 'pillar.stl'), [0 0], 8, 10, 110);
+fem.boxSTL(fullfile(out, 'top.stl'),  [-25 -25 110], [25 25 116]);
+
+% bodies: mesh with Gmsh, mm -> m, assign materials
+steel = fem.material(210e9, 0.30, 7850);
+alu   = fem.material(70e9,  0.33, 2700);
+base   = fem.Body(fullfile(out, 'base.stl'),   steel, Size = 8, Scale = 1e-3);
+pillar = fem.Body(fullfile(out, 'pillar.stl'), alu,   Size = 3, Scale = 1e-3);
+top    = fem.Body(fullfile(out, 'top.stl'),    steel, Size = 6, Scale = 1e-3, Rigid = true);
+
+% assembly: connections and boundary conditions
+a = fem.Assembly();
+a.add(base);  a.add(pillar);  a.add(top);
+a.tie('base', 'pillar');                    % bonded (finer mesh as slave)
+a.tie('pillar', 'top', Stiffness = 1e13);   % elastic joint to the rigid plate, N/m^3
+a.fix('base', @(X) X(:,3) < 1e-9);          % clamp bottom face
+
+tic;  [K, M, T] = a.system();  t = toc;
+fprintf('%d dofs (%d after constraints), assembled in %.1f s\n', a.nDof, size(K, 1), t);
+
+% natural frequencies and modes
+[V, f] = fem.modes(K, M, 6);
+
+figure('Color', 'w');
+for k = 1:4
+    subplot(1, 4, k);
+    u = T*V(:,k);                            % node dofs, then rigid-body dofs
+    a.plot(u, 0.03/max(abs(u(1:3*size(a.X, 1)))));
+    title(sprintf('Mode %d: %.0f Hz', k, f(k)));  axis off
+end
+
+% Craig-Bampton model: the 6 dofs of the rigid top plate (at its centroid)
+% are kept as boundary, plus 20 fixed-interface modes
+ib = a.qdof(a.dof('top'));                   % [ux uy uz rx ry rz], indices into q
+[Kc, Mc, Vc] = fem.craigBampton(K, M, ib, 20);
+[~, fc] = fem.modes(Kc, Mc, 6);
+
+% lumped-mass model, e.g. for explicit time integration
+[Kl, Ml] = a.system(Lumped = true);
+[~, fl] = fem.modes(Kl, Ml, 6);
+disp(table((1:6)', f, fc, fl, 'VariableNames', {'mode', 'full_Hz', 'CB_Hz', 'lumped_Hz'}));
+
+% state space of the 26-dof CB model: vertical force in, vertical displacement out.
+% The full displacement field is u = T*Vc*x(1:nr).
+nr = size(Kc, 1);  Dc = 1e-5*Kc + 1*Mc;      % Rayleigh damping
+A  = [zeros(nr), eye(nr); -Mc\Kc, -Mc\Dc];
+Bu = [zeros(nr, 1); Mc\((1:nr)' == 3)];      % x(3) is the plate's uz
+Cy = [(1:nr) == 3, zeros(1, nr)];
+
+##### SOURCE END #####
+-->
+</body>
+</html>

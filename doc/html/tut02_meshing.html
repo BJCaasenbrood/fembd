@@ -1,0 +1,297 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<META http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      -->
+<title>tut02_meshing</title>
+<meta name="generator" content="MATLAB 24.1">
+<link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
+<meta name="DC.date" content="2026-11-07">
+<meta name="DC.source" content="tut02_meshing.m">
+<style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; }
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+span.typesection { color:#A0522D }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style>
+</head>
+<body>
+<div class="content">
+<h2>Contents</h2>
+<div>
+<ul>
+<li>
+<a href="#1">Tutorial 2 - Meshing: STL, Gmsh, element order and convergence</a>
+</li>
+<li>
+<a href="#2">1. Checking Gmsh</a>
+</li>
+<li>
+<a href="#3">2. Meshing an STL directly</a>
+</li>
+<li>
+<a href="#4">3. Tet4 vs Tet10: a convergence study</a>
+</li>
+<li>
+<a href="#5">4. Curved surfaces and Tet10</a>
+</li>
+<li>
+<a href="#6">5. Meshes from the Gmsh GUI</a>
+</li>
+<li>
+<a href="#7">6. Units and placement</a>
+</li>
+</ul>
+</div>
+<h2 id="1">Tutorial 2 - Meshing: STL, Gmsh, element order and convergence</h2>
+<p>This tutorial covers:</p>
+<div>
+<ul>
+<li>
+<tt>fem.meshSTL</tt> options: <tt>Size</tt>, <tt>Order</tt>, <tt>Remesh</tt>, <tt>FeatureAngle</tt>
+</li>
+<li>Tet4 vs Tet10 elements, and a mesh convergence study</li>
+<li>loading meshes made in the Gmsh GUI (<tt>fem.readMsh</tt>)</li>
+<li>placing parts with <tt>Scale</tt> and <tt>transform</tt>
+</li>
+</ul>
+</div>
+<pre class="codeinput">addpath(fileparts(fileparts(mfilename(<span class="string">'fullpath'</span>))));
+out = fullfile(tempdir, <span class="string">'femTutorials'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
+</pre>
+<h2 id="2">1. Checking Gmsh</h2>
+<p>The toolbox calls the Gmsh executable. It uses the GMSH environment variable if set, otherwise 'gmsh' on the PATH, e.g. setenv('GMSH', 'C:\gmsh-4.13.1-Windows64\gmsh.exe')</p>
+<pre class="codeinput">fem.gmsh(<span class="string">'--version'</span>);
+</pre>
+<pre class="codeoutput">4.12.1
+</pre>
+<h2 id="3">2. Meshing an STL directly</h2>
+<p>
+<tt>fem.meshSTL</tt> returns nodes X (n x 3) and tetrahedra T (ne x 4 or 10). With Remesh = true (default), Gmsh splits the STL into smooth patches, using FeatureAngle to detect edges, and remeshes them to the requested Size. This helps with CAD STLs, which are full of long thin triangles. Remesh = false keeps the STL triangles as the boundary of the mesh.</p>
+<pre class="codeinput">cyl = fullfile(out, <span class="string">'cylinder.stl'</span>);
+fem.cylinderSTL(cyl, [0 0], 10, 0, 60);               <span class="comment">% r = 10, height 60 (mm)</span>
+[X1, T1] = fem.meshSTL(cyl, Size = 4);
+[X2, T2] = fem.meshSTL(cyl, Remesh = false);
+fprintf(<span class="string">'remeshed: %d tets, STL kept as boundary: %d tets\n'</span>, size(T1, 1), size(T2, 1));
+
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
+subplot(1, 2, 1);  tetramesh(T1(:,1:4), X1, <span class="string">'FaceAlpha'</span>, 0.1);  axis <span class="string">equal</span>;  title(<span class="string">'Remesh = true'</span>);
+subplot(1, 2, 2);  tetramesh(T2(:,1:4), X2, <span class="string">'FaceAlpha'</span>, 0.1);  axis <span class="string">equal</span>;  title(<span class="string">'Remesh = false'</span>);
+</pre>
+<pre class="codeoutput">remeshed: 1615 tets, STL kept as boundary: 232 tets
+</pre>
+<img vspace="5" hspace="5" src="tut02_meshing_01.png" alt=""> <h2 id="4">3. Tet4 vs Tet10: a convergence study</h2>
+<p>Linear tetrahedra (Tet4) are too stiff in bending ("locking") and need very fine meshes. Quadratic Tet10 elements are accurate on coarse meshes and are the default. We compute the first cantilever frequency on increasingly fine meshes and compare with Euler-Bernoulli.</p>
+<pre class="codeinput">beam = fullfile(out, <span class="string">'beam.stl'</span>);
+fem.boxSTL(beam, [0 0 0], [1000 50 50]);
+steel = fem.material(210e9, 0.3, 7850);
+fEB = 1.875104^2/(2*pi)*sqrt(210e9*0.05^4/12/(7850*0.05^2));
+sizes = [50 25 12.5];
+err = zeros(2, numel(sizes));  ndof = err;
+<span class="keyword">for</span> order = 1:2
+    <span class="keyword">for</span> k = 1:numel(sizes)
+        b = fem.Body(beam, steel, Size = sizes(k), Order = order, Scale = 1e-3);
+        a = fem.Assembly();  a.add(b);  a.fix(1, @(X) X(:,1) &lt; 1e-9);
+        [K, M] = a.system();
+        [~, f] = fem.modes(K, M, 1);
+        err(order, k) = f/fEB - 1;  ndof(order, k) = size(K, 1);
+    <span class="keyword">end</span>
+<span class="keyword">end</span>
+disp(array2table(100*err, <span class="string">'VariableNames'</span>, compose(<span class="string">'h=%g'</span>, sizes), <span class="keyword">...</span>
+     <span class="string">'RowNames'</span>, {<span class="string">'Tet4 error %'</span>, <span class="string">'Tet10 error %'</span>}));
+
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
+loglog(ndof', abs(err'), <span class="string">'o-'</span>);  grid <span class="string">on</span>
+xlabel(<span class="string">'dofs'</span>);  ylabel(<span class="string">'|f_1/f_{EB} - 1|'</span>);  legend(<span class="string">'Tet4'</span>, <span class="string">'Tet10'</span>);
+title(<span class="string">'Convergence of the first bending frequency'</span>);
+</pre>
+<pre class="codeoutput">                      h=50       h=25       h=12.5 
+                     _______    _______    ________
+
+    Tet4 error %      43.349      30.32      9.1315
+    Tet10 error %    0.20855    0.12066    0.064954
+
+</pre>
+<img vspace="5" hspace="5" src="tut02_meshing_02.png" alt=""> <h2 id="5">4. Curved surfaces and Tet10</h2>
+<p>Tet10 edge nodes are placed on the curved surface that Gmsh reconstructs from the STL. On coarse meshes of small radii this can fold an element; meshSTL then remeshes with straight-sided Tet10 and gives a warning. A smaller Size keeps the curved geometry.</p>
+<h2 id="6">5. Meshes from the Gmsh GUI</h2>
+<p>For full control (local refinement, physical groups, ...), mesh in Gmsh yourself and save as ASCII .msh, version 2.2 or 4.1. Pass the .msh file to fem.Body, or read it with fem.readMsh. Here we create such a file through fem.gmsh, which takes any Gmsh command-line arguments.</p>
+<pre class="codeinput">geo = fullfile(out, <span class="string">'block.geo'</span>);
+writelines([<span class="string">'SetFactory("OpenCASCADE"); Box(1) = {0, 0, 0, 100, 40, 20};'</span> <span class="keyword">...</span>
+            <span class="string">'Mesh.MeshSizeMax = 8; Mesh.ElementOrder = 2;'</span>], geo);
+msh = fullfile(out, <span class="string">'block.msh'</span>);
+fem.gmsh(sprintf(<span class="string">'"%s" -3 -format msh41 -o "%s" -v 0'</span>, geo, msh));
+block = fem.Body(msh, steel, Scale = 1e-3);
+fprintf(<span class="string">'%s.msh: %d nodes, %d elements\n'</span>, block.Name, block.nNode, size(block.T, 1));
+</pre>
+<pre class="codeoutput">block.msh: 1941 nodes, 980 elements
+</pre>
+<h2 id="7">6. Units and placement</h2>
+<p>Scale converts coordinates after meshing, so Size stays in file units. <tt>transform(R, t)</tt> moves a body rigidly (x -&gt; R*x + t), e.g. to place the same part twice in an assembly.</p>
+<pre class="codeinput">copy = fem.Body(msh, steel, Scale = 1e-3, Name = <span class="string">'block2'</span>);
+Rz = [0 -1 0; 1 0 0; 0 0 1];                      <span class="comment">% 90 degrees about z</span>
+copy.transform(Rz, [0.2 0 0]);
+a = fem.Assembly();  a.add(block);  a.add(copy);
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);  a.plot();  title(<span class="string">'Two placed copies of one mesh'</span>);
+</pre>
+<img vspace="5" hspace="5" src="tut02_meshing_03.png" alt=""> <p class="footer">
+<br>
+<a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2024a</a>
+<br>
+</p>
+</div>
+<!--
+##### SOURCE BEGIN #####
+%% Tutorial 2 - Meshing: STL, Gmsh, element order and convergence
+% This tutorial covers:
+%
+% * |fem.meshSTL| options: |Size|, |Order|, |Remesh|, |FeatureAngle|
+% * Tet4 vs Tet10 elements, and a mesh convergence study
+% * loading meshes made in the Gmsh GUI (|fem.readMsh|)
+% * placing parts with |Scale| and |transform|
+
+addpath(fileparts(fileparts(mfilename('fullpath'))));
+out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
+
+%% 1. Checking Gmsh
+% The toolbox calls the Gmsh executable. It uses the GMSH environment
+% variable if set, otherwise 'gmsh' on the PATH, e.g.
+%   setenv('GMSH', 'C:\gmsh-4.13.1-Windows64\gmsh.exe')
+fem.gmsh('REPLACE_WITH_DASH_DASHversion');
+
+%% 2. Meshing an STL directly
+% |fem.meshSTL| returns nodes X (n x 3) and tetrahedra T (ne x 4 or 10).
+% With Remesh = true (default), Gmsh splits the STL into smooth patches,
+% using FeatureAngle to detect edges, and remeshes them to the requested
+% Size. This helps with CAD STLs, which are full of long thin triangles.
+% Remesh = false keeps the STL triangles as the boundary of the mesh.
+cyl = fullfile(out, 'cylinder.stl');
+fem.cylinderSTL(cyl, [0 0], 10, 0, 60);               % r = 10, height 60 (mm)
+[X1, T1] = fem.meshSTL(cyl, Size = 4);
+[X2, T2] = fem.meshSTL(cyl, Remesh = false);
+fprintf('remeshed: %d tets, STL kept as boundary: %d tets\n', size(T1, 1), size(T2, 1));
+
+figure('Color', 'w');
+subplot(1, 2, 1);  tetramesh(T1(:,1:4), X1, 'FaceAlpha', 0.1);  axis equal;  title('Remesh = true');
+subplot(1, 2, 2);  tetramesh(T2(:,1:4), X2, 'FaceAlpha', 0.1);  axis equal;  title('Remesh = false');
+
+%% 3. Tet4 vs Tet10: a convergence study
+% Linear tetrahedra (Tet4) are too stiff in bending ("locking") and need
+% very fine meshes. Quadratic Tet10 elements are accurate on coarse meshes
+% and are the default. We compute the first cantilever frequency on
+% increasingly fine meshes and compare with Euler-Bernoulli.
+beam = fullfile(out, 'beam.stl');
+fem.boxSTL(beam, [0 0 0], [1000 50 50]);
+steel = fem.material(210e9, 0.3, 7850);
+fEB = 1.875104^2/(2*pi)*sqrt(210e9*0.05^4/12/(7850*0.05^2));
+sizes = [50 25 12.5];
+err = zeros(2, numel(sizes));  ndof = err;
+for order = 1:2
+    for k = 1:numel(sizes)
+        b = fem.Body(beam, steel, Size = sizes(k), Order = order, Scale = 1e-3);
+        a = fem.Assembly();  a.add(b);  a.fix(1, @(X) X(:,1) < 1e-9);
+        [K, M] = a.system();
+        [~, f] = fem.modes(K, M, 1);
+        err(order, k) = f/fEB - 1;  ndof(order, k) = size(K, 1);
+    end
+end
+disp(array2table(100*err, 'VariableNames', compose('h=%g', sizes), ...
+     'RowNames', {'Tet4 error %', 'Tet10 error %'}));
+
+figure('Color', 'w');
+loglog(ndof', abs(err'), 'o-');  grid on
+xlabel('dofs');  ylabel('|f_1/f_{EB} - 1|');  legend('Tet4', 'Tet10');
+title('Convergence of the first bending frequency');
+
+%% 4. Curved surfaces and Tet10
+% Tet10 edge nodes are placed on the curved surface that Gmsh reconstructs
+% from the STL. On coarse meshes of small radii this can fold an element;
+% meshSTL then remeshes with straight-sided Tet10 and gives a warning. A
+% smaller Size keeps the curved geometry.
+
+%% 5. Meshes from the Gmsh GUI
+% For full control (local refinement, physical groups, ...), mesh in Gmsh
+% yourself and save as ASCII .msh, version 2.2 or 4.1. Pass the .msh file to
+% fem.Body, or read it with fem.readMsh. Here we create such a file
+% through fem.gmsh, which takes any Gmsh command-line arguments.
+geo = fullfile(out, 'block.geo');
+writelines(['SetFactory("OpenCASCADE"); Box(1) = {0, 0, 0, 100, 40, 20};' ...
+            'Mesh.MeshSizeMax = 8; Mesh.ElementOrder = 2;'], geo);
+msh = fullfile(out, 'block.msh');
+fem.gmsh(sprintf('"%s" -3 -format msh41 -o "%s" -v 0', geo, msh));
+block = fem.Body(msh, steel, Scale = 1e-3);
+fprintf('%s.msh: %d nodes, %d elements\n', block.Name, block.nNode, size(block.T, 1));
+
+%% 6. Units and placement
+% Scale converts coordinates after meshing, so Size stays in file units.
+% |transform(R, t)| moves a body rigidly (x -> R*x + t), e.g. to place
+% the same part twice in an assembly.
+copy = fem.Body(msh, steel, Scale = 1e-3, Name = 'block2');
+Rz = [0 -1 0; 1 0 0; 0 0 1];                      % 90 degrees about z
+copy.transform(Rz, [0.2 0 0]);
+a = fem.Assembly();  a.add(block);  a.add(copy);
+figure('Color', 'w');  a.plot();  title('Two placed copies of one mesh');
+
+##### SOURCE END #####
+-->
+</body>
+</html>
