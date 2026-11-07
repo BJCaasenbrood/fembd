@@ -62,6 +62,9 @@ methods
                     Remesh = opts.Remesh, FeatureAngle = opts.FeatureAngle);
             end
         end
+        assert(opts.Rigid || isfield(mat, 'D'), 'fem:Body', ['%s: an elastic body needs ' ...
+            'a material with stiffness D, e.g. fem.material(E, nu, rho). For a rigid ' ...
+            'body set Rigid = true.'], opts.Name);
         b.Name = opts.Name;
         b.Mat  = mat;
         b.X    = opts.Scale*X;
