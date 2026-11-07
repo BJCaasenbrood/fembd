@@ -92,10 +92,13 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <a href="#3">The system</a>
 </li>
 <li>
-<a href="#4">Loads and outputs</a>
+<a href="#4">Inputs, outputs and state space</a>
 </li>
 <li>
-<a href="#5">Plotting</a>
+<a href="#5">Loads and outputs (by hand)</a>
+</li>
+<li>
+<a href="#6">Plotting</a>
 </li>
 </ul>
 </div>
@@ -126,7 +129,17 @@ a.fix(joint, [])              <span class="comment">% lock a joint</span>
 <p>All constraints are eliminated with u = T*q: tie slaves, nodes of rigid bodies and couplings, B sides of joints, cut joints and supports. The returned K = T'*Kfull*T and M = T'*Mfull*T are symmetric and sparse. <tt>a.assemble()</tt> gives the unconstrained Kfull and Mfull, and <tt>a.constraints()</tt> gives T and the independent dofs.</p>
 <p>
 <tt>a.qdof(d)</tt> converts global dofs into positions in q, so u(d) = q(a.qdof(d)).</p>
-<h2 id="4">Loads and outputs</h2>
+<h2 id="4">Inputs, outputs and state space</h2>
+<p>Named inputs (actuators, loads) and outputs (sensors), one signal per direction, selected as in <tt>a.dof</tt>:</p>
+<pre class="language-matlab">a.input(<span class="string">'tau1'</span>, <span class="string">'motor1'</span>);                          <span class="comment">% joint torque</span>
+a.input(<span class="string">'Fz'</span>, <span class="string">'gripper'</span>, @(X) X(:,1) &gt; 0.98, 3);    <span class="comment">% total force on a node set</span>
+a.output(<span class="string">'enc1'</span>, <span class="string">'motor1'</span>);                         <span class="comment">% joint angle</span>
+a.output(<span class="string">'tip'</span>, <span class="string">'tool'</span>, [], 1:3, Type = <span class="string">'acceleration'</span>);
+sys = a.statespace(Modes = 20, Damping = 0.02);
+</pre>
+<p>
+<tt>statespace</tt> returns A, B, C, D in modal coordinates [eta; deta], with signal names, the mode frequencies and mode shapes. Rigid-body and mechanism modes are double integrators. Static correction (default) makes the DC gain exact with few modes. Use <tt>Format = "ss"</tt> for an <tt>ss</tt> object (Control System Toolbox).</p>
+<h2 id="5">Loads and outputs (by hand)</h2>
 <p>Build loads and outputs in the full space and project them:</p>
 <pre class="language-matlab">f  = zeros(a.nDof, 1);  f(d) = F;      <span class="comment">% nodal forces</span>
 fq = T'*f;                             <span class="comment">% reduced load</span>
@@ -134,7 +147,7 @@ q  = K\fq;  u = T*q;                   <span class="comment">% static solution</
 C  = zeros(1, a.nDof);  C(d(1)) = 1;  Cq = C*T;   <span class="comment">% output</span>
 </pre>
 <p>Gravity is <tt>T'*(Mfull*g)</tt> with g = -9.81 in every z node dof. Support reactions are <tt>Kfull*u - f</tt> at the supported dofs. See <a href="tut05_loadsStatics.html">Tutorial 5</a>.</p>
-<h2 id="5">Plotting</h2>
+<h2 id="6">Plotting</h2>
 <p>
 <tt>a.plot(u, scale)</tt> draws all bodies deformed by the full vector u. Since u also holds rotation dofs (radians), scale with the node dofs only: <tt>scale = s/max(abs(u(1:3*size(a.X, 1))))</tt>.</p>
 <p class="footer">
@@ -184,7 +197,23 @@ C  = zeros(1, a.nDof);  C(d(1)) = 1;  Cq = C*T;   <span class="comment">% output
 % |a.qdof(d)| converts global dofs into positions in q, so
 % u(d) = q(a.qdof(d)).
 %
-%% Loads and outputs
+%% Inputs, outputs and state space
+% Named inputs (actuators, loads) and outputs (sensors), one signal per
+% direction, selected as in |a.dof|:
+%
+%   a.input('tau1', 'motor1');                          % joint torque
+%   a.input('Fz', 'gripper', @(X) X(:,1) > 0.98, 3);    % total force on a node set
+%   a.output('enc1', 'motor1');                         % joint angle
+%   a.output('tip', 'tool', [], 1:3, Type = 'acceleration');
+%   sys = a.statespace(Modes = 20, Damping = 0.02);
+%
+% |statespace| returns A, B, C, D in modal coordinates [eta; deta], with
+% signal names, the mode frequencies and mode shapes. Rigid-body and
+% mechanism modes are double integrators. Static correction (default)
+% makes the DC gain exact with few modes. Use |Format = "ss"| for an |ss|
+% object (Control System Toolbox).
+%
+%% Loads and outputs (by hand)
 % Build loads and outputs in the full space and project them:
 %
 %   f  = zeros(a.nDof, 1);  f(d) = F;      % nodal forces

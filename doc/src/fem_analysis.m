@@ -19,6 +19,15 @@
 % responses (direct and modal), Newmark time integration, and state-space
 % forms. For explicit time integration use |a.system(Lumped = true)|.
 %
+%% State-space models
+% With inputs and outputs defined (|a.input|, |a.output|), one call gives a
+% reduced modal state-space model, including static correction, damping
+% and acceleration feedthrough:
+%
+%   sys = a.statespace(Modes = 20, Damping = 0.02);
+%
+% See <fem_system.html Dofs, Supports, Loads and the System>.
+%
 %% Craig-Bampton reduction
 %
 %   [Kc, Mc, V, f] = fem.craigBampton(K, M, b, n)

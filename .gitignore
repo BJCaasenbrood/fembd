@@ -8,3 +8,6 @@ slprj/
 /html/
 tutorials/html/
 examples/html/
+
+# local scripts
+/main_ivr.m

@@ -100,6 +100,9 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <li>
 <a href="#7">6. State-space forms</a>
 </li>
+<li>
+<a href="#8">7. One call: inputs, outputs and statespace</a>
+</li>
 </ul>
 </div>
 <h2 id="1">Tutorial 8 - Dynamic analysis: damping, frequency response, time response</h2>
@@ -198,7 +201,25 @@ fprintf(<span class="string">'modal model: %d states, DC gain %.4e (exact %.4e)\
 </pre>
 <pre class="codeoutput">modal model: 20 states, DC gain 3.0368e-06 (exact 3.0389e-06)
 </pre>
-<p class="footer">
+<h2 id="8">7. One call: inputs, outputs and statespace</h2>
+<p>All of the above in three lines: named inputs and outputs, and a reduced modal state space. Static correction adds the quasi-static response to the inputs to the modal basis, so the DC gain is exact even with 3 modes.</p>
+<pre class="codeinput">tipFace = @(X) X(:,1) &gt; 1 - 1e-9;
+a.input(<span class="string">'Fz'</span>, <span class="string">'beam'</span>, tipFace, 3);                       <span class="comment">% 1 N total over the tip face</span>
+a.output(<span class="string">'uz'</span>, <span class="string">'beam'</span>, tipFace, 3);                      <span class="comment">% average tip deflection</span>
+a.output(<span class="string">'az'</span>, <span class="string">'beam'</span>, tipFace, 3, Type = <span class="string">'acceleration'</span>);
+sys = a.statespace(Modes = 3, Damping = 0.02);
+fprintf(<span class="string">'statespace: %d states, DC gain %.4e (exact %.4e)\n'</span>, size(sys.A, 1), <span class="keyword">...</span>
+        -sys.C(1,:)*(sys.A\sys.B) + sys.D(1), c*(K\b));
+H2 = arrayfun(@(f) sys.C(1,:)*((2i*pi*f*eye(size(sys.A)) - sys.A)\sys.B), fHz);
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
+loglog(fHz, abs(H), fHz, abs(H2), <span class="string">'--'</span>);  grid <span class="string">on</span>
+xlabel(<span class="string">'frequency (Hz)'</span>);  ylabel(<span class="string">'|u_{tip}/F| (m/N)'</span>);
+legend(<span class="string">'full model'</span>, <span class="string">'statespace, 3 modes'</span>);
+<span class="comment">% With the Control System Toolbox: sys = a.statespace(..., Format = "ss"); bode(sys)</span>
+</pre>
+<pre class="codeoutput">statespace: 8 states, DC gain 3.0389e-06 (exact 3.0389e-06)
+</pre>
+<img vspace="5" hspace="5" src="tut08_dynamics_03.png" alt=""> <p class="footer">
 <br>
 <a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2024a</a>
 <br>
@@ -305,6 +326,24 @@ Bm = [zeros(nm, 1); V'*b];
 Cm = [c*V, zeros(1, nm)];
 fprintf('modal model: %d states, DC gain %.4e (exact %.4e)\n', 2*nm, -Cm*(Am\Bm), c*(K\b));
 % The small DC error comes from the truncated higher modes.
+
+%% 7. One call: inputs, outputs and statespace
+% All of the above in three lines: named inputs and outputs, and a reduced
+% modal state space. Static correction adds the quasi-static response to
+% the inputs to the modal basis, so the DC gain is exact even with 3 modes.
+tipFace = @(X) X(:,1) > 1 - 1e-9;
+a.input('Fz', 'beam', tipFace, 3);                       % 1 N total over the tip face
+a.output('uz', 'beam', tipFace, 3);                      % average tip deflection
+a.output('az', 'beam', tipFace, 3, Type = 'acceleration');
+sys = a.statespace(Modes = 3, Damping = 0.02);
+fprintf('statespace: %d states, DC gain %.4e (exact %.4e)\n', size(sys.A, 1), ...
+        -sys.C(1,:)*(sys.A\sys.B) + sys.D(1), c*(K\b));
+H2 = arrayfun(@(f) sys.C(1,:)*((2i*pi*f*eye(size(sys.A)) - sys.A)\sys.B), fHz);
+figure('Color', 'w');
+loglog(fHz, abs(H), fHz, abs(H2), 'REPLACE_WITH_DASH_DASH');  grid on
+xlabel('frequency (Hz)');  ylabel('|u_{tip}/F| (m/N)');
+legend('full model', 'statespace, 3 modes');
+% With the Control System Toolbox: sys = a.statespace(..., Format = "ss"); bode(sys)
 
 ##### SOURCE END #####
 -->

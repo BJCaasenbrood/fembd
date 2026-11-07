@@ -37,7 +37,23 @@
 % |a.qdof(d)| converts global dofs into positions in q, so
 % u(d) = q(a.qdof(d)).
 %
-%% Loads and outputs
+%% Inputs, outputs and state space
+% Named inputs (actuators, loads) and outputs (sensors), one signal per
+% direction, selected as in |a.dof|:
+%
+%   a.input('tau1', 'motor1');                          % joint torque
+%   a.input('Fz', 'gripper', @(X) X(:,1) > 0.98, 3);    % total force on a node set
+%   a.output('enc1', 'motor1');                         % joint angle
+%   a.output('tip', 'tool', [], 1:3, Type = 'acceleration');
+%   sys = a.statespace(Modes = 20, Damping = 0.02);
+%
+% |statespace| returns A, B, C, D in modal coordinates [eta; deta], with
+% signal names, the mode frequencies and mode shapes. Rigid-body and
+% mechanism modes are double integrators. Static correction (default)
+% makes the DC gain exact with few modes. Use |Format = "ss"| for an |ss|
+% object (Control System Toolbox).
+%
+%% Loads and outputs (by hand)
 % Build loads and outputs in the full space and project them:
 %
 %   f  = zeros(a.nDof, 1);  f(d) = F;      % nodal forces

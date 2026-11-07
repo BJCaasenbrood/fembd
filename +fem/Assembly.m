@@ -18,6 +18,8 @@ properties
     Refs   = struct('Name', {}, 'body', {}, 'nodes', {}, 'x', {})   % reference points
     Joints = struct('Name', {}, 'A', {}, 'B', {}, 'p', {}, 'R', {}, 'free', {}, 'k', {}, 'value', {})
     Transmissions = struct('Name', {}, 'joints', {}, 'dirs', {}, 'c', {}, 'k', {})
+    Inputs  = struct('Name', {}, 'id', {}, 'nodes', {}, 'dirs', {})                % actuators, loads
+    Outputs = struct('Name', {}, 'id', {}, 'nodes', {}, 'dirs', {}, 'type', {})    % sensors
     Fixes  = struct('id', {}, 'nodes', {}, 'dirs', {})              % supports (u = 0)
 end
 
@@ -439,6 +441,115 @@ methods
         a.Joints(k).value = value;
     end
 
+    function input(a, name, id, sel, dirs)
+    %INPUT Add a named input (actuator or load): one signal per direction.
+    %   a.input(name, joint)             force/torque on the joint coordinates
+    %   a.input(name, ref, [], dirs)     force (1:3) or moment (4:6) on a
+    %                                    rigid body or coupling
+    %   a.input(name, body, sel, dirs)   total force on the nodes selected by
+    %                                    sel, split equally over them
+    %   Selections work as in a.dof. See also output, statespace.
+        if nargin < 4, sel = []; end
+        if nargin < 5, dirs = []; end
+        a.Inputs(end+1) = a.ioSpec(name, id, sel, dirs);
+    end
+
+    function output(a, name, id, sel, dirs, opts)
+    %OUTPUT Add a named output (sensor): one signal per direction.
+    %   Selections as in a.input; on a node set the output is the average
+    %   motion of the nodes. Option Type: 'displacement' (default),
+    %   'velocity' or 'acceleration'. See also statespace.
+        arguments
+            a
+            name (1,:) char
+            id
+            sel = []
+            dirs = []
+            opts.Type (1,:) char {mustBeMember(opts.Type, ...
+                {'displacement', 'velocity', 'acceleration'})} = 'displacement'
+        end
+        spec = a.ioSpec(name, id, sel, dirs);  spec.type = opts.Type;
+        a.Outputs(end+1) = spec;
+    end
+
+    function [Bu, Cu, inName, outName, type] = ioMatrices(a)
+    %IOMATRICES Inputs and outputs in the full space: forces f = Bu*input and
+    %   outputs y = Cu*u (or its time derivatives, per type), with names.
+        [Bu, inName] = a.ioColumns(a.Inputs);
+        [Cu, outName, type] = a.ioColumns(a.Outputs);
+        Cu = Cu';
+    end
+
+    function sys = statespace(a, opts)
+    %STATESPACE State-space model of the assembly with its inputs and outputs.
+    %   sys = a.statespace(Modes = 20, Damping = 0.02) returns a struct with
+    %   A, B, C, D, InputName, OutputName, f (Hz) and Shapes (full-space
+    %   mode shapes). States are [eta; deta] in modal coordinates.
+    %
+    %   Options:
+    %     Modes            number of modes (default 20); rigid-body and
+    %                      mechanism modes are included as exact double
+    %                      integrators (lambda < 1e-10 max(lambda) is set to 0)
+    %     Damping          modal damping ratio, scalar or one per state mode
+    %     StaticCorrection add the quasi-static response to the inputs to the
+    %                      basis (default true): exact DC gain with few modes
+    %     Lumped           lumped mass (default false)
+    %     Format           "struct" (default) or "ss" (Control System Toolbox)
+        arguments
+            a
+            opts.Modes (1,1) double {mustBePositive} = 20
+            opts.Damping double = 0.02
+            opts.StaticCorrection (1,1) logical = true
+            opts.Lumped (1,1) logical = false
+            opts.Format (1,1) string {mustBeMember(opts.Format, ["struct", "ss"])} = "struct"
+        end
+        assert(~isempty(a.Inputs) || ~isempty(a.Outputs), 'fem:statespace', ...
+            'Define inputs and outputs first (a.input, a.output).');
+        [K, M, T] = a.system(Lumped = opts.Lumped);
+        [Bu, Cu, inName, outName, type] = a.ioMatrices();
+        B = T'*Bu;  C = Cu*T;  n = size(K, 1);
+
+        [V, f] = fem.modes(K, M, min(opts.Modes, n));
+        W = V;
+        if opts.StaticCorrection && size(V, 2) < n && ~isempty(B)
+            lam = (2*pi*f).^2;                   % quasi-static shapes; shifted if K is singular
+            sigma = 0;  if lam(1) < 1e-8*lam(end), sigma = -1e-6*lam(end); end
+            X = (K - sigma*M)\full(B);
+            X = X - V*(V'*(M*X));                % keep only the part the modes miss
+            [P, S] = eig((X'*M*X + (X'*M*X)')/2, 'vector');
+            keep = S > 1e-12*max([S; eps]);
+            W = [V, X*P(:,keep)./sqrt(S(keep))'];
+        end
+        Kr = full(W'*K*W);  Mr = full(W'*M*W);
+        [P, lam] = eig((Kr + Kr')/2, (Mr + Mr')/2, 'vector');
+        [lam, i] = sort(max(real(lam), 0));  P = real(P(:, i));
+        lam(lam < 1e-10*max(lam)) = 0;           % round-off rigid/mechanism modes: exactly 0
+        P = P./sqrt(dot(P, Mr*P));
+        Phi = W*P;  w = sqrt(lam);  nr = numel(w);
+
+        zeta = opts.Damping(:);
+        if isscalar(zeta), zeta = zeta*ones(nr, 1); end
+        assert(numel(zeta) == nr, 'fem:statespace', 'Damping: scalar or %d values.', nr);
+        Om2 = diag(lam);  Z = diag(2*zeta.*w);
+        Bm = Phi'*B;  Cm = C*Phi;  no = size(C, 1);
+        A = [zeros(nr), eye(nr); -Om2, -Z];
+        Bs = [zeros(nr, size(B, 2)); Bm];
+        Cs = zeros(no, 2*nr);  Ds = zeros(no, size(B, 2));
+        for r = 1:no
+            switch type{r}
+                case 'displacement', Cs(r,:) = [Cm(r,:), zeros(1, nr)];
+                case 'velocity',     Cs(r,:) = [zeros(1, nr), Cm(r,:)];
+                otherwise,           Cs(r,:) = [-Cm(r,:)*Om2, -Cm(r,:)*Z];
+                                     Ds(r,:) = Cm(r,:)*Bm;
+            end
+        end
+        sys = struct('A', A, 'B', Bs, 'C', Cs, 'D', Ds, 'InputName', {inName}, ...
+                     'OutputName', {outName}, 'f', w/(2*pi), 'Shapes', T*Phi);
+        if opts.Format == "ss"
+            sys = ss(A, Bs, Cs, Ds, 'InputName', inName, 'OutputName', outName);
+        end
+    end
+
     function j = qdof(a, d)
     %QDOF Indices into q of global dofs d (e.g. from a.dof), so u(d) = q(j).
     %   The dofs must be independent: not supported, not dependent (tie
@@ -482,6 +593,44 @@ methods
 end
 
 methods (Access = private)
+    function spec = ioSpec(a, name, id, sel, dirs)
+    % Store an input/output selection; node sets are resolved now.
+        assert(~any(strcmp([{a.Inputs.Name}, {a.Outputs.Name}], name)), 'fem:io', ...
+            'Signal name %s is already used.', name);
+        [kind, k] = a.lookup(id, isempty(sel));
+        nodes = [];
+        if strcmp(kind, 'body')
+            b = a.Bodies{k};  id = b;
+            nodes = (1:b.nNode)';
+            if ~isempty(sel), nodes = b.nodes(sel); end
+            assert(~isempty(nodes), 'fem:io', '%s: no nodes selected.', name);
+            if isempty(dirs), dirs = 1:3; end
+        end
+        spec = struct('Name', name, 'id', {id}, 'nodes', nodes, 'dirs', dirs);
+    end
+
+    function [W, names, type] = ioColumns(a, specs)
+    % One column per signal: unit weights on the selected dofs (node sets:
+    % split equally over the nodes).
+        W = sparse(a.nDof, 0);  names = {};  type = {};
+        for s = specs
+            if isempty(s.nodes)
+                d = a.dof(s.id, [], s.dirs);  cols = num2cell(d');
+                dirs = s.dirs;  if isempty(dirs), dirs = 1:numel(d); end
+            else
+                dirs = s.dirs;
+                cols = arrayfun(@(k) a.dof(s.id, s.nodes, k), dirs, 'UniformOutput', false);
+            end
+            for c = 1:numel(cols)
+                d = cols{c};
+                W(:, end+1) = sparse(d, 1, 1/numel(d), a.nDof, 1);       %#ok<AGROW>
+                names{end+1} = s.Name;                                     %#ok<AGROW>
+                if numel(cols) > 1, names{end} = sprintf('%s_%d', s.Name, dirs(c)); end
+                if isfield(s, 'type'), type{end+1} = s.type; end           %#ok<AGROW>
+            end
+        end
+    end
+
     function off = offsets(a)
         off = cumsum([0, cellfun(@(b) b.nNode, a.Bodies)]);
     end

@@ -124,11 +124,21 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <li>
 <a href="matlab:doc('fem.Assembly/joint')">joint</a> - kinematic joint between reference points</li>
 <li>
+<a href="matlab:doc('fem.Assembly/transmission')">transmission</a> - elastic or rigid ratio between joints (belts, gears)</li>
+<li>
 <a href="matlab:doc('fem.Assembly/pose')">pose</a> - move a joint to a finite position</li>
 <li>
 <a href="matlab:doc('fem.Assembly/fix')">fix</a> - supports</li>
 <li>
 <a href="matlab:doc('fem.Assembly/dof')">dof</a> - global dof indices</li>
+<li>
+<a href="matlab:doc('fem.Assembly/input')">input</a> - named input (actuator, load)</li>
+<li>
+<a href="matlab:doc('fem.Assembly/output')">output</a> - named output (sensor)</li>
+<li>
+<a href="matlab:doc('fem.Assembly/statespace')">statespace</a> - state-space model with the inputs and outputs</li>
+<li>
+<a href="matlab:doc('fem.Assembly/ioMatrices')">ioMatrices</a> - inputs and outputs in the full space</li>
 <li>
 <a href="matlab:doc('fem.Assembly/qdof')">qdof</a> - positions of dofs in q</li>
 <li>
@@ -189,9 +199,14 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 % * <matlab:doc('fem.Assembly/tie') tie> - bonded tie or elastic interface
 % * <matlab:doc('fem.Assembly/couple') couple> - rigid coupling of nodes to a reference point
 % * <matlab:doc('fem.Assembly/joint') joint> - kinematic joint between reference points
+% * <matlab:doc('fem.Assembly/transmission') transmission> - elastic or rigid ratio between joints (belts, gears)
 % * <matlab:doc('fem.Assembly/pose') pose> - move a joint to a finite position
 % * <matlab:doc('fem.Assembly/fix') fix> - supports
 % * <matlab:doc('fem.Assembly/dof') dof> - global dof indices
+% * <matlab:doc('fem.Assembly/input') input> - named input (actuator, load)
+% * <matlab:doc('fem.Assembly/output') output> - named output (sensor)
+% * <matlab:doc('fem.Assembly/statespace') statespace> - state-space model with the inputs and outputs
+% * <matlab:doc('fem.Assembly/ioMatrices') ioMatrices> - inputs and outputs in the full space
 % * <matlab:doc('fem.Assembly/qdof') qdof> - positions of dofs in q
 % * <matlab:doc('fem.Assembly/system') system> - reduced K, M and T
 % * <matlab:doc('fem.Assembly/assemble') assemble> - unconstrained K and M

@@ -258,6 +258,32 @@ check('Elastic transmission vs two-inertia drive mode', f(end), ...
 check('Rigid transmission: reflected inertia Js + N^2 Jm', f, sqrt(kz/(Js + N^2*Jm))/(2*pi), 1e-8);
 check('Rigid transmission: driver coordinate stays in q', numel(a.qdof(a.dof('motor'))), 1, 0);
 
+% inputs, outputs and state space: cantilever, tip force -> tip deflection
+a = fem.Assembly();  a.add(L);  a.fix('left', @(X) X(:,1) < 1e-9);
+a.input('Fz', 'left', @(X) X(:,1) > Lx/2 - 1e-9, 3);
+a.output('uz', 'left', @(X) X(:,1) > Lx/2 - 1e-9, 3);
+[Kr, Mr, T] = a.system();  [Bu, Cu] = a.ioMatrices();
+dc = Cu*T*(Kr\(T'*Bu));                                         % exact static gain
+sys = a.statespace(Modes = 2);
+dcSys = -sys.C*(sys.A\sys.B) + sys.D;
+check('State space: DC gain with static correction (2 modes)', dcSys, dc, 1e-8);
+sys0 = a.statespace(Modes = 2, StaticCorrection = false);
+err0 = abs(-sys0.C*(sys0.A\sys0.B)/dc - 1);
+check(sprintf('State space: correction matters (error %.1e without)', err0), err0 > 1e-4, true, 0);
+[~, f] = fem.modes(Kr, Mr, 2);
+check('State space: modal frequencies', sys.f(1:2), f, 1e-8);
+
+% mechanism (free drive) and acceleration feedthrough: belt drive, all modes
+[a, Kr, Mr] = buildBelt(kb, N, mL, cL, JL, Jm, 0);
+a.input('tau', 'motor');
+a.output('acc', 'motor', [], [], Type = 'acceleration');
+a.output('th', 'shoulder', [], 3);
+[~, ~, T] = a.system();  [Bu, Cu] = a.ioMatrices();
+sys = a.statespace(Modes = size(Kr, 1), Damping = 0);
+check('State space: free drive gives a double integrator', sum(abs(eig(sys.A)) < 1e-6), 2, 0);
+check('State space: acceleration feedthrough C M^-1 B', sys.D(1), full(Cu(1,:)*T*(Mr\(T'*Bu))), 1e-8);
+check('State space: signal names', [sys.InputName, sys.OutputName], {'tau', 'acc', 'th'}, 0);
+
 % MSH 4.1 reader vs 2.2
 geo = fullfile(tmp, 'b.geo');
 writelines(sprintf(['Merge "%s";\nClassifySurfaces{40*Pi/180,1,1,Pi};\nCreateGeometry;\n' ...
@@ -298,6 +324,7 @@ a.transmission({'motor', 'shoulder'}, [1/N -1], Stiffness = k, Dirs = {1, 3});
 end
 
 function check(name, val, ref, tol)
+if iscell(val), val = double(isequal(val, ref)); ref = 1; end
 err = max(abs(val(:) - ref(:))./max(abs(ref(:)), 1));
 if isequal(ref, 0), err = max(abs(val(:))); end
 status = "PASS";  if err > tol, status = "FAIL"; end

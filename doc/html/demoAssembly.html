@@ -136,7 +136,7 @@ A  = [zeros(nr), eye(nr); -Mc\Kc, -Mc\Dc];
 Bu = [zeros(nr, 1); Mc\((1:nr)' == 3)];      <span class="comment">% x(3) is the plate's uz</span>
 Cy = [(1:nr) == 3, zeros(1, nr)];
 </pre>
-<pre class="codeoutput">31863 dofs (25104 after constraints), assembled in 0.7 s
+<pre class="codeoutput">31863 dofs (25104 after constraints), assembled in 0.8 s
     mode    full_Hz    CB_Hz     lumped_Hz
     ____    _______    ______    _________
 

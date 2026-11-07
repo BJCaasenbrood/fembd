@@ -20,6 +20,10 @@
 % * <matlab:doc('fem.Assembly/pose') pose> - move a joint to a finite position
 % * <matlab:doc('fem.Assembly/fix') fix> - supports
 % * <matlab:doc('fem.Assembly/dof') dof> - global dof indices
+% * <matlab:doc('fem.Assembly/input') input> - named input (actuator, load)
+% * <matlab:doc('fem.Assembly/output') output> - named output (sensor)
+% * <matlab:doc('fem.Assembly/statespace') statespace> - state-space model with the inputs and outputs
+% * <matlab:doc('fem.Assembly/ioMatrices') ioMatrices> - inputs and outputs in the full space
 % * <matlab:doc('fem.Assembly/qdof') qdof> - positions of dofs in q
 % * <matlab:doc('fem.Assembly/system') system> - reduced K, M and T
 % * <matlab:doc('fem.Assembly/assemble') assemble> - unconstrained K and M

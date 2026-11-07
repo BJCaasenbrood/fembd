@@ -97,3 +97,21 @@ Bm = [zeros(nm, 1); V'*b];
 Cm = [c*V, zeros(1, nm)];
 fprintf('modal model: %d states, DC gain %.4e (exact %.4e)\n', 2*nm, -Cm*(Am\Bm), c*(K\b));
 % The small DC error comes from the truncated higher modes.
+
+%% 7. One call: inputs, outputs and statespace
+% All of the above in three lines: named inputs and outputs, and a reduced
+% modal state space. Static correction adds the quasi-static response to
+% the inputs to the modal basis, so the DC gain is exact even with 3 modes.
+tipFace = @(X) X(:,1) > 1 - 1e-9;
+a.input('Fz', 'beam', tipFace, 3);                       % 1 N total over the tip face
+a.output('uz', 'beam', tipFace, 3);                      % average tip deflection
+a.output('az', 'beam', tipFace, 3, Type = 'acceleration');
+sys = a.statespace(Modes = 3, Damping = 0.02);
+fprintf('statespace: %d states, DC gain %.4e (exact %.4e)\n', size(sys.A, 1), ...
+        -sys.C(1,:)*(sys.A\sys.B) + sys.D(1), c*(K\b));
+H2 = arrayfun(@(f) sys.C(1,:)*((2i*pi*f*eye(size(sys.A)) - sys.A)\sys.B), fHz);
+figure('Color', 'w');
+loglog(fHz, abs(H), fHz, abs(H2), '--');  grid on
+xlabel('frequency (Hz)');  ylabel('|u_{tip}/F| (m/N)');
+legend('full model', 'statespace, 3 modes');
+% With the Control System Toolbox: sys = a.statespace(..., Format = "ss"); bode(sys)

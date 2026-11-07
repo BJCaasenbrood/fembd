@@ -236,6 +236,10 @@ out with f ≈ 0. Mode shapes are normalised so that `VᵀMV = I`.
 | `a.pose(joint, value)` | Move a joint to a finite angle/offset (relative to its creation pose); B side moves rigidly (§2.5) |
 | `a.fix(id, sel, dirs)` | Support selected body nodes in `dirs ⊂ 1:3`, or a reference point (`dirs ⊂ 1:6`) or joint coordinates with `a.fix(id, [], dirs)`. |
 | `d = a.dof(id, sel, dirs)` | Global dof indices of body nodes, of a reference point `[ux uy uz rx ry rz]`, or of a joint's coordinates. |
+| `a.input(name, id, sel, dirs)` | Named input (joint torque/force, force/moment on a reference point, or total force on a node set) |
+| `a.output(name, id, sel, dirs, Type=)` | Named output: displacement (default), velocity or acceleration; node sets are averaged |
+| `sys = a.statespace(Modes=, Damping=, StaticCorrection=, Lumped=, Format=)` | Modal state-space model with the inputs and outputs (Recipes) |
+| `[Bu, Cu, inName, outName, type] = a.ioMatrices()` | Inputs and outputs in the full space |
 | `j = a.qdof(d)` | Positions of global dofs `d` in `q`, so `u(d) = q(j)`. `d` must be independent (not supported, not a tie slave). |
 | `[K, M] = a.assemble(Lumped=false)` | Full matrices, including elastic interfaces |
 | `[T, I] = a.constraints()` | `u = T*q`, and the independent global dofs `I` |
@@ -255,6 +259,21 @@ a function `@(X) logical` on node coordinates (n×3), or node indices.
 ---
 
 ## 4 Recipes
+
+**Inputs, outputs and a state-space model** (recommended for control):
+```matlab
+a.input('tau1', 'motor1');                               % torque on a joint coordinate
+a.input('Fz', 'gripper', @(X) X(:,1) > 0.98, 3);         % total force split over selected nodes
+a.output('enc1', 'motor1');                              % joint angle
+a.output('tip', 'tool', [], 1:3, Type = 'acceleration'); % accelerometer (3 signals)
+sys = a.statespace(Modes = 20, Damping = 0.02);          % struct: A, B, C, D, names, f, Shapes
+```
+- **Signals:** each input or output is one signal per direction, named `name` or `name_dir`.
+- **States:** modal, `[η; η̇]`. Rigid-body and mechanism modes are undamped double integrators.
+- **Static correction** (default) adds the quasi-static response to the inputs to the modal basis, so the DC gain is exact with few modes.
+- **Acceleration outputs** get the feedthrough `D = CΦΦᵀB`.
+- **`Format = "ss"`** returns an `ss` object (Control System Toolbox).
+- **`a.ioMatrices()`** gives the full-space `Bu`, `Cu` for your own formulations.
 
 **Loads and outputs.** Build them in the full space and project with `T`:
 ```matlab
