@@ -411,15 +411,17 @@ methods
             if size(F, 2) == 6
                 F = [F(:,[1 4 6]); F(:,[4 2 5]); F(:,[6 5 3]); F(:,[4 5 6])];
             end
-            if any(u)
-                patch('Faces', F, 'Vertices', b.X + scale*Ui, 'FaceVertexCData', ...
-                      vecnorm(Ui, 2, 2), 'FaceColor', 'interp', 'EdgeAlpha', 0.2);
-            else
-                patch('Faces', F, 'Vertices', b.X, 'FaceColor', c(i,:), 'EdgeAlpha', 0.2);
+            if any(u)                                     % colour by |u|
+                C = vecnorm(Ui, 2, 2);
+            else                                          % one colour per body
+                C = repmat(c(i,:), b.nNode, 1);
             end
+            patch('Faces', F, 'Vertices', b.X + scale*Ui, 'FaceVertexCData', C, ...
+                  'FaceColor', 'interp', 'LineStyle', 'none');
         end
         if ~held, hold off, end
-        axis equal;  view(3);
+        axis equal;  view(3);  shading interp
+        if isempty(findobj(gca, 'Type', 'light')), camlight, end
     end
 end
 
