@@ -10,4 +10,4 @@ tutorials/html/
 examples/html/
 
 # local scripts
-/main_ivr.m
+/main_ivr*.m
