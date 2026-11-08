@@ -584,18 +584,21 @@ methods
             'eliminated by a closed loop.']);
     end
 
-    function plot(a, u, scale)
+    function h = plot(a, u, scale)
     %PLOT Draw the boundary of all bodies, optionally deformed by u (nDof x 1).
+    %   h = a.plot(u, scale) returns one graphics handle per body: a patch,
+    %   or a marker for a point mass. See also animate.
         if nargin < 2 || isempty(u), u = zeros(a.nDof, 1); end
         if nargin < 3, scale = 1; end
         off = a.offsets;  U = reshape(u(1:3*off(end)), 3, [])';  c = lines(numel(a.Bodies));
+        h = gobjects(1, numel(a.Bodies));
         held = ishold;  hold on
         for i = 1:numel(a.Bodies)
             b = a.Bodies{i};  Ui = U(off(i)+1:off(i+1), :);  F = b.F;
             if isempty(F)                                 % point mass: marker
                 [~, k] = a.lookup(b, true);  x = b.Ref;  d = a.refDofs(k);
                 if any(u), x = x + scale*u(d(1:3))'; end
-                plot3(x(1), x(2), x(3), 'ko', 'MarkerFaceColor', c(i,:), 'MarkerSize', 8);
+                h(i) = plot3(x(1), x(2), x(3), 'ko', 'MarkerFaceColor', c(i,:), 'MarkerSize', 8);
                 continue
             end
             if size(F, 2) == 6
@@ -606,12 +609,84 @@ methods
             else                                          % one colour per body
                 C = repmat(c(i,:), b.nNode, 1);
             end
-            patch('Faces', F, 'Vertices', b.X + scale*Ui, 'FaceVertexCData', C, ...
-                  'FaceColor', 'interp', 'LineStyle', 'none');
+            h(i) = patch('Faces', F, 'Vertices', b.X + scale*Ui, 'FaceVertexCData', C, ...
+                         'FaceColor', 'interp', 'LineStyle', 'none');
         end
         if ~held, hold off, end
         axis equal;  view(3);  shading interp
         if isempty(findobj(gca, 'Type', 'light')), camlight, end
+        if nargout == 0, clear h, end
+    end
+
+    function animate(a, u, opts)
+    %ANIMATE Animate a mode shape (or any displacement u, nDof x 1).
+    %   a.animate(u) draws the deformed bodies and oscillates them as
+    %   X + scale*sin(phase)*u. The phase follows the wall clock, so the
+    %   speed does not depend on the rendering speed. Vibration modes are too
+    %   fast for real time (a screen shows ~60 frames/s), so they play in
+    %   slow motion at Rate cycles per second. Closing the figure stops it.
+    %
+    %   Options:
+    %     Amplitude  largest displacement shown (default 0.05, model units)
+    %     Frequency  real frequency in Hz, shown in the title with the
+    %                slow-motion factor (e.g. f(k) from fem.modes)
+    %     Rate       playback rate in cycles per second (default 1)
+    %     Duration   length in seconds (default 3; inf until closed)
+    %     Title      title text, e.g. 'Mode 4'; with Frequency it is
+    %                followed by the frequency and slow-motion factor
+    %
+    %   Example:
+    %     [V, f] = fem.modes(K, M, 6);
+    %     a.animate(T*V(:,4), Frequency = f(4), Title = 'Mode 4');
+        arguments
+            a
+            u (:,1) double
+            opts.Amplitude (1,1) double {mustBePositive} = 0.05
+            opts.Frequency double = []
+            opts.Rate (1,1) double {mustBePositive} = 1
+            opts.Duration (1,1) double {mustBePositive} = 3
+            opts.Title = []
+        end
+        assert(numel(u) == a.nDof, 'fem:animate', 'u must have a.nDof = %d entries.', a.nDof);
+        off = a.offsets;  nU = 3*off(end);
+        umax = max(abs(u(1:nU)));
+        sc = opts.Amplitude/max(umax, eps);
+        cla;  h = a.plot(u, sc);  axis manual
+        ttl = char(opts.Title);                   % e.g. 'Mode 4', completed with the frequency
+        if ~isempty(opts.Frequency)
+            if opts.Frequency > 0
+                ft = sprintf('%.1f Hz (%.0fx slow motion)', opts.Frequency, opts.Frequency/opts.Rate);
+            else
+                ft = 'rigid-body / mechanism mode';
+            end
+            if isempty(ttl), ttl = ft; else, ttl = [ttl ': ' ft]; end
+        end
+        if ~isempty(ttl), title(ttl); end
+
+        U = reshape(u(1:nU), 3, [])';
+        pos = cell(1, numel(a.Bodies));  shape = pos;   % rest positions and mode shapes
+        for i = 1:numel(a.Bodies)
+            b = a.Bodies{i};
+            if isempty(b.F)                               % point mass: its reference point
+                [~, k] = a.lookup(b, true);  d = a.refDofs(k);
+                pos{i} = b.Ref;  shape{i} = u(d(1:3))';
+            else
+                pos{i} = b.X;    shape{i} = U(off(i)+1:off(i+1), :);
+            end
+        end
+        t0 = tic;
+        while toc(t0) < opts.Duration && all(isvalid(h))
+            s = sc*sin(2*pi*opts.Rate*toc(t0));
+            for i = 1:numel(h)
+                x = pos{i} + s*shape{i};
+                if isa(h(i), 'matlab.graphics.primitive.Patch')
+                    set(h(i), 'Vertices', x);
+                else
+                    set(h(i), 'XData', x(1), 'YData', x(2), 'ZData', x(3));
+                end
+            end
+            drawnow;
+        end
     end
 end
 

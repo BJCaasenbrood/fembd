@@ -30,6 +30,7 @@
 % * <matlab:doc('fem.Assembly/assemble') assemble> - unconstrained K and M
 % * <matlab:doc('fem.Assembly/constraints') constraints> - the map u = T*q
 % * <matlab:doc('fem.Assembly/plot') plot> - plot (deformed) bodies
+% * <matlab:doc('fem.Assembly/animate') animate> - slow-motion mode animation
 %
 %% Analysis
 %

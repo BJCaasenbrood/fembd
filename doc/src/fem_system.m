@@ -67,7 +67,14 @@
 % reactions are |Kfull*u - f| at the supported dofs. See
 % <tut05_loadsStatics.html Tutorial 5>.
 %
-%% Plotting
-% |a.plot(u, scale)| draws all bodies deformed by the full vector u.
+%% Plotting and animation
+% |h = a.plot(u, scale)| draws all bodies deformed by the full vector u and
+% returns one graphics handle per body. |a.animate(u, ...)| animates a mode
+% in slow motion (vibration modes are far too fast for real time); the
+% phase follows the wall clock, so the speed does not depend on rendering:
+%
+%   [V, f] = fem.modes(K, M, 6);
+%   a.animate(T*V(:,4), Frequency = f(4), Title = 'Mode 4', Rate = 1, Duration = 3);
+%
 % Since u also holds rotation dofs (radians), scale with the node dofs
 % only: |scale = s/max(abs(u(1:3*size(a.X, 1))))|.

@@ -249,7 +249,8 @@ out with f ≈ 0. Mode shapes are normalised so that `VᵀMV = I`.
 | `[K, M, D] = a.assemble(Lumped=false)` | Full matrices, including elastic interfaces; `D` holds joint and transmission dampers |
 | `[T, I] = a.constraints()` | `u = T*q`, and the independent global dofs `I` |
 | `[K, M, T, D] = a.system(Lumped=false)` | Reduced matrices, `T`, and the reduced damping matrix `D = T'·D·T` |
-| `a.plot(u, scale)` | Boundary surfaces, deformed by the full vector `u` and coloured by \|u\| |
+| `h = a.plot(u, scale)` | Boundary surfaces, deformed by the full vector `u` and coloured by \|u\| |
+| `a.animate(u, Frequency=, Title=, Amplitude=, Rate=, Duration=)` | Slow-motion animation of a mode or displacement `u`, clock-driven (speed independent of rendering); the title shows the slow-motion factor |
 | `Bodies`, `Links`, `Refs`, `Joints`, `Fixes`, `nDof`, `X` | Bodies, interfaces, reference points, joints, supports, number of full dofs, all nodes |
 
 **References.** A body is referred to by its index, `Name` or handle. A reference point or joint

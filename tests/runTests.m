@@ -312,6 +312,23 @@ pe = polyeig(full(Kr), full(Dr), full(Mr));
 check('Transmission + joint damping: statespace poles == polyeig(K, D, M)', ...
       sort(eig(sys.A), 'ComparisonMethod', 'real'), sort(pe, 'ComparisonMethod', 'real'), 1e-8);
 
+% plot handles and mode animation (headless): beam + rigid block + point mass
+a = fem.Assembly();  a.add(L);  a.add(fem.Body.rigidSurface(fullfile(tmp, 'right.stl'), 7800));
+a.add(fem.Body.pointMass(0.5, [Lx/4 h h], 1e-4*eye(3), Name = 'pm'));
+a.tie('left', 'right');  a.fix('left', @(X) X(:,1) < 1e-9);
+r = a.couple('left', @(X) abs(X(:,1) - Lx/4) < h/4);  a.joint(r, 'pm', 'fixed');
+[Kr, Mr, T] = a.system();  [V, f] = fem.modes(Kr, Mr, 1);
+fig = figure('Visible', 'off');
+hp = a.plot(T*V(:,1), 0.01);
+check('plot returns one handle per body (2 patches, 1 marker)', ...
+      [numel(hp), sum(isa(hp(1), 'matlab.graphics.primitive.Patch') + isa(hp(2), 'matlab.graphics.primitive.Patch')), isa(hp(3), 'matlab.graphics.chart.primitive.Line')], [3 2 1], 0);
+tic;  a.animate(T*V(:,1), Frequency = f(1), Rate = 2, Duration = 0.4);  ta = toc;
+hp = findobj(gca, 'Type', 'patch');  hm = findobj(gca, 'Type', 'line');
+moved = any(abs(hp(end).Vertices(:) - L.X(:)) > 0) && ~isequal([hm.XData hm.YData hm.ZData], [Lx/4 h h]);
+check(sprintf('animate: runs for its Duration (%.2f s) and moves bodies and markers', ta), ...
+      double(ta >= 0.4 && ta < 5 && moved && contains(get(get(gca, 'Title'), 'String'), 'slow motion')), 1, 0);
+close(fig);
+
 % memory: an elastic transmission on a model with ~600k dofs (a detailed rigid
 % STL) must not build full-length outer products (g'*g ran out of memory)
 fem.cylinderSTL(fullfile(tmp, 'big.stl'), [0 0], 0.03, 0, 0.3, 100000);
