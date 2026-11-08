@@ -266,6 +266,18 @@ check('Rigid transmission on a rigid body rz == on its joint', f1, f2, 1e-10);
 f1 = elbowBelt(true, kb);  f2 = elbowBelt(false, kb);  % base-mounted elbow drive
 check('Base-mounted elbow belt: absolute rz == shoulder + elbow', f1, f2, 1e-10);
 
+% memory: an elastic transmission on a model with ~600k dofs (a detailed rigid
+% STL) must not build full-length outer products (g'*g ran out of memory)
+fem.cylinderSTL(fullfile(tmp, 'big.stl'), [0 0], 0.03, 0, 0.3, 100000);
+a = fem.Assembly();
+a.add(fem.Body.rigidSurface(fullfile(tmp, 'big.stl'), 7850, Name = 'link'));
+a.add(fem.Body.pointMass(0.1, [0.1 0 0], 1e-4*eye(3), Name = 'rotor'));
+a.joint('ground', 'link',  'revolute', Point = [0 0 0],   Name = 'axis');
+a.joint('ground', 'rotor', 'revolute', Point = [0.1 0 0], Name = 'motor');
+a.transmission({'motor', 'link'}, [1 -1], Stiffness = 169430, Dirs = {1, 6});
+tic;  [Kr, ~] = a.system();  t = toc;
+check(sprintf('Transmission at %d dofs: system in %.1f s', a.nDof, t), size(Kr, 1), 2, 0);
+
 % inputs, outputs and state space: cantilever, tip force -> tip deflection
 a = fem.Assembly();  a.add(L);  a.fix('left', @(X) X(:,1) < 1e-9);
 a.input('Fz', 'left', @(X) X(:,1) > Lx/2 - 1e-9, 3);

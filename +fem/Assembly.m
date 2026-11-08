@@ -254,8 +254,9 @@ methods
             K = K + sparse(d, d, a.Joints(k).k, n, n);
         end
         for t = a.Transmissions(~arrayfun(@(t) isempty(t.k), a.Transmissions))
-            g = a.transmissionRow(t);                     % elastic transmissions
-            K = K + t.k*(g'*g);
+            d = arrayfun(@(i) a.transmissionDof(t, i), 1:numel(t.idx));
+            [i, j] = ndgrid(d, d);                        % elastic transmissions:
+            K = K + sparse(i(:), j(:), t.k*reshape(t.c'*t.c, [], 1), n, n);   % k c c'
         end
         for L = a.Links(~arrayfun(@(L) isempty(L.k), a.Links))
             ns = numel(L.slave);  kn = L.k(1);  kt = L.k(end);
