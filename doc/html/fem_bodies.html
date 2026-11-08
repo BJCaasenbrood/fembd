@@ -143,6 +143,13 @@ b = fem.Body.pointMass(m, c, J, Name = <span class="string">'motor'</span>);    
 </pre>
 <p>
 <tt>rigidSurface</tt> computes mass, centre of mass and inertia exactly from the closed STL surface. <tt>pointMass</tt> takes mass <tt>m</tt>, centre of mass <tt>c</tt> and inertia tensor <tt>J</tt> (about <tt>c</tt>), e.g. from a CAD report; it has no surface and is connected with a joint. See <a href="tut06_rigidBodies.html">Tutorial 6</a>.</p>
+<p>To use measured or CAD mass properties instead, call <tt>setMass</tt> on any rigid body. The inertia can be given about another point, in principal axes, or in mm, and is checked for validity:</p>
+<pre class="language-matlab">b.setMass(1.25);                                        <span class="comment">% scale: same distribution</span>
+b.setMass(1.25, CenterOfMass = c, Inertia = J);         <span class="comment">% J about c, global axes</span>
+b.setMass(1.25, CenterOfMass = c, Inertia = Jo, InertiaPoint = o);   <span class="comment">% J about point o</span>
+b.setMass(1.25, CenterOfMass = c, Inertia = [J1 J2 J3], Axes = R);   <span class="comment">% principal axes</span>
+b.setMass(1.25, CenterOfMass = cmm, Inertia = Jmm, LengthScale = 1e-3);   <span class="comment">% mm, kg mm^2</span>
+</pre>
 <h2 id="6">Placing parts</h2>
 <p>
 <tt>b.transform(R, t)</tt> moves a body rigidly, x -&gt; R*x + t.</p>
@@ -226,6 +233,16 @@ b = fem.Body.pointMass(m, c, J, Name = <span class="string">'motor'</span>);    
 % and inertia tensor |J| (about |c|), e.g. from a CAD report; it has no
 % surface and is connected with a joint. See
 % <tut06_rigidBodies.html Tutorial 6>.
+%
+% To use measured or CAD mass properties instead, call |setMass| on any
+% rigid body. The inertia can be given about another point, in principal
+% axes, or in mm, and is checked for validity:
+%
+%   b.setMass(1.25);                                        % scale: same distribution
+%   b.setMass(1.25, CenterOfMass = c, Inertia = J);         % J about c, global axes
+%   b.setMass(1.25, CenterOfMass = c, Inertia = Jo, InertiaPoint = o);   % J about point o
+%   b.setMass(1.25, CenterOfMass = c, Inertia = [J1 J2 J3], Axes = R);   % principal axes
+%   b.setMass(1.25, CenterOfMass = cmm, Inertia = Jmm, LengthScale = 1e-3);   % mm, kg mm^2
 %
 %% Placing parts
 % |b.transform(R, t)| moves a body rigidly, x -> R*x + t.

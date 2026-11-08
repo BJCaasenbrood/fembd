@@ -67,6 +67,16 @@
 % surface and is connected with a joint. See
 % <tut06_rigidBodies.html Tutorial 6>.
 %
+% To use measured or CAD mass properties instead, call |setMass| on any
+% rigid body. The inertia can be given about another point, in principal
+% axes, or in mm, and is checked for validity:
+%
+%   b.setMass(1.25);                                        % scale: same distribution
+%   b.setMass(1.25, CenterOfMass = c, Inertia = J);         % J about c, global axes
+%   b.setMass(1.25, CenterOfMass = c, Inertia = Jo, InertiaPoint = o);   % J about point o
+%   b.setMass(1.25, CenterOfMass = c, Inertia = [J1 J2 J3], Axes = R);   % principal axes
+%   b.setMass(1.25, CenterOfMass = cmm, Inertia = Jmm, LengthScale = 1e-3);   % mm, kg mm^2
+%
 %% Placing parts
 % |b.transform(R, t)| moves a body rigidly, x -> R*x + t.
 %

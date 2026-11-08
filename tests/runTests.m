@@ -266,6 +266,27 @@ check('Rigid transmission on a rigid body rz == on its joint', f1, f2, 1e-10);
 f1 = elbowBelt(true, kb);  f2 = elbowBelt(false, kb);  % base-mounted elbow drive
 check('Base-mounted elbow belt: absolute rz == shoulder + elbow', f1, f2, 1e-10);
 
+% setMass: mass properties of rigid bodies from CAD data
+B = fem.Body.rigidSurface(fullfile(tmp, 'beam.stl'), 7800);
+c0 = B.MassProps.c;  J0 = B.MassProps.J;  m0 = B.MassProps.m;
+B.setMass(2*m0);
+check('setMass(m): mass set, inertia scaled, c kept', [B.MassProps.m, B.MassProps.J(:)', B.MassProps.c], ...
+      [2*m0, 2*J0(:)', c0], 1e-12);
+Jo = J0 + m*(dot(c0, c0)*eye(3) - c0'*c0);            % the same inertia about the origin
+B.setMass(m, CenterOfMass = c0, Inertia = Jo, InertiaPoint = [0 0 0]);
+check('setMass: inertia about another point (parallel axis)', B.MassProps.J, J0, 1e-10);
+Rz = [cosd(30) -sind(30) 0; sind(30) cosd(30) 0; 0 0 1];
+B.setMass(m, Inertia = [1 2 2.5], Axes = Rz);
+check('setMass: principal moments and axes', B.MassProps.J, Rz*diag([1 2 2.5])*Rz', 1e-12);
+B.setMass(m*1, CenterOfMass = 1e3*c0, Inertia = 1e6*J0, LengthScale = 1e-3);
+check('setMass: mm and kg mm^2', [B.MassProps.c, B.MassProps.J(:)'], [c0, J0(:)'], 1e-12);
+try, B.setMass(m, Inertia = [1 1 3]); ok = false; catch e, ok = strcmp(e.identifier, 'fem:setMass'); end
+check('setMass: invalid inertia (triangle inequality) is rejected', ok, true, 0);
+a = fem.Assembly();  a.add(Rb);  Rb.setMass(3*m);       % meshed rigid body: no double counting
+[~, Mr] = a.system();
+check('setMass on a meshed rigid body replaces the mesh mass', full(Mr(1,1)), 3*m, 1e-10);
+Rb.MassProps = [];                                       % restore (Rb is used elsewhere)
+
 % memory: an elastic transmission on a model with ~600k dofs (a detailed rigid
 % STL) must not build full-length outer products (g'*g ran out of memory)
 fem.cylinderSTL(fullfile(tmp, 'big.stl'), [0 0], 0.03, 0, 0.3, 100000);

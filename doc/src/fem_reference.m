@@ -7,6 +7,7 @@
 % * <matlab:doc('fem.Body') fem.Body> - elastic or rigid body: mesh, material, K and M
 % * <matlab:doc('fem.Body.rigidSurface') fem.Body.rigidSurface> - rigid body from an STL surface (no meshing)
 % * <matlab:doc('fem.Body.pointMass') fem.Body.pointMass> - rigid body from mass properties only
+% * <matlab:doc('fem.Body/setMass') setMass> - set a rigid body's mass properties (e.g. from CAD)
 % * <matlab:doc('fem.Assembly') fem.Assembly> - bodies, connections, supports; reduced K, M and u = T*q
 % * <matlab:doc('fem.material') fem.material> - isotropic linear-elastic material
 %

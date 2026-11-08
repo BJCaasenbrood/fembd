@@ -224,6 +224,7 @@ out with f ≈ 0. Mode shapes are normalised so that `VᵀMV = I`.
 | `[K, M] = b.matrices(Lumped=false)` | Body matrices (3·nNode square; K = 0 if rigid) |
 | `b = fem.Body.rigidSurface(file, rho, Name=, Scale=, RefPoint=)` | Rigid body from an STL surface, without meshing |
 | `b = fem.Body.pointMass(m, c, J, Name=, RefPoint=)` | Rigid body from mass properties only (`J` about `c`); connect it with a joint |
+| `b.setMass(m, CenterOfMass=, Inertia=, InertiaPoint=, Axes=, LengthScale=)` | Override a rigid body's mass properties (e.g. from CAD). Inertia can be given about another point or in principal axes, and in mm; it is validated (symmetric, positive, triangle inequality). A meshed rigid body then ignores its mesh mass |
 | `M6 = b.rigidMass()`, `MassProps` | 6×6 mass about `Ref`, and `struct(m, c, J)`, of a mesh-free rigid body |
 | `b.transform(R, t)` | Rigid placement `x → R x + t` (also moves `Ref`) |
 | `idx = b.nodes(sel)` | Node indices for a selector |
