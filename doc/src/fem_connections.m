@@ -40,7 +40,8 @@
 % which may be |'ground'|. B follows A except for the released
 % directions, which become joint coordinates: ordinary dofs that can be
 % loaded, supported (locked), used as outputs or as Craig-Bampton
-% boundary dofs. |Stiffness| adds springs on them.
+% boundary dofs. |Stiffness| adds springs on them and |Damping| viscous
+% dampers (e.g. bearing or motor friction); transmissions accept |Damping| too.
 %
 % <html>
 % <table border="1" cellpadding="4" style="border-collapse:collapse">

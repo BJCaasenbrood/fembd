@@ -123,6 +123,7 @@ where `E` selects the released directions (the `Free` mask in the joint frame) a
 joint coordinates.
 - The joint is exact: B's 6 dofs become dependent and `s` becomes independent dofs.
 - A `Stiffness` on the released directions adds `diag(k)` on `s`: a torsion spring for a revolute joint, an axial spring for a prismatic one, or a 6-dof bushing for `'free'`.
+- A `Damping` on the released directions adds `diag(c)` to the damping matrix `D`: viscous bearing or motor friction, or a damped bushing.
 - A released joint without stiffness is a mechanism: `fem.modes` returns it with f = 0.
 - **Closed loops** (e.g. four-bar linkages) are allowed in the linear model. Joints are processed in the order they were created. A joint becomes a *cut joint* if its two ends are already connected through earlier joints, if its B side already follows another joint, or if its B side is supported. Its released coordinates follow from the relative motion, `s = (R̂E)ᵀ(P_B q_B − P_A q_A)`, and its constrained directions give rows `C q = 0` (§2.6). Define driving joints first: earlier joints keep their coordinates independent where possible.
 - **Posing.** `a.pose(joint, value)` sets the joint to a finite position: an angle in rad or an offset in m, relative to the pose the joint was created in. Everything on its B side moves rigidly: bodies, couplings, downstream joints and tied bodies. The next `a.system()` then linearises about the new pose. Sweeping a pose shows how the dynamics depend on the configuration. If the moving side is attached elsewhere too (a closed loop or a support), `pose` gives an error: posing closed loops would need a loop-closure solve, which is not implemented yet.
@@ -140,7 +141,7 @@ joint coordinates.
 ### 2.5b Transmissions
 `a.transmission(joints, c)` relates coordinates of different joints: a belt, gear, cable or rack. Their
 "stretch" is `δ = Σ cᵢ sᵢ`.
-- **Elastic** (`Stiffness = k`): a spring on `δ`, adding `K += k g gᵀ` with `g` the row of coefficients.
+- **Elastic** (`Stiffness = k`): a spring on `δ`, adding `K += k g gᵀ` with `g` the row of coefficients. `Damping = c` adds a damper on `δ`: `D += c g gᵀ`.
 - **Rigid** (no stiffness): the exact constraint `δ = 0`, removed by the coordinate partitioning of §2.6. The first joint listed (the driver) keeps its coordinate.
 
 Each entry is a joint (`Dirs`: its joint coordinate) or a reference point, i.e. a rigid body or
@@ -235,7 +236,7 @@ out with f ≈ 0. Mode shapes are normalised so that `VᵀMV = I`.
 | `a.add(body)` | Append a body |
 | `ns = a.tie(master, slave, Tol=, Stiffness=, Select=)` | Bonded tie, or elastic interface if `Stiffness` is given. `Tol` defaults to 0.1 × the median face edge of the finer surface. `Select`: selector restricting the slave nodes. Returns the number of tied nodes. |
 | `r = a.couple(body, sel, Name=, Point=)` | Rigid coupling (RBE2) of selected nodes of an elastic body to a new reference point; returns its name |
-| `j = a.joint(A, B, type, Point=, Axis=, Frame=, Free=, Stiffness=, Name=)` | Joint between reference points (rigid bodies, couplings, or `'ground'` for A); returns its name (§2.5). `Point` defaults to B's reference point, `Axis` to `[0 0 1]`. |
+| `j = a.joint(A, B, type, Point=, Axis=, Frame=, Free=, Stiffness=, Damping=, Name=)` | Joint between reference points (rigid bodies, couplings, or `'ground'` for A); returns its name (§2.5). `Point` defaults to B's reference point, `Axis` to `[0 0 1]`. |
 | `t = a.transmission(ids, c, Stiffness=, Dirs=, Name=)` | Elastic or rigid ratio between joint coordinates or reference-point dofs, `δ = Σ cᵢ sᵢ` (§2.5b) |
 | `a.pose(joint, value)` | Move a joint to a finite angle/offset (relative to its creation pose); B side moves rigidly (§2.5) |
 | `a.fix(id, sel, dirs)` | Support selected body nodes in `dirs ⊂ 1:3`, or a reference point (`dirs ⊂ 1:6`) or joint coordinates with `a.fix(id, [], dirs)`. |
@@ -245,9 +246,9 @@ out with f ≈ 0. Mode shapes are normalised so that `VᵀMV = I`.
 | `sys = a.statespace(Modes=, Damping=, StaticCorrection=, Lumped=, Format=)` | Modal state-space model with the inputs and outputs (Recipes) |
 | `[Bu, Cu, inName, outName, type] = a.ioMatrices()` | Inputs and outputs in the full space |
 | `j = a.qdof(d)` | Positions of global dofs `d` in `q`, so `u(d) = q(j)`. `d` must be independent (not supported, not a tie slave). |
-| `[K, M] = a.assemble(Lumped=false)` | Full matrices, including elastic interfaces |
+| `[K, M, D] = a.assemble(Lumped=false)` | Full matrices, including elastic interfaces; `D` holds joint and transmission dampers |
 | `[T, I] = a.constraints()` | `u = T*q`, and the independent global dofs `I` |
-| `[K, M, T] = a.system(Lumped=false)` | Reduced matrices and `T` |
+| `[K, M, T, D] = a.system(Lumped=false)` | Reduced matrices, `T`, and the reduced damping matrix `D = T'·D·T` |
 | `a.plot(u, scale)` | Boundary surfaces, deformed by the full vector `u` and coloured by \|u\| |
 | `Bodies`, `Links`, `Refs`, `Joints`, `Fixes`, `nDof`, `X` | Bodies, interfaces, reference points, joints, supports, number of full dofs, all nodes |
 
@@ -273,7 +274,8 @@ a.output('tip', 'tool', [], 1:3, Type = 'acceleration'); % accelerometer (3 sign
 sys = a.statespace(Modes = 20, Damping = 0.02);          % struct: A, B, C, D, names, f, Shapes
 ```
 - **Signals:** each input or output is one signal per direction, named `name` or `name_dir`.
-- **States:** modal, `[η; η̇]`. Rigid-body and mechanism modes are undamped double integrators.
+- **States:** modal, `[η; η̇]`. Rigid-body and mechanism modes are double integrators (undamped unless a joint or transmission damper acts on them).
+- **Damping:** the modal ratio `Damping` plus the joint and transmission dampers, projected exactly onto the retained modes (a full, non-proportional modal damping matrix).
 - **Static correction** (default) adds the quasi-static response to the inputs to the modal basis, so the DC gain is exact with few modes.
 - **Acceleration outputs** get the feedthrough `D = CΦΦᵀB`.
 - **`Format = "ss"`** returns an `ss` object (Control System Toolbox).

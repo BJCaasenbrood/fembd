@@ -30,7 +30,8 @@
 %
 % All constraints are eliminated with u = T*q: tie slaves, nodes of rigid
 % bodies and couplings, B sides of joints, cut joints and supports. The
-% returned K = T'*Kfull*T and M = T'*Mfull*T are symmetric and sparse.
+% returned K = T'*Kfull*T and M = T'*Mfull*T are symmetric and sparse. A
+% fourth output D = T'*Dfull*T holds joint and transmission dampers.
 % |a.assemble()| gives the unconstrained Kfull and Mfull, and
 % |a.constraints()| gives T and the independent dofs.
 %
@@ -49,7 +50,8 @@
 %
 % |statespace| returns A, B, C, D in modal coordinates [eta; deta], with
 % signal names, the mode frequencies and mode shapes. Rigid-body and
-% mechanism modes are double integrators. Static correction (default)
+% mechanism modes are double integrators. Joint and transmission dampers
+% are added to the modal damping. Static correction (default)
 % makes the DC gain exact with few modes. Use |Format = "ss"| for an |ss|
 % object (Control System Toolbox).
 %

@@ -14,7 +14,8 @@
 %
 % $$M\ddot q + D\dot q + K q = T^\top f(t), \qquad u = T q .$$
 %
-% fem returns K and M; damping is up to you, e.g. Rayleigh damping
+% fem returns K and M, and D for joint and transmission dampers
+% (|[K, M, T, D] = a.system()|). Material damping is up to you, e.g. Rayleigh damping
 % D = alpha*M + beta*K. <tut08_dynamics.html Tutorial 8> shows frequency
 % responses (direct and modal), Newmark time integration, and state-space
 % forms. For explicit time integration use |a.system(Lumped = true)|.

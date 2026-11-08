@@ -16,8 +16,8 @@ properties
     Bodies = {}
     Links  = struct('slave', {}, 'master', {}, 'N', {}, 'n', {}, 'A', {}, 'k', {})
     Refs   = struct('Name', {}, 'body', {}, 'nodes', {}, 'x', {})   % reference points
-    Joints = struct('Name', {}, 'A', {}, 'B', {}, 'p', {}, 'R', {}, 'free', {}, 'k', {}, 'value', {})
-    Transmissions = struct('Name', {}, 'kind', {}, 'idx', {}, 'dirs', {}, 'c', {}, 'k', {})
+    Joints = struct('Name', {}, 'A', {}, 'B', {}, 'p', {}, 'R', {}, 'free', {}, 'k', {}, 'value', {}, 'damp', {})
+    Transmissions = struct('Name', {}, 'kind', {}, 'idx', {}, 'dirs', {}, 'c', {}, 'k', {}, 'damp', {})
     Inputs  = struct('Name', {}, 'id', {}, 'nodes', {}, 'dirs', {})                % actuators, loads
     Outputs = struct('Name', {}, 'id', {}, 'nodes', {}, 'dirs', {}, 'type', {})    % sensors
     Fixes  = struct('id', {}, 'nodes', {}, 'dirs', {})              % supports (u = 0)
@@ -125,6 +125,8 @@ methods
     %   Free      1x6 logical mask [ux uy uz rx ry rz] in the joint frame,
     %             overrides type
     %   Stiffness stiffness of the released dofs (scalar or per dof)
+    %   Damping   viscous damping of the released dofs (scalar or per dof),
+    %             e.g. N m s/rad for a revolute joint
     %   Name      default 'joint<k>'
         arguments
             a
@@ -137,6 +139,7 @@ methods
             opts.Frame double = []
             opts.Free = []
             opts.Stiffness double = 0
+            opts.Damping double = 0
             opts.Name (1,:) char = ''
         end
         iA = a.refIndex(A);  iB = a.refIndex(B);
@@ -158,7 +161,8 @@ methods
         name = opts.Name;
         if isempty(name), name = sprintf('joint%d', numel(a.Joints) + 1); end
         a.Joints(end+1) = struct('Name', name, 'A', iA, 'B', iB, 'p', p(:)', 'R', R, ...
-            'free', free, 'k', opts.Stiffness(:).*ones(nnz(free), 1), 'value', zeros(nnz(free), 1));
+            'free', free, 'k', opts.Stiffness(:).*ones(nnz(free), 1), 'value', zeros(nnz(free), 1), ...
+            'damp', opts.Damping(:).*ones(nnz(free), 1));
     end
 
     function ns = tie(a, master, slave, opts)
@@ -232,8 +236,9 @@ methods
             'N', triShape(l, size(Fm, 2)), 'n', n, 'A', nodeA(s), 'k', opts.Stiffness);
     end
 
-    function [K, M] = assemble(a, opts)
-    %ASSEMBLE Unconstrained global K and M, including elastic interfaces.
+    function [K, M, D] = assemble(a, opts)
+    %ASSEMBLE Unconstrained global K and M, including elastic interfaces, and
+    %   the damping matrix D of joint and transmission dampers.
     %   Option Lumped = true gives an HRZ-lumped (diagonal) mass matrix.
         arguments
             a
@@ -249,23 +254,26 @@ methods
                 M(d, d) = M(d, d) + b.rigidMass();
             end
         end
-        for k = 1:numel(a.Joints)                         % joint springs
+        D = sparse(n, n);
+        for k = 1:numel(a.Joints)                         % joint springs and dampers
             d = a.jointDofs(k);
             K = K + sparse(d, d, a.Joints(k).k, n, n);
+            D = D + sparse(d, d, a.Joints(k).damp, n, n);
         end
         for t = a.Transmissions(~arrayfun(@(t) isempty(t.k), a.Transmissions))
             d = arrayfun(@(i) a.transmissionDof(t, i), 1:numel(t.idx));
-            [i, j] = ndgrid(d, d);                        % elastic transmissions:
-            K = K + sparse(i(:), j(:), t.k*reshape(t.c'*t.c, [], 1), n, n);   % k c c'
+            [i, j] = ndgrid(d, d);  cc = reshape(t.c'*t.c, [], 1);   % elastic transmissions:
+            K = K + sparse(i(:), j(:), t.k*cc, n, n);               % k c c'
+            D = D + sparse(i(:), j(:), t.damp*cc, n, n);            % damping c_d c c'
         end
         for L = a.Links(~arrayfun(@(L) isempty(L.k), a.Links))
             ns = numel(L.slave);  kn = L.k(1);  kt = L.k(end);
             nn = permute(L.n, [2 3 1]).*permute(L.n, [3 2 1]);
             Db = reshape(L.A, 1, 1, []).*(kt*eye(3) + (kn - kt)*nn);
             [p, q, i] = ndgrid(1:3, 1:3, 1:ns);
-            D = sparse(3*(i(:) - 1) + p(:), 3*(i(:) - 1) + q(:), Db(:));
+            Ds = sparse(3*(i(:) - 1) + p(:), 3*(i(:) - 1) + q(:), Db(:));
             G = a.gap(L);
-            K = K + G'*D*G;
+            K = K + G'*Ds*G;
         end
     end
 
@@ -346,18 +354,20 @@ methods
         end
     end
 
-    function [K, M, T] = system(a, opts)
-    %SYSTEM Reduced matrices K = T'*K*T, M = T'*M*T and the map u = T*q.
+    function [K, M, T, D] = system(a, opts)
+    %SYSTEM Reduced matrices K = T'*K*T, M = T'*M*T and the map u = T*q, and
+    %   the reduced damping matrix D of joint and transmission dampers.
     %   Option Lumped = true lumps the body mass matrices (HRZ). M stays
     %   diagonal unless rigid ties redistribute slave masses to masters.
         arguments
             a
             opts.Lumped (1,1) logical = false
         end
-        [K, M] = a.assemble(Lumped = opts.Lumped);
+        [K, M, D] = a.assemble(Lumped = opts.Lumped);
         T = a.constraints();
         K = T'*K*T;  K = (K + K')/2;
         M = T'*M*T;  M = (M + M')/2;
+        D = T'*D*T;  D = (D + D')/2;
     end
 
     function name = transmission(a, ids, coeffs, opts)
@@ -379,12 +389,14 @@ methods
     %         % base-mounted motor driving the absolute rotation of a link
     %     a.transmission({'gear1', 'gear2'}, [r1 r2])        % meshing gears
     %     a.transmission({'pinion', 'rack'}, [r -1])         % rack and pinion
+    %   Option Damping = c adds a viscous damper on delta (elastic only).
         arguments
             a
             ids (1,:) cell
             coeffs (1,:) double
             opts.Dirs = []
             opts.Stiffness double = []
+            opts.Damping (1,1) double = 0
             opts.Name (1,:) char = ''
         end
         nj = numel(ids);
@@ -405,10 +417,13 @@ methods
         end
         assert(isempty(opts.Stiffness) || isscalar(opts.Stiffness), 'fem:transmission', ...
             'Stiffness must be a scalar (or empty for a rigid transmission).');
+        assert(~isempty(opts.Stiffness) || opts.Damping == 0, 'fem:transmission', ...
+            'Damping needs an elastic transmission (give Stiffness, possibly 0).');
         name = opts.Name;
         if isempty(name), name = sprintf('transmission%d', numel(a.Transmissions) + 1); end
         a.Transmissions(end+1) = struct('Name', name, 'kind', {kind}, 'idx', idx, ...
-                                        'dirs', dirs, 'c', coeffs, 'k', opts.Stiffness);
+                                        'dirs', dirs, 'c', coeffs, 'k', opts.Stiffness, ...
+                                        'damp', opts.Damping);
     end
 
     function pose(a, name, value)
@@ -497,7 +512,8 @@ methods
     %     Modes            number of modes (default 20); rigid-body and
     %                      mechanism modes are included as exact double
     %                      integrators (lambda < 1e-10 max(lambda) is set to 0)
-    %     Damping          modal damping ratio, scalar or one per state mode
+    %     Damping          modal damping ratio, scalar or one per state mode;
+    %                      joint and transmission dampers are added to it
     %     StaticCorrection add the quasi-static response to the inputs to the
     %                      basis (default true): exact DC gain with few modes
     %     Lumped           lumped mass (default false)
@@ -512,7 +528,7 @@ methods
         end
         assert(~isempty(a.Inputs) || ~isempty(a.Outputs), 'fem:statespace', ...
             'Define inputs and outputs first (a.input, a.output).');
-        [K, M, T] = a.system(Lumped = opts.Lumped);
+        [K, M, T, Dq] = a.system(Lumped = opts.Lumped);
         [Bu, Cu, inName, outName, type] = a.ioMatrices();
         B = T'*Bu;  C = Cu*T;  n = size(K, 1);
 
@@ -537,7 +553,7 @@ methods
         zeta = opts.Damping(:);
         if isscalar(zeta), zeta = zeta*ones(nr, 1); end
         assert(numel(zeta) == nr, 'fem:statespace', 'Damping: scalar or %d values.', nr);
-        Om2 = diag(lam);  Z = diag(2*zeta.*w);
+        Om2 = diag(lam);  Z = diag(2*zeta.*w) + full(Phi'*Dq*Phi);   % modal + discrete dampers
         Bm = Phi'*B;  Cm = C*Phi;  no = size(C, 1);
         A = [zeros(nr), eye(nr); -Om2, -Z];
         Bs = [zeros(nr, size(B, 2)); Bm];

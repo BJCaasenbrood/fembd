@@ -125,7 +125,7 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <h2 id="4">Joints</h2>
 <pre class="language-matlab">j = a.joint(A, B, type, Point=, Axis=, Frame=, Free=, Stiffness=, Name=)
 </pre>
-<p>A joint connects reference point B (a rigid body or a coupling) to A, which may be <tt>'ground'</tt>. B follows A except for the released directions, which become joint coordinates: ordinary dofs that can be loaded, supported (locked), used as outputs or as Craig-Bampton boundary dofs. <tt>Stiffness</tt> adds springs on them.</p>
+<p>A joint connects reference point B (a rigid body or a coupling) to A, which may be <tt>'ground'</tt>. B follows A except for the released directions, which become joint coordinates: ordinary dofs that can be loaded, supported (locked), used as outputs or as Craig-Bampton boundary dofs. <tt>Stiffness</tt> adds springs on them and <tt>Damping</tt> viscous dampers (e.g. bearing or motor friction); transmissions accept <tt>Damping</tt> too.</p>
 <p>
 <table border="1" cellpadding="4" style="border-collapse:collapse">
 <tr><th>Type</th><th>Free in the joint frame</th></tr>
@@ -209,7 +209,8 @@ a.transmission({<span class="string">'gear1'</span>, <span class="string">'gear2
 % which may be |'ground'|. B follows A except for the released
 % directions, which become joint coordinates: ordinary dofs that can be
 % loaded, supported (locked), used as outputs or as Craig-Bampton
-% boundary dofs. |Stiffness| adds springs on them.
+% boundary dofs. |Stiffness| adds springs on them and |Damping| viscous
+% dampers (e.g. bearing or motor friction); transmissions accept |Damping| too.
 %
 % <html>
 % <table border="1" cellpadding="4" style="border-collapse:collapse">

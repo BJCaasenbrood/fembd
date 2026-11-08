@@ -287,6 +287,31 @@ a = fem.Assembly();  a.add(Rb);  Rb.setMass(3*m);       % meshed rigid body: no 
 check('setMass on a meshed rigid body replaces the mesh mass', full(Mr(1,1)), 3*m, 1e-10);
 Rb.MassProps = [];                                       % restore (Rb is used elsewhere)
 
+% damping on joints and transmissions
+mD = 2;  rD = [0.2 0 0];  JD = 0.01;  kD = 300;  cD = 0.4;
+a = fem.Assembly();
+a.add(fem.Body.pointMass(mD, rD, JD*eye(3), Name = 'link'));
+a.joint('ground', 'link', 'revolute', Point = [0 0 0], Stiffness = kD, Damping = cD, Name = 'axis');
+a.input('tau', 'axis');  a.output('th', 'axis');
+[~, ~, ~, Dr] = a.system();
+check('Joint damping: D = c on the joint coordinate', full(Dr), cD, 1e-12);
+sys = a.statespace(Modes = 1, Damping = 0);
+Jtot = JD + mD*norm(rD)^2;
+check('Joint damping: poles of J s^2 + c s + k', sort(eig(sys.A)), sort(roots([Jtot cD kD])), 1e-10);
+
+a = fem.Assembly();                                     % damped belt between rotor and link
+a.add(fem.Body.pointMass(2, [0.2 0 0], 0.01*eye(3), Name = 'link'));
+a.add(fem.Body.pointMass(0.1, [0.5 0 0], 1e-4*eye(3), Name = 'rotor'));
+a.joint('ground', 'link',  'revolute', Point = [0 0 0], Stiffness = 300, Name = 'axis');
+a.joint('ground', 'rotor', 'revolute', Point = [0.5 0 0], Damping = 1e-3, Name = 'motor');
+a.transmission({'motor', 'link'}, [1/3 -1], Stiffness = 2e4, Damping = 2, Dirs = {1, 6});
+a.input('tau', 'motor');  a.output('th', 'link', [], 6);
+[Kr, Mr, ~, Dr] = a.system();
+sys = a.statespace(Modes = size(Kr, 1), Damping = 0);
+pe = polyeig(full(Kr), full(Dr), full(Mr));
+check('Transmission + joint damping: statespace poles == polyeig(K, D, M)', ...
+      sort(eig(sys.A), 'ComparisonMethod', 'real'), sort(pe, 'ComparisonMethod', 'real'), 1e-8);
+
 % memory: an elastic transmission on a model with ~600k dofs (a detailed rigid
 % STL) must not build full-length outer products (g'*g ran out of memory)
 fem.cylinderSTL(fullfile(tmp, 'big.stl'), [0 0], 0.03, 0, 0.3, 100000);
