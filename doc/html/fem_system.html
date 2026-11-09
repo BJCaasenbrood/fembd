@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>Dofs, Supports, Loads and the System</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-08">
+<meta name="DC.date" content="2026-11-09">
 <meta name="DC.source" content="fem_system.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -126,7 +126,7 @@ a.fix(joint, [])              <span class="comment">% lock a joint</span>
 <h2 id="3">The system</h2>
 <pre class="language-matlab">[K, M, T] = a.system(Lumped = false)
 </pre>
-<p>All constraints are eliminated with u = T*q: tie slaves, nodes of rigid bodies and couplings, B sides of joints, cut joints and supports. The returned K = T'*Kfull*T and M = T'*Mfull*T are symmetric and sparse. A fourth output D = T'*Dfull*T holds joint and transmission dampers. <tt>a.assemble()</tt> gives the unconstrained Kfull and Mfull, and <tt>a.constraints()</tt> gives T and the independent dofs.</p>
+<p>All constraints are eliminated with u = T*q: tie slaves, nodes of rigid bodies and couplings, B sides of joints, cut joints and supports. The returned K = T'*Kfull*T and M = T'*Mfull*T are symmetric and sparse. A fourth output D = T'*Dfull*T holds body (Rayleigh), joint and transmission dampers. <tt>a.assemble()</tt> gives the unconstrained Kfull and Mfull, and <tt>a.constraints()</tt> gives T and the independent dofs.</p>
 <p>
 <tt>a.qdof(d)</tt> converts global dofs into positions in q, so u(d) = q(a.qdof(d)).</p>
 <h2 id="4">Inputs, outputs and state space</h2>
@@ -138,7 +138,7 @@ a.output(<span class="string">'tip'</span>, <span class="string">'tool'</span>, 
 sys = a.statespace(Modes = 20, Damping = 0.02);
 </pre>
 <p>
-<tt>statespace</tt> returns A, B, C, D in modal coordinates [eta; deta], with signal names, the mode frequencies and mode shapes. Rigid-body and mechanism modes are double integrators. Joint and transmission dampers are added to the modal damping. Static correction (default) makes the DC gain exact with few modes. Use <tt>Format = "ss"</tt> for an <tt>ss</tt> object (Control System Toolbox).</p>
+<tt>statespace</tt> returns A, B, C, D in modal coordinates [eta; deta], with signal names, the mode frequencies and mode shapes. Rigid-body and mechanism modes are double integrators. Joint and transmission dampers are added to the modal damping. Static correction (default) makes the DC gain exact with few modes. Use <tt>Format = "ss"</tt> for an <tt>ss</tt> object (Control System Toolbox), needed for <tt>zpk</tt>, <tt>tf</tt> and <tt>feedback</tt>; see <a href="fem_analysis.html#4">Control design</a>.</p>
 <h2 id="5">Loads and outputs (by hand)</h2>
 <p>Build loads and outputs in the full space and project them:</p>
 <pre class="language-matlab">f  = zeros(a.nDof, 1);  f(d) = F;      <span class="comment">% nodal forces</span>
@@ -195,7 +195,7 @@ a.animate(T*V(:,4), Frequency = f(4), Title = <span class="string">'Mode 4'</spa
 % All constraints are eliminated with u = T*q: tie slaves, nodes of rigid
 % bodies and couplings, B sides of joints, cut joints and supports. The
 % returned K = T'*Kfull*T and M = T'*Mfull*T are symmetric and sparse. A
-% fourth output D = T'*Dfull*T holds joint and transmission dampers.
+% fourth output D = T'*Dfull*T holds body (Rayleigh), joint and transmission dampers.
 % |a.assemble()| gives the unconstrained Kfull and Mfull, and
 % |a.constraints()| gives T and the independent dofs.
 %
@@ -217,7 +217,8 @@ a.animate(T*V(:,4), Frequency = f(4), Title = <span class="string">'Mode 4'</spa
 % mechanism modes are double integrators. Joint and transmission dampers
 % are added to the modal damping. Static correction (default)
 % makes the DC gain exact with few modes. Use |Format = "ss"| for an |ss|
-% object (Control System Toolbox).
+% object (Control System Toolbox), needed for |zpk|, |tf| and |feedback|;
+% see <fem_analysis.html#4 Control design>.
 %
 %% Loads and outputs (by hand)
 % Build loads and outputs in the full space and project them:

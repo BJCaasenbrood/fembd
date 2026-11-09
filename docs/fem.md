@@ -217,6 +217,7 @@ out with f ≈ 0. Mode shapes are normalised so that `VᵀMV = I`.
 | `Size`, `Order`, `Remesh`, `FeatureAngle` | | Passed to `fem.meshSTL` |
 | `Rigid` | false | Make the body rigid (§2.4) |
 | `RefPoint` | centroid | Reference point of a rigid body (after `Scale`) |
+| `Damping` | `[0 0]` | Rayleigh damping `[α β]` of an elastic body: `D = αM + βK`. `β = 2ζ/ω` gives ratio ζ at ω (rising with frequency); `α` also damps the body's rigid motion |
 
 | Member | |
 |---|---|
@@ -246,7 +247,7 @@ out with f ≈ 0. Mode shapes are normalised so that `VᵀMV = I`.
 | `sys = a.statespace(Modes=, Damping=, StaticCorrection=, Lumped=, Format=)` | Modal state-space model with the inputs and outputs (Recipes) |
 | `[Bu, Cu, inName, outName, type] = a.ioMatrices()` | Inputs and outputs in the full space |
 | `j = a.qdof(d)` | Positions of global dofs `d` in `q`, so `u(d) = q(j)`. `d` must be independent (not supported, not a tie slave). |
-| `[K, M, D] = a.assemble(Lumped=false)` | Full matrices, including elastic interfaces; `D` holds joint and transmission dampers |
+| `[K, M, D] = a.assemble(Lumped=false)` | Full matrices, including elastic interfaces; `D` holds body (Rayleigh), joint and transmission dampers |
 | `[T, I] = a.constraints()` | `u = T*q`, and the independent global dofs `I` |
 | `[K, M, T, D] = a.system(Lumped=false)` | Reduced matrices, `T`, and the reduced damping matrix `D = T'·D·T` |
 | `h = a.plot(u, scale)` | Boundary surfaces, deformed by the full vector `u` and coloured by \|u\| |
@@ -276,11 +277,42 @@ sys = a.statespace(Modes = 20, Damping = 0.02);          % struct: A, B, C, D, n
 ```
 - **Signals:** each input or output is one signal per direction, named `name` or `name_dir`.
 - **States:** modal, `[η; η̇]`. Rigid-body and mechanism modes are double integrators (undamped unless a joint or transmission damper acts on them).
-- **Damping:** the modal ratio `Damping` plus the joint and transmission dampers, projected exactly onto the retained modes (a full, non-proportional modal damping matrix).
+- **Damping:** the modal ratio `Damping` plus the body, joint and transmission dampers, projected exactly onto the retained modes (a full, non-proportional modal damping matrix).
 - **Static correction** (default) adds the quasi-static response to the inputs to the modal basis, so the DC gain is exact with few modes.
 - **Acceleration outputs** get the feedthrough `D = CΦΦᵀB`.
 - **`Format = "ss"`** returns an `ss` object (Control System Toolbox).
 - **`a.ioMatrices()`** gives the full-space `Bu`, `Cu` for your own formulations.
+
+**Transfer functions and control design** (Control System Toolbox). `zpk`, `tf`, `bode` and
+`feedback` need an `ss` object: the default struct gives "Invalid syntax". Use `Format = "ss"`, or
+convert the struct with `ss(sys.A, sys.B, sys.C, sys.D, 'InputName', sys.InputName, 'OutputName', sys.OutputName)`.
+```matlab
+sys = a.statespace(Modes = 20, Format = "ss");
+s   = tf('s');
+G11 = zpk(sys('enc1', 'tau1'));                  % one channel, by signal names
+G11r = tf(balred(sys('enc1', 'tau1'), 6));       % low-order tf in s
+
+% decentralised PID with a 2nd-order low-pass per loop
+P = sys({'enc1', 'enc2'}, {'tau1', 'tau2'});      % 2x2 plant
+C = tf(zeros(2));
+for k = 1:2
+    LP     = wlp(k)^2/(s^2 + 2*zlp(k)*wlp(k)*s + wlp(k)^2);
+    C(k,k) = (KP(k) + KI(k)/s + KD(k)*s)*LP;
+end
+CL = feedback(P*C, eye(2));                      % MIMO closed loop, coupling included
+margin(C(1,1)*P(1,1))                            % loop-at-a-time margins
+```
+- **Keep `ss` for the full model.** A `tf` of 40+ states has badly conditioned polynomial
+  coefficients: use `zpk` per channel, or reduce first (`balred`) and then convert to `tf`.
+  `ss*tf` products stay `ss`, so the loop gain keeps the full accuracy.
+- **Proper controllers.** A pure derivative `KD*s` is improper. Roll it off with a low-pass
+  (above) or a derivative filter, `pid(KP, KI, KD, Tf)`.
+- **Collocation.** Torque to its own joint or motor coordinate (`tau1 → enc1`) is collocated:
+  poles and zeros alternate and the loop is robust. Feeding back a coordinate behind an elastic
+  transmission (`tau1 → th1`, link side of a belt) is not collocated: the belt mode puts a
+  phase drop of 180° in the loop and limits the bandwidth.
+- **Damping.** With `Damping = 0` only the physical dampers (body, joint, transmission) act, and lightly damped modes give
+  sharp peaks in the margins. A small modal ratio (0.01–0.02) is usually more realistic.
 
 **Loads and outputs.** Build them in the full space and project with `T`:
 ```matlab

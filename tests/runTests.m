@@ -44,6 +44,21 @@ a = fem.Assembly();  a.add(b);
 [~, f] = fem.modes(Kr, Mr, 7);
 check('Free body: 6 rigid modes', max(f(1:6))/f(7), 0, 1e-4);
 
+% Rayleigh body damping: modal ratios alpha/(2 w) + beta w/2
+aR = 2;  bR = 2e-5;
+a = fem.Assembly();
+a.add(fem.Body(fullfile(tmp, 'beam.stl'), steel, Size = h/2, Order = 1, Damping = [aR bR]));
+a.fix(1, @(X) X(:,1) < 1e-9);
+a.input('F', 1, @(X) X(:,1) > Lx - 1e-9, 3);  a.output('uz', 1, @(X) X(:,1) > Lx - 1e-9, 3);
+[Kr, Mr, ~, Dr] = a.system();
+check('Body damping: D = alpha M + beta K', norm(Dr - aR*Mr - bR*Kr, 1)/norm(Dr, 1), 0, 1e-12);
+sys = a.statespace(Modes = 4, Damping = 0, StaticCorrection = false);
+p = eig(sys.A);  [~, i] = sort(abs(p));  p = p(i(1:2:end));
+w = 2*pi*sys.f;
+check('Body damping: modal ratios alpha/(2w) + beta w/2', -real(p)./abs(p), aR./(2*w) + bR*w/2, 1e-8);
+ok = false;  try, fem.Body(struct('X', b.X, 'T', b.T), steel, Rigid = true, Damping = [1 0]); catch, ok = true; end
+check('Body damping on a rigid body is rejected', ok, true, 0);
+
 % two non-conforming halves, tied
 fem.boxSTL(fullfile(tmp, 'left.stl'),  [0 0 0],    [Lx/2 h h]);
 fem.boxSTL(fullfile(tmp, 'right.stl'), [Lx/2 0 0], [Lx h h]);

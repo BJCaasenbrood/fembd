@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>Modal Analysis, Dynamics and Reduction</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-08">
+<meta name="DC.date" content="2026-11-09">
 <meta name="DC.source" content="fem_analysis.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -92,7 +92,10 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <a href="#3">State-space models</a>
 </li>
 <li>
-<a href="#4">Craig-Bampton reduction</a>
+<a href="#4">Control design</a>
+</li>
+<li>
+<a href="#5">Craig-Bampton reduction</a>
 </li>
 </ul>
 </div>
@@ -103,19 +106,45 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <h2 id="2">Dynamics</h2>
 <p>The equations of motion in q are</p>
 <p>
-<img src="fem_analysis_eq09385788491283767730.png" alt="$$M\ddot q + D\dot q + K q = T^\top f(t), \qquad u = T q .$$" style="width:295px;height:22px;"></p>
-<p>fem returns K and M, and D for joint and transmission dampers (<tt>[K, M, T, D] = a.system()</tt>). Material damping is up to you, e.g. Rayleigh damping D = alpha*M + beta*K. <a href="tut08_dynamics.html">Tutorial 8</a> shows frequency responses (direct and modal), Newmark time integration, and state-space forms. For explicit time integration use <tt>a.system(Lumped = true)</tt>.</p>
+<img src="fem_analysis_eq09385788491283767730.png" alt="$$M\ddot q + D\dot q + K q = T^\top f(t), \qquad u = T q .$$" style="width:263px;height:20px;"></p>
+<p>fem returns K and M, and D for body, joint and transmission dampers (<tt>[K, M, T, D] = a.system()</tt>). Material damping of a body is Rayleigh damping, D = alpha*M + beta*K, set with <tt>fem.Body(..., Damping = [alpha beta])</tt>; <tt>beta = 2*zeta/omega</tt> gives the ratio zeta at omega. <a href="tut08_dynamics.html">Tutorial 8</a> shows frequency responses (direct and modal), Newmark time integration, and state-space forms. For explicit time integration use <tt>a.system(Lumped = true)</tt>.</p>
 <h2 id="3">State-space models</h2>
 <p>With inputs and outputs defined (<tt>a.input</tt>, <tt>a.output</tt>), one call gives a reduced modal state-space model, including static correction, damping and acceleration feedthrough:</p>
 <pre class="language-matlab">sys = a.statespace(Modes = 20, Damping = 0.02);
 </pre>
 <p>See <a href="fem_system.html">Dofs, Supports, Loads and the System</a>.</p>
-<h2 id="4">Craig-Bampton reduction</h2>
+<h2 id="4">Control design</h2>
+<p>With the Control System Toolbox, ask for an <tt>ss</tt> object: <tt>zpk</tt>, <tt>tf</tt>, <tt>bode</tt> and <tt>feedback</tt> do not accept the default struct (the error is "Invalid syntax"). Channels are selected by signal name:</p>
+<pre class="language-matlab">sys = a.statespace(Modes = 20, Format = <span class="string">"ss"</span>);
+s   = tf(<span class="string">'s'</span>);
+G11 = zpk(sys(<span class="string">'enc1'</span>, <span class="string">'tau1'</span>));              <span class="comment">% one channel</span>
+G11r = tf(balred(sys(<span class="string">'enc1'</span>, <span class="string">'tau1'</span>), 6));   <span class="comment">% low-order tf in s</span>
+</pre>
+<p>A decentralised PID with a second-order low-pass per loop, closed around the full 2 x 2 plant so the coupling between the loops is kept:</p>
+<pre class="language-matlab">P = sys({<span class="string">'enc1'</span>, <span class="string">'enc2'</span>}, {<span class="string">'tau1'</span>, <span class="string">'tau2'</span>});
+C = tf(zeros(2));
+<span class="keyword">for</span> k = 1:2
+    LP     = wlp(k)^2/(s^2 + 2*zlp(k)*wlp(k)*s + wlp(k)^2);
+    C(k,k) = (KP(k) + KI(k)/s + KD(k)*s)*LP;
+<span class="keyword">end</span>
+CL = feedback(P*C, eye(2));                  <span class="comment">% closed loop</span>
+margin(C(1,1)*P(1,1))                        <span class="comment">% loop-at-a-time margins</span>
+</pre>
+<p>Notes:</p>
+<div>
+<ul>
+<li>Keep the full model as <tt>ss</tt>: a <tt>tf</tt> of 40+ states has badly conditioned coefficients. Use <tt>zpk</tt> per channel, or reduce with <tt>balred</tt> before converting to <tt>tf</tt>.</li>
+<li>A pure derivative <tt>KD*s</tt> is improper; roll it off with a low-pass (as above) or use <tt>pid(KP, KI, KD, Tf)</tt>.</li>
+<li>Torque to its own joint or motor coordinate (<tt>tau1 -&gt; enc1</tt>) is collocated and robust. A coordinate behind an elastic transmission (<tt>tau1 -&gt; th1</tt>, the link side of a belt) is not: the transmission mode adds a 180 degree phase drop and limits the bandwidth.</li>
+<li>With <tt>Damping = 0</tt> only the physical dampers act; a small modal ratio (0.01-0.02) gives more realistic margins.</li>
+</ul>
+</div>
+<h2 id="5">Craig-Bampton reduction</h2>
 <pre class="language-matlab">[Kc, Mc, V, f] = fem.craigBampton(K, M, b, n)
 </pre>
 <p>Keeps the dofs <tt>b</tt> (indices into K, e.g. from <tt>a.qdof</tt>) as physical coordinates and adds <tt>n</tt> fixed-interface modes:</p>
 <p>
-<img src="fem_analysis_eq04802420464473604444.png" alt="$$q \approx V \left[\begin{array}{c} u_b \\ \eta \end{array}\right], \quad&#10;  V = \left[\begin{array}{cc} I &amp; 0 \\ \Psi &amp; \Phi \end{array}\right], \quad&#10;  \Psi = -K_{ii}^{-1} K_{ib}.$$" style="width:385px;height:45px;"></p>
+<img src="fem_analysis_eq04802420464473604444.png" alt="$$q \approx V \left[\begin{array}{c} u_b \\ \eta \end{array}\right], \quad&#10;  V = \left[\begin{array}{cc} I &amp; 0 \\ \Psi &amp; \Phi \end{array}\right], \quad&#10;  \Psi = -K_{ii}^{-1} K_{ib}.$$" style="width:344px;height:40px;"></p>
 <p>
 <tt>n = 0</tt> gives Guyan reduction, which is exact for static loads at the boundary. The full field follows from u = T*V*x. Good boundary dofs are interfaces, actuators and sensors: e.g. the 6 dofs of a coupling or rigid body, or joint coordinates. See <a href="tut09_reduction.html">Tutorial 9</a>.</p>
 <pre class="language-matlab">ib = a.qdof(a.dof(<span class="string">'flange'</span>));
@@ -146,9 +175,10 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 %
 % $$M\ddot q + D\dot q + K q = T^\top f(t), \qquad u = T q .$$
 %
-% fem returns K and M, and D for joint and transmission dampers
-% (|[K, M, T, D] = a.system()|). Material damping is up to you, e.g. Rayleigh damping
-% D = alpha*M + beta*K. <tut08_dynamics.html Tutorial 8> shows frequency
+% fem returns K and M, and D for body, joint and transmission dampers
+% (|[K, M, T, D] = a.system()|). Material damping of a body is Rayleigh
+% damping, D = alpha*M + beta*K, set with |fem.Body(..., Damping = [alpha beta])|;
+% |beta = 2*zeta/omega| gives the ratio zeta at omega. <tut08_dynamics.html Tutorial 8> shows frequency
 % responses (direct and modal), Newmark time integration, and state-space
 % forms. For explicit time integration use |a.system(Lumped = true)|.
 %
@@ -160,6 +190,42 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 %   sys = a.statespace(Modes = 20, Damping = 0.02);
 %
 % See <fem_system.html Dofs, Supports, Loads and the System>.
+%
+%% Control design
+% With the Control System Toolbox, ask for an |ss| object: |zpk|, |tf|,
+% |bode| and |feedback| do not accept the default struct (the error is
+% "Invalid syntax"). Channels are selected by signal name:
+%
+%   sys = a.statespace(Modes = 20, Format = "ss");
+%   s   = tf('s');
+%   G11 = zpk(sys('enc1', 'tau1'));              % one channel
+%   G11r = tf(balred(sys('enc1', 'tau1'), 6));   % low-order tf in s
+%
+% A decentralised PID with a second-order low-pass per loop, closed around
+% the full 2 x 2 plant so the coupling between the loops is kept:
+%
+%   P = sys({'enc1', 'enc2'}, {'tau1', 'tau2'});
+%   C = tf(zeros(2));
+%   for k = 1:2
+%       LP     = wlp(k)^2/(s^2 + 2*zlp(k)*wlp(k)*s + wlp(k)^2);
+%       C(k,k) = (KP(k) + KI(k)/s + KD(k)*s)*LP;
+%   end
+%   CL = feedback(P*C, eye(2));                  % closed loop
+%   margin(C(1,1)*P(1,1))                        % loop-at-a-time margins
+%
+% Notes:
+%
+% * Keep the full model as |ss|: a |tf| of 40+ states has badly
+%   conditioned coefficients. Use |zpk| per channel, or reduce with
+%   |balred| before converting to |tf|.
+% * A pure derivative |KD*s| is improper; roll it off with a low-pass (as
+%   above) or use |pid(KP, KI, KD, Tf)|.
+% * Torque to its own joint or motor coordinate (|tau1 -> enc1|) is
+%   collocated and robust. A coordinate behind an elastic transmission
+%   (|tau1 -> th1|, the link side of a belt) is not: the transmission mode
+%   adds a 180 degree phase drop and limits the bandwidth.
+% * With |Damping = 0| only the physical dampers act; a small modal ratio
+%   (0.01-0.02) gives more realistic margins.
 %
 %% Craig-Bampton reduction
 %

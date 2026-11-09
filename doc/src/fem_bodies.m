@@ -21,6 +21,7 @@
 % <tr><td>FeatureAngle</td><td>40</td><td>Angle (deg) used to split the STL into smooth patches</td></tr>
 % <tr><td>Rigid</td><td>false</td><td>Make the body rigid (6 dofs at RefPoint)</td></tr>
 % <tr><td>RefPoint</td><td>centroid</td><td>Reference point of a rigid body</td></tr>
+% <tr><td>Damping</td><td>[0 0]</td><td>Rayleigh damping [alpha beta] of an elastic body: D = alpha*M + beta*K</td></tr>
 % </table>
 % </html>
 %

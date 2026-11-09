@@ -13,6 +13,10 @@ classdef Body < handle
 %     Rigid    true: non-deformable body with 6 dofs at RefPoint; its mesh
 %              is only used for mass, inertia, interfaces and plotting
 %     RefPoint reference point of a rigid body (default: centroid)
+%     Damping  Rayleigh damping [alpha beta] of an elastic body (default
+%              [0 0]): D = alpha*M + beta*K. beta = 2*zeta/omega gives the
+%              damping ratio zeta at omega, rising linearly with frequency;
+%              alpha also damps the body's rigid-body motion (like a drag)
 %
 %   Rigid bodies without a volume mesh:
 %     b = fem.Body.rigidSurface(file, rho, ...)  STL surface only (no Gmsh)
@@ -29,6 +33,7 @@ properties
     Rigid (1,1) logical = false
     Ref  (1,3) double   % reference point of a rigid body
     MassProps = []      % struct(m, c, J) of a mesh-free rigid body (J about c)
+    Damping (1,2) double = [0 0]   % Rayleigh damping [alpha beta]: D = alpha*M + beta*K
 end
 
 properties (Dependent)
@@ -49,6 +54,7 @@ methods
             opts.FeatureAngle (1,1) double = 40
             opts.Rigid (1,1) logical = false
             opts.RefPoint double = []
+            opts.Damping (1,2) double {mustBeNonnegative} = [0 0]
         end
         if isstruct(src)
             X = src.X;  T = src.T;
@@ -65,11 +71,15 @@ methods
         assert(opts.Rigid || isfield(mat, 'D'), 'fem:Body', ['%s: an elastic body needs ' ...
             'a material with stiffness D, e.g. fem.material(E, nu, rho). For a rigid ' ...
             'body set Rigid = true.'], opts.Name);
+        assert(~opts.Rigid || ~any(opts.Damping), 'fem:Body', ['%s: Damping is ' ...
+            'material damping of an elastic body; damp rigid bodies with joint ' ...
+            'dampers.'], opts.Name);
         b.Name = opts.Name;
         b.Mat  = mat;
         b.X    = opts.Scale*X;
         b.T    = orient(b.X, T);
         b.Rigid = opts.Rigid;
+        b.Damping = opts.Damping;
         if isempty(T)
             b.F = zeros(0, 3);  b.Ref = zeros(1, 3);
         else

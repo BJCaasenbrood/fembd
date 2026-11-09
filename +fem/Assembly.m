@@ -238,15 +238,18 @@ methods
 
     function [K, M, D] = assemble(a, opts)
     %ASSEMBLE Unconstrained global K and M, including elastic interfaces, and
-    %   the damping matrix D of joint and transmission dampers.
+    %   the damping matrix D of body (Rayleigh), joint and transmission dampers.
     %   Option Lumped = true gives an HRZ-lumped (diagonal) mass matrix.
         arguments
             a
             opts.Lumped (1,1) logical = false
         end
         [K, M] = cellfun(@(b) b.matrices(Lumped = opts.Lumped), a.Bodies, 'UniformOutput', false);
+        D = cellfun(@(b, K, M) b.Damping(1)*M + b.Damping(2)*K, a.Bodies, K, M, ...
+                    'UniformOutput', false);                  % Rayleigh damping per body
         n = a.nDof;  off = a.offsets;  nx = n - 3*off(end);
         K = blkdiag(K{:}, sparse(nx, nx));  M = blkdiag(M{:}, sparse(nx, nx));
+        D = blkdiag(D{:}, sparse(nx, nx));
         for k = 1:numel(a.Refs)                           % mesh-free rigid bodies
             b = a.Refs(k).body;
             if isempty(a.Refs(k).nodes) && ~isempty(b.MassProps)
@@ -254,7 +257,6 @@ methods
                 M(d, d) = M(d, d) + b.rigidMass();
             end
         end
-        D = sparse(n, n);
         for k = 1:numel(a.Joints)                         % joint springs and dampers
             d = a.jointDofs(k);
             K = K + sparse(d, d, a.Joints(k).k, n, n);
@@ -356,7 +358,7 @@ methods
 
     function [K, M, T, D] = system(a, opts)
     %SYSTEM Reduced matrices K = T'*K*T, M = T'*M*T and the map u = T*q, and
-    %   the reduced damping matrix D of joint and transmission dampers.
+    %   the reduced damping matrix D of body, joint and transmission dampers.
     %   Option Lumped = true lumps the body mass matrices (HRZ). M stays
     %   diagonal unless rigid ties redistribute slave masses to masters.
         arguments
@@ -513,7 +515,7 @@ methods
     %                      mechanism modes are included as exact double
     %                      integrators (lambda < 1e-10 max(lambda) is set to 0)
     %     Damping          modal damping ratio, scalar or one per state mode;
-    %                      joint and transmission dampers are added to it
+    %                      body, joint and transmission dampers are added to it
     %     StaticCorrection add the quasi-static response to the inputs to the
     %                      basis (default true): exact DC gain with few modes
     %     Lumped           lumped mass (default false)
