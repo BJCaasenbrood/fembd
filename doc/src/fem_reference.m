@@ -9,6 +9,7 @@
 % * <matlab:doc('fembd.Body.pointMass') fembd.Body.pointMass> - rigid body from mass properties only
 % * <matlab:doc('fembd.Body/setMass') setMass> - set a rigid body's mass properties (e.g. from CAD)
 % * <matlab:doc('fembd.Assembly') fembd.Assembly> - bodies, connections, supports; reduced K, M and u = T*q
+% * <matlab:doc('fembd.Model') fembd.Model> - nonlinear multibody model (large rotations)
 % * <matlab:doc('fembd.material') fembd.material> - isotropic linear-elastic material
 %
 %% Assembly methods
@@ -31,6 +32,9 @@
 % * <matlab:doc('fembd.Assembly/constraints') constraints> - the map u = T*q
 % * <matlab:doc('fembd.Assembly/plot') plot> - plot (deformed) bodies
 % * <matlab:doc('fembd.Assembly/animate') animate> - slow-motion mode animation
+% * <matlab:doc('fembd.Assembly/nonlinear') nonlinear> - nonlinear model of the assembly
+% * <matlab:doc('fembd.Model/simulate') Model.simulate> - time integration (generalised-alpha)
+% * <matlab:doc('fembd.Model/animate') Model.animate> - animation of a simulation
 %
 %% Analysis
 %

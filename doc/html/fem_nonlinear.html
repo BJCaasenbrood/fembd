@@ -1,0 +1,204 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<META http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      -->
+<title>Nonlinear Model (Large Rotations)</title>
+<meta name="generator" content="MATLAB 24.1">
+<link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
+<meta name="DC.date" content="2026-11-10">
+<meta name="DC.source" content="fem_nonlinear.m">
+<style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; }
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+span.typesection { color:#A0522D }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style>
+</head>
+<body>
+<div class="content">
+<h1>Nonlinear Model (Large Rotations)</h1>
+<!--introduction-->
+<p>The linear model (<tt>a.system</tt>, <tt>a.statespace</tt>) holds for small motions about one pose. For large rotations, e.g. a robot arm moving through its workspace, the same assembly gives a nonlinear multibody model:</p>
+<pre class="language-matlab">m = a.nonlinear(Gravity = [0 0 -9.81]);          <span class="comment">% fembd.Model</span>
+[t, y, x] = m.simulate([0 2], Step = 1e-3, <span class="keyword">...</span>
+    Input = @(t, y) [KP1*(r1(t) - y.enc1); KP2*(r2(t) - y.enc2)]);
+plot(t, y.th1);  m.animate(t, x, Rate = 0.5);    <span class="comment">% half speed</span>
+</pre>
+<!--/introduction-->
+<h2>Contents</h2>
+<div>
+<ul>
+<li>
+<a href="#1">Formulation</a>
+</li>
+<li>
+<a href="#2">Coordinates and signals</a>
+</li>
+<li>
+<a href="#3">Current limits</a>
+</li>
+<li>
+<a href="#4">Verification</a>
+</li>
+</ul>
+</div>
+<h2 id="1">Formulation</h2>
+<p>Each rigid body has a frame at its centre of mass, with position r (world) and rotation R; its velocities are v (world) and omega (body frame). The equations of motion are</p>
+<p>
+<img src="fem_nonlinear_eq17129074484355075723.png" alt="$$M \dot\nu + G^\top \lambda = F(q, \nu, t), \qquad g(q) = 0,$$" style="width:283px;height:22px;"></p>
+<p>with the constant mass matrix M = diag(m I, J), the forces F (gravity, gyroscopic, joint springs and dampers, elastic transmissions, inputs) and the joint constraints g with Jacobian G.</p>
+<div>
+<ul>
+<li>
+<b>Joints and supports</b> are exact nonlinear constraints: locked translations are components of the joint offset in the frame on A; locked rotations are dot products of frame axes, so a revolute joint keeps its axes aligned at any angle. Redundant constraints are dropped at the start (rank-revealing QR).</li>
+<li>
+<b>Rigid transmissions</b> and supported joints are constraints; elastic transmissions are springs and dampers.</li>
+<li>
+<b>Time integration</b>: generalised-alpha on the Lie group R3 x SO(3) of each body, with Newton iterations. Positions satisfy the constraints at every step and velocities are projected onto them. <tt>Rho</tt> (default 0.8) damps high frequencies numerically; 1 gives no numerical damping.</li>
+</ul>
+</div>
+<h2 id="2">Coordinates and signals</h2>
+<div>
+<ul>
+<li>Joint coordinates are measured from the configuration in which the joint was created, as in <tt>a.pose</tt>: translations in the joint frame, rotations as the rotation vector of B relative to A (for a revolute joint the angle). Joint springs are relaxed there.</li>
+<li>Transmissions are relaxed (elastic) or held (rigid) at the initial configuration.</li>
+<li>Reference-point outputs are the displacement of the point and the rotation vector of the body, from the initial configuration.</li>
+<li>Inputs come from <tt>Input = @(t, y)</tt>, evaluated with the outputs of the previous step (a controller sampled at the time step). Initial joint velocities: <tt>Rates = struct('joint', v)</tt>.</li>
+</ul>
+</div>
+<h2 id="3">Current limits</h2>
+<p>Rigid bodies only: elastic bodies (Craig-Bampton modes in a floating frame), couplings and ties are not supported yet. Outputs are displacements and velocities.</p>
+<h2 id="4">Verification</h2>
+<p>
+<tt>tests/runTests.m</tt> checks the model against the Lagrange equations of a double pendulum, the exact solution of a damped belt drive at large angles (linear for parallel axes), a rigid transmission under constant torque, a heavy top (energy and Euler equations) and free fall. All converge at second order in the time step.</p>
+<p class="footer">
+<br>
+<a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2024a</a>
+<br>
+</p>
+</div>
+<!--
+##### SOURCE BEGIN #####
+%% Nonlinear Model (Large Rotations)
+% The linear model (|a.system|, |a.statespace|) holds for small motions
+% about one pose. For large rotations, e.g. a robot arm moving through its
+% workspace, the same assembly gives a nonlinear multibody model:
+%
+%   m = a.nonlinear(Gravity = [0 0 -9.81]);          % fembd.Model
+%   [t, y, x] = m.simulate([0 2], Step = 1e-3, ...
+%       Input = @(t, y) [KP1*(r1(t) - y.enc1); KP2*(r2(t) - y.enc2)]);
+%   plot(t, y.th1);  m.animate(t, x, Rate = 0.5);    % half speed
+%
+%% Formulation
+% Each rigid body has a frame at its centre of mass, with position r
+% (world) and rotation R; its velocities are v (world) and omega (body
+% frame). The equations of motion are
+%
+% $$M \dot\nu + G^\top \lambda = F(q, \nu, t), \qquad g(q) = 0,$$
+%
+% with the constant mass matrix M = diag(m I, J), the forces F (gravity,
+% gyroscopic, joint springs and dampers, elastic transmissions, inputs)
+% and the joint constraints g with Jacobian G.
+%
+% * *Joints and supports* are exact nonlinear constraints: locked
+%   translations are components of the joint offset in the frame on A;
+%   locked rotations are dot products of frame axes, so a revolute joint
+%   keeps its axes aligned at any angle. Redundant constraints are dropped
+%   at the start (rank-revealing QR).
+% * *Rigid transmissions* and supported joints are constraints; elastic
+%   transmissions are springs and dampers.
+% * *Time integration*: generalised-alpha on the Lie group R3 x SO(3) of
+%   each body, with Newton iterations. Positions satisfy the constraints at
+%   every step and velocities are projected onto them. |Rho| (default 0.8)
+%   damps high frequencies numerically; 1 gives no numerical damping.
+%
+%% Coordinates and signals
+%
+% * Joint coordinates are measured from the configuration in which the
+%   joint was created, as in |a.pose|: translations in the joint frame,
+%   rotations as the rotation vector of B relative to A (for a revolute
+%   joint the angle). Joint springs are relaxed there.
+% * Transmissions are relaxed (elastic) or held (rigid) at the initial
+%   configuration.
+% * Reference-point outputs are the displacement of the point and the
+%   rotation vector of the body, from the initial configuration.
+% * Inputs come from |Input = @(t, y)|, evaluated with the outputs of the
+%   previous step (a controller sampled at the time step). Initial joint
+%   velocities: |Rates = struct('joint', v)|.
+%
+%% Current limits
+% Rigid bodies only: elastic bodies (Craig-Bampton modes in a floating
+% frame), couplings and ties are not supported yet. Outputs are
+% displacements and velocities.
+%
+%% Verification
+% |tests/runTests.m| checks the model against the Lagrange equations of a
+% double pendulum, the exact solution of a damped belt drive at large
+% angles (linear for parallel axes), a rigid transmission under constant
+% torque, a heavy top (energy and Euler equations) and free fall. All
+% converge at second order in the time step.
+
+##### SOURCE END #####
+-->
+</body>
+</html>

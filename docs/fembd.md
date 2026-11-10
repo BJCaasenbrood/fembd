@@ -8,7 +8,7 @@ for modal, harmonic, transient or reduced-order analysis.
 New to the toolbox? Start with the tutorials in [`../tutorials`](../tutorials/README.md).
 
 Contents: [1 Workflow](#1-workflow) · [2 Formulation](#2-formulation) ·
-[3 API](#3-api) · [4 Recipes](#4-recipes) · [5 Limitations](#5-limitations)
+[3 API](#3-api) · [4 Recipes](#4-recipes) · [5 Nonlinear model](#5-nonlinear-model-large-rotations) · [6 Limitations](#6-limitations)
 
 ---
 
@@ -247,6 +247,7 @@ out with f ≈ 0. Mode shapes are normalised so that `VᵀMV = I`.
 | `sys = a.statespace(Modes=, Damping=, StaticCorrection=, Lumped=, Format=)` | Modal state-space model with the inputs and outputs (Recipes) |
 | `[Bu, Cu, inName, outName, type] = a.ioMatrices()` | Inputs and outputs in the full space |
 | `j = a.qdof(d)` | Positions of global dofs `d` in `q`, so `u(d) = q(j)`. `d` must be independent (not supported, not a tie slave). |
+| `m = a.nonlinear(Gravity=)` | Nonlinear multibody model (`fembd.Model`, §5): `m.simulate(tspan, Step=, Input=, Rates=, Rho=, Tol=)`, `m.animate(t, x, Rate=, Title=)` |
 | `[K, M, D] = a.assemble(Lumped=false)` | Full matrices, including elastic interfaces; `D` holds body (Rayleigh), joint and transmission dampers |
 | `[T, I] = a.constraints()` | `u = T*q`, and the independent global dofs `I` |
 | `[K, M, T, D] = a.system(Lumped=false)` | Reduced matrices, `T`, and the reduced damping matrix `D = T'·D·T` |
@@ -374,8 +375,49 @@ spread slave mass onto master nodes; elastic joints keep it diagonal.
 
 ---
 
-## 5 Limitations
-- Linear elasticity only: small strains and small rotations, no contact, no geometric stiffness.
+## 5 Nonlinear model (large rotations)
+
+`m = a.nonlinear(Gravity = [0 0 -9.81])` turns the same assembly into a nonlinear multibody model
+(`fembd.Model`) for large rotations, e.g. a robot arm moving through its workspace. The linear
+model (`a.statespace`) stays the tool for frequency-domain analysis about one pose.
+```matlab
+m = a.nonlinear(Gravity = [0 0 -9.81]);
+[t, y, x] = m.simulate([0 2], Step = 1e-3, ...
+    Input = @(t, y) [KP1*(r1(t) - y.enc1); KP2*(r2(t) - y.enc2)]);   % controller in the loop
+plot(t, y.th1);  m.animate(t, x, Rate = 0.5);                         % half speed
+```
+- **Coordinates:** each rigid body has a frame at its centre of mass: position `r` (world) and
+  rotation `R`, with velocities `[v (world); ω (body)]`. The mass matrix is constant
+  (`diag(m I, J)`), with gyroscopic forces `ω × Jω`.
+- **Joints and supports** are exact nonlinear constraints `g(q) = 0` with Lagrange multipliers.
+  Locked translations: the components of the joint offset in the frame on A. Locked rotations:
+  dot products of frame axes (a revolute joint keeps its axes aligned at any angle). Redundant
+  constraints (e.g. a fixed body that also has a joint to ground) are detected at the start
+  (rank-revealing QR) and dropped.
+- **Forces:** gravity, joint springs and dampers, elastic transmissions, and the inputs (joint
+  forces/torques; forces and moments on rigid bodies, world axes). Rigid transmissions and
+  supported joints are constraints.
+- **Coordinates of joints** are measured from the configuration in which the joint was created
+  (as in `pose`): translations in the joint frame, rotations as the rotation vector of B relative
+  to A (for a revolute joint: the angle). Joint springs are relaxed there. Transmissions are
+  relaxed (elastic) or held (rigid) at the initial configuration. Reference-point outputs are the
+  displacement of the point and the rotation vector of the body, from the initial configuration.
+- **Time integration:** generalised-α on the Lie group R³ × SO(3) of each body, with Newton
+  iterations. Positions satisfy the constraints at every step; velocities are projected onto
+  them. `Rho` (default 0.8) sets the numerical damping of high frequencies (1: none).
+- **Inputs** come from `Input = @(t, y)`, evaluated with the outputs of the previous step: a
+  controller sampled at the time step. Initial joint velocities: `Rates = struct('joint', v)`.
+- **Phase 1 limits:** rigid bodies only (elastic bodies, couplings and ties follow, via
+  Craig–Bampton modes in a floating frame); displacement and velocity outputs.
+
+Verified against the Lagrange equations of a double pendulum, the exact (linear) solution of a
+damped belt drive at large angles, a rigid transmission under a constant torque, a heavy top
+(energy, Euler equations) and free fall; all converge at second order in the time step.
+
+---
+
+## 6 Limitations
+- Linear elasticity only: small strains, no contact, no geometric stiffness. Large rotations of rigid bodies: see the nonlinear model (§5).
 - Ties project onto the flat corner triangle of each master face. On curved Tet10 interfaces the error is about the chord height.
 - If curved Tet10 edge nodes invert an element (coarse mesh, small radius), `meshSTL` re-meshes with straight-sided Tet10 and warns. A smaller `Size` keeps the curved geometry.
 - STL surfaces must be closed and watertight for `Remesh = true`. Only ASCII `.msh` files are read.
@@ -384,6 +426,6 @@ spread slave mass onto master nodes; elastic joints keep it diagonal.
 - `T` is formed explicitly: memory grows with the number of tie and rigid-body nodes. `craigBampton` forms the dense `V`.
 - Requires MATLAB R2022a or later and Gmsh 4.
 
-Verification: `tests/runTests.m` covers 37 checks, including Euler–Bernoulli, rigid-body
+Verification: `tests/runTests.m` covers 77 checks, including Euler–Bernoulli, rigid-body
 invariance, exact rigid inertia, tie and spring consistency, joints against 1-dof oscillators, a four-bar against velocity analysis, and
-hinged-beam solutions, couplings, posed joints against a double pendulum, mesh-free rigid bodies, Craig–Bampton accuracy and the MSH readers.
+hinged-beam solutions, couplings, posed joints against a double pendulum, mesh-free rigid bodies, Craig–Bampton accuracy, damping, state space, the MSH readers and the nonlinear model (§5).

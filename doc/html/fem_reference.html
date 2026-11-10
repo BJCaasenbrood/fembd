@@ -111,6 +111,8 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <li>
 <a href="matlab:doc('fembd.Assembly')">fembd.Assembly</a> - bodies, connections, supports; reduced K, M and u = T*q</li>
 <li>
+<a href="matlab:doc('fembd.Model')">fembd.Model</a> - nonlinear multibody model (large rotations)</li>
+<li>
 <a href="matlab:doc('fembd.material')">fembd.material</a> - isotropic linear-elastic material</li>
 </ul>
 </div>
@@ -153,6 +155,12 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <a href="matlab:doc('fembd.Assembly/plot')">plot</a> - plot (deformed) bodies</li>
 <li>
 <a href="matlab:doc('fembd.Assembly/animate')">animate</a> - slow-motion mode animation</li>
+<li>
+<a href="matlab:doc('fembd.Assembly/nonlinear')">nonlinear</a> - nonlinear model of the assembly</li>
+<li>
+<a href="matlab:doc('fembd.Model/simulate')">Model.simulate</a> - time integration (generalised-alpha)</li>
+<li>
+<a href="matlab:doc('fembd.Model/animate')">Model.animate</a> - animation of a simulation</li>
 </ul>
 </div>
 <h2 id="3">Analysis</h2>
@@ -196,6 +204,7 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 % * <matlab:doc('fembd.Body.pointMass') fembd.Body.pointMass> - rigid body from mass properties only
 % * <matlab:doc('fembd.Body/setMass') setMass> - set a rigid body's mass properties (e.g. from CAD)
 % * <matlab:doc('fembd.Assembly') fembd.Assembly> - bodies, connections, supports; reduced K, M and u = T*q
+% * <matlab:doc('fembd.Model') fembd.Model> - nonlinear multibody model (large rotations)
 % * <matlab:doc('fembd.material') fembd.material> - isotropic linear-elastic material
 %
 %% Assembly methods
@@ -218,6 +227,9 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 % * <matlab:doc('fembd.Assembly/constraints') constraints> - the map u = T*q
 % * <matlab:doc('fembd.Assembly/plot') plot> - plot (deformed) bodies
 % * <matlab:doc('fembd.Assembly/animate') animate> - slow-motion mode animation
+% * <matlab:doc('fembd.Assembly/nonlinear') nonlinear> - nonlinear model of the assembly
+% * <matlab:doc('fembd.Model/simulate') Model.simulate> - time integration (generalised-alpha)
+% * <matlab:doc('fembd.Model/animate') Model.animate> - animation of a simulation
 %
 %% Analysis
 %

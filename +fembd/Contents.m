@@ -1,9 +1,10 @@
-% FEM  Linear-elastic finite elements for STL assemblies
+% FEMBD  Finite elements and multibody dynamics for STL assemblies
 %   Documentation: Help browser, Supplemental Software    Manual: docs/fembd.md
 %
 % Model
 %   Body          - Elastic or rigid body: Gmsh Tet4/Tet10 mesh, material, K and M
 %   Assembly      - Bodies, ties, couplings, joints, supports; reduced K, M, u = T*q
+%   Model         - Nonlinear multibody model (large rotations): simulate, animate
 %   material      - Isotropic linear-elastic material (D, rho)
 %
 % Analysis

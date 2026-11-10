@@ -393,6 +393,84 @@ end
 [X2, T2] = fembd.readMsh(fullfile(tmp, 'b22.msh'));
 [X4, T4] = fembd.readMsh(fullfile(tmp, 'b41.msh'));
 check('MSH 4.1 == MSH 2.2', norm(X2(T2(:)) - X4(T4(:))) + abs(numel(T2) - numel(T4)), 0, 1e-12);
+
+% nonlinear model: double compound pendulum vs Lagrange equations (ode45)
+m1 = 1.5;  m2 = 0.8;  L1 = 0.4;  lc1 = 0.2;  lc2 = 0.25;  I1 = 0.02;  I2 = 0.01;  g = 9.81;
+a = fembd.Assembly();
+a.add(fembd.Body.pointMass(m1, [lc1 0 0], I1*eye(3), Name = 'link1'));
+a.add(fembd.Body.pointMass(m2, [L1+lc2 0 0], I2*eye(3), Name = 'link2'));
+a.joint('ground', 'link1', 'revolute', Point = [0 0 0], Axis = [0 1 0], Name = 'j1');
+a.joint('link1', 'link2', 'revolute', Point = [L1 0 0], Axis = [0 1 0], Name = 'j2');
+a.output('ry1', 'link1', [], 5);  a.output('ry2', 'link2', [], 5);  a.output('q2', 'j2');
+[t, y] = a.nonlinear(Gravity = [0 0 -g]).simulate([0 1], Step = 2.5e-4);
+c12 = @(z) m2*L1*lc2*cos(z(1) - z(2));  s12 = @(z) m2*L1*lc2*sin(z(1) - z(2));
+f = @(t, z) [z(3:4); [I1 + m1*lc1^2 + m2*L1^2, c12(z); c12(z), I2 + m2*lc2^2] \ ...
+    -[s12(z)*z(4)^2 + (m1*lc1 + m2*L1)*g*sin(z(1)); -s12(z)*z(3)^2 + m2*lc2*g*sin(z(2))]];
+[~, z] = ode45(f, t, [pi/2; pi/2; 0; 0], odeset('RelTol', 1e-12, 'AbsTol', 1e-12));
+check('Nonlinear: double pendulum vs Lagrange (ode45)', ...
+      pi/2 - unwrap([y.ry1 y.ry2]), z(:,1:2), 2e-5);
+check('Nonlinear: joint angle == difference of link angles', wrapToPi(y.q2 - (y.ry2 - y.ry1)), 0, 1e-12);
+
+% nonlinear model: damped elastic belt at large angles == linear (parallel axes)
+[a0, ~] = refBeltNL(false);  [a, ~] = refBeltNL(true);
+[K, M, ~, D] = a0.system();  n = size(K, 1);
+i = [a0.qdof(a0.dof('motor')), a0.qdof(a0.dof('axis'))];
+A = [zeros(n), eye(n); -M\K, -M\D];  x0 = zeros(2*n, 1);  x0(i) = [1.5; 0.5];
+[t, y] = a.nonlinear().simulate([0 0.3], Step = 1e-4);
+X = cell2mat(arrayfun(@(tk) expm(A*tk)*x0, t', 'UniformOutput', false))';
+check('Nonlinear: belt, 1.5 rad, == linear solution', [y.qm y.qa], X(:, i), 2e-4);
+
+% nonlinear model: rigid transmission, motor torque, redundant support
+N = 3;  Jm = 1e-4;  Js = 0.01 + 2*0.2^2;  tau = 0.02;
+a = fembd.Assembly();
+a.add(fembd.Body.pointMass(2, [0.2 0 0], 0.01*eye(3), Name = 'link'));
+a.add(fembd.Body.pointMass(0.1, [0.5 0 0], Jm*eye(3), Name = 'rotor'));
+a.joint('ground', 'link',  'revolute', Point = [0 0 0], Name = 'axis');
+a.joint('ground', 'rotor', 'revolute', Point = [0.5 0 0], Name = 'motor');
+a.transmission({'motor', 'axis'}, [1/N -1]);
+a.fix('rotor', [], 1:3);                                 % redundant with the motor joint
+a.input('tau', 'motor');  a.output('qm', 'motor');  a.output('qa', 'axis');
+nl = a.nonlinear();
+[t, y] = nl.simulate([0 0.5], Step = 1e-3, Input = @(t, y) tau);
+check('Nonlinear: rigid transmission + torque, (Jm + Js/N^2) qm'''' = tau', ...
+      [y.qm, N*y.qa], repmat(0.5*tau/(Jm + Js/N^2)*t.^2, 1, 2), 1e-7);
+check('Nonlinear: redundant constraints dropped (14 -> 11 rows)', numel(nl.keep), 11, 0);
+
+% nonlinear model: heavy top on a spherical joint (energy, ode45)
+a = fembd.Assembly();
+a.add(fembd.Body.pointMass(1, [0 0 0.1], diag([2 2 4])*1e-3, Name = 'top'));
+a.joint('ground', 'top', 'spherical', Point = [0 0 0], Name = 'pivot');
+a.pose('pivot', [0.3 0 0]);
+nl = a.nonlinear(Gravity = [0 0 -g]);
+[t, ~, x] = nl.simulate([0 0.2], Step = 1e-4, Rates = struct('pivot', [0 0 60]), Rho = 0.9);
+Jb = nl.Bodies(1).J;  w = x.nu(4:6,:);  r = squeeze(x.r(:,1,:));
+E = 0.5*sum(x.nu(1:3,:).^2) + 0.5*sum(w.*(Jb*w)) + g*r(3,:);
+cb = r(:,1);  Jp = Jb + (cb'*cb*eye(3) - cb*cb');      % body frame = world at t = 0
+f = @(t, z) [reshape(reshape(z(1:9), 3, 3)*[0 -z(12) z(11); z(12) 0 -z(10); -z(11) z(10) 0], 9, 1); ...
+             Jp\(cross(cb, reshape(z(1:9), 3, 3)'*[0; 0; -g]) - cross(z(10:12), Jp*z(10:12)))];
+[~, z] = ode45(f, [0 0.2], [reshape(eye(3), 9, 1); w(:,1)], odeset('RelTol', 1e-12, 'AbsTol', 1e-12));
+check(sprintf('Nonlinear: heavy top (%.0f rad/s), energy', norm(w(:,1))), E/E(1), 1, 1e-6);
+check('Nonlinear: heavy top vs Euler equations (ode45)', r(:,end), reshape(z(end,1:9), 3, 3)*cb, 1e-6);
+
+% nonlinear model: free fall along a prismatic joint
+a = fembd.Assembly();
+a.add(fembd.Body.pointMass(3, [0.1 0.2 0.3], 0.01*eye(3), Name = 'slider'));
+a.joint('ground', 'slider', 'prismatic', Axis = [0 0 1], Name = 'z');
+a.output('z', 'z');
+[t, y] = a.nonlinear(Gravity = [1 2 -g]).simulate([0 0.3], Step = 1e-2);
+check('Nonlinear: free fall on a prismatic joint', y.z, -0.5*g*t.^2, 1e-12);
+end
+
+function [a, name] = refBeltNL(posed)
+% Link on a torsion spring driven by a rotor through a damped elastic belt.
+a = fembd.Assembly();  name = 'belt';
+a.add(fembd.Body.pointMass(2, [0.2 0 0], 0.01*eye(3), Name = 'link'));
+a.add(fembd.Body.pointMass(0.1, [0.5 0 0], 1e-4*eye(3), Name = 'rotor'));
+a.joint('ground', 'link',  'revolute', Point = [0 0 0], Stiffness = 300, Damping = 0.05, Name = 'axis');
+a.joint('ground', 'rotor', 'revolute', Point = [0.5 0 0], Damping = 1e-3, Name = 'motor');
+a.transmission({'motor', 'axis'}, [1/3 -1], Stiffness = 50, Damping = 0.02, Name = name);
+a.output('qm', 'motor');  a.output('qa', 'axis');
+if posed, a.pose('motor', 1.5);  a.pose('axis', 0.5); end
 end
 
 function [a, K, M] = buildFourbar(order, k, mk, Jz, cs, O2, A, B, O4)

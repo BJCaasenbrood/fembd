@@ -1,8 +1,9 @@
-# fembd — linear-elastic assemblies in MATLAB
+# fembd — finite elements and multibody dynamics in MATLAB
 
 A compact research alternative to the PDE Toolbox for linear elasticity. It loads STL parts,
 meshes them with Gmsh, assigns linear materials, connects the bodies, and returns the stiffness
-and mass matrices for dynamic analysis.
+and mass matrices for dynamic analysis. The same assembly also gives a state-space model for
+control, and a nonlinear multibody model for large rotations (`a.nonlinear`).
 
 ```matlab
 addpath('path/to/PDEToolbox');

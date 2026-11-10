@@ -6,6 +6,7 @@
         <tocitem target="fem_connections.html">Connections: Ties, Couplings and Joints</tocitem>
         <tocitem target="fem_system.html">Dofs, Supports, Loads and the System</tocitem>
         <tocitem target="fem_analysis.html">Modal Analysis, Dynamics and Reduction</tocitem>
+        <tocitem target="fem_nonlinear.html">Nonlinear Model (Large Rotations)</tocitem>
         <tocitem target="fem_theory.html">Formulation</tocitem>
         <tocitem target="fem_reference.html">Function Reference</tocitem>
         <tocitem target="fem_tutorials.html">Tutorials

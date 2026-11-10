@@ -575,6 +575,13 @@ methods
         end
     end
 
+    function m = nonlinear(a, varargin)
+    %NONLINEAR Nonlinear multibody model (large rotations) of the assembly:
+    %   m = a.nonlinear(Gravity = [0 0 -9.81]) returns a fembd.Model, see
+    %   fembd.Model and fembd.Model/simulate.
+        m = fembd.Model(a, varargin{:});
+    end
+
     function j = qdof(a, d)
     %QDOF Indices into q of global dofs d (e.g. from a.dof), so u(d) = q(j).
     %   The dofs must be independent: not supported, not dependent (tie
@@ -692,7 +699,7 @@ methods
     end
 end
 
-methods (Access = private)
+methods (Access = {?fembd.Model})          % private, shared with the nonlinear model
     function spec = ioSpec(a, name, id, sel, dirs)
     % Store an input/output selection; node sets are resolved now.
         assert(~any(strcmp([{a.Inputs.Name}, {a.Outputs.Name}], name)), 'fembd:io', ...
