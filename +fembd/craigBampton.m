@@ -1,6 +1,6 @@
 function [Kr, Mr, V, f] = craigBampton(K, M, b, n)
 %CRAIGBAMPTON Craig-Bampton reduction with boundary dofs b and n modes.
-%   [Kr, Mr, V, f] = fem.craigBampton(K, M, b, n) keeps the dofs b (indices
+%   [Kr, Mr, V, f] = fembd.craigBampton(K, M, b, n) keeps the dofs b (indices
 %   into K, e.g. from Assembly.qdof) as physical coordinates and adds n
 %   fixed-interface modes. The reduced coordinates are x = [u_b; eta] with
 %   u ~ V*x, Kr = V'*K*V and Mr = V'*M*V. f are the fixed-interface
@@ -12,7 +12,7 @@ function [Kr, Mr, V, f] = craigBampton(K, M, b, n)
 N = size(K, 1);  b = b(:);  i = setdiff((1:N)', b);  nb = numel(b);
 Psi = -(decomposition(K(i,i), 'chol') \ full(K(i,b)));    % constraint modes
 if n > 0
-    [Phi, f] = fem.modes(K(i,i), M(i,i), n);              % fixed-interface modes
+    [Phi, f] = fembd.modes(K(i,i), M(i,i), n);              % fixed-interface modes
 else
     Phi = zeros(numel(i), 0);  f = zeros(0, 1);
 end

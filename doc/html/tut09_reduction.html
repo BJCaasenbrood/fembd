@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>tut09_reduction</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-08">
+<meta name="DC.date" content="2026-11-10">
 <meta name="DC.source" content="tut09_reduction.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -111,24 +111,24 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 </div>
 <pre class="codeinput">addpath(fileparts(fileparts(mfilename(<span class="string">'fullpath'</span>))));
 out = fullfile(tempdir, <span class="string">'femTutorials'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
-fem.boxSTL(fullfile(out, <span class="string">'beam.stl'</span>), [0 0 0], [1000 50 50]);
-beam = fem.Body(fullfile(out, <span class="string">'beam.stl'</span>), fem.material(210e9, 0.3, 7850), <span class="keyword">...</span>
+fembd.boxSTL(fullfile(out, <span class="string">'beam.stl'</span>), [0 0 0], [1000 50 50]);
+beam = fembd.Body(fullfile(out, <span class="string">'beam.stl'</span>), fembd.material(210e9, 0.3, 7850), <span class="keyword">...</span>
                 Size = 25, Scale = 1e-3);
 </pre>
 <h2 id="2">1. Boundary dofs</h2>
 <p>A coupling on the tip face gives the beam an interface with 6 dofs, like a flange. Its reference dofs, mapped into q, are the boundary.</p>
-<pre class="codeinput">a = fem.Assembly();  a.add(beam);  a.fix(<span class="string">'beam'</span>, @(X) X(:,1) &lt; 1e-9);
+<pre class="codeinput">a = fembd.Assembly();  a.add(beam);  a.fix(<span class="string">'beam'</span>, @(X) X(:,1) &lt; 1e-9);
 tip = a.couple(<span class="string">'beam'</span>, @(X) X(:,1) &gt; 1 - 1e-9, Name = <span class="string">'tip'</span>);
 [K, M, T] = a.system();
 ib = a.qdof(a.dof(<span class="string">'tip'</span>));                      <span class="comment">% [ux uy uz rx ry rz] of the tip</span>
-[~, f] = fem.modes(K, M, 8);
+[~, f] = fembd.modes(K, M, 8);
 fprintf(<span class="string">'full model: %d dofs\n'</span>, size(K, 1));
 </pre>
 <pre class="codeoutput">full model: 6774 dofs
 </pre>
 <h2 id="3">2. Guyan reduction</h2>
 <p>n = 0 keeps only the boundary dofs. The rest of the structure follows statically (constraint modes). The static response at the boundary is exact, but frequencies are overestimated because the interior inertia is only approximated.</p>
-<pre class="codeinput">[Kg, Mg, Vg] = fem.craigBampton(K, M, ib, 0);
+<pre class="codeinput">[Kg, Mg, Vg] = fembd.craigBampton(K, M, ib, 0);
 b = zeros(size(K, 1), 1);  b(ib(3)) = 1;        <span class="comment">% 1 N in z at the tip</span>
 bg = Vg'*b;                                     <span class="comment">% load in reduced coordinates</span>
 fprintf(<span class="string">'static tip deflection: full %.6e m, Guyan %.6e m\n'</span>, b'*(K\b), bg'*(Kg\bg));
@@ -140,8 +140,8 @@ fprintf(<span class="string">'static tip deflection: full %.6e m, Guyan %.6e m\n
 <p>Adding n fixed-interface modes (eta) makes the low frequencies converge quickly. The reduced coordinates are x = [u_b; eta], and q ~ Vc*x.</p>
 <pre class="codeinput">nModes = [0 2 5 10];  err = zeros(4, numel(nModes));
 <span class="keyword">for</span> k = 1:numel(nModes)
-    [Kc, Mc] = fem.craigBampton(K, M, ib, nModes(k));
-    [~, fc] = fem.modes(Kc, Mc, 4);
+    [Kc, Mc] = fembd.craigBampton(K, M, ib, nModes(k));
+    [~, fc] = fembd.modes(Kc, Mc, 4);
     err(:,k) = 100*(fc./f(1:4) - 1);
 <span class="keyword">end</span>
 disp(array2table(err, <span class="string">'VariableNames'</span>, compose(<span class="string">'n=%d'</span>, nModes), <span class="keyword">...</span>
@@ -158,8 +158,8 @@ disp(array2table(err, <span class="string">'VariableNames'</span>, compose(<span
 </pre>
 <h2 id="5">4. Recovering the full field</h2>
 <p>A reduced solution x maps back to the full displacements: u = T*Vc*x.</p>
-<pre class="codeinput">[Kc, Mc, Vc] = fem.craigBampton(K, M, ib, 10);
-[Xc, fc] = fem.modes(Kc, Mc, 1);
+<pre class="codeinput">[Kc, Mc, Vc] = fembd.craigBampton(K, M, ib, 10);
+[Xc, fc] = fembd.modes(Kc, Mc, 1);
 u = T*Vc*Xc(:,1);
 figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);  a.plot(u, 0.1/max(abs(u(1:3*size(a.X, 1)))));
 title(sprintf(<span class="string">'Mode 1 from the %d-dof CB model: %.2f Hz'</span>, size(Kc, 1), fc));
@@ -201,18 +201,18 @@ legend(sprintf(<span class="string">'full (%d dofs)'</span>, size(K, 1)), sprint
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
-fem.boxSTL(fullfile(out, 'beam.stl'), [0 0 0], [1000 50 50]);
-beam = fem.Body(fullfile(out, 'beam.stl'), fem.material(210e9, 0.3, 7850), ...
+fembd.boxSTL(fullfile(out, 'beam.stl'), [0 0 0], [1000 50 50]);
+beam = fembd.Body(fullfile(out, 'beam.stl'), fembd.material(210e9, 0.3, 7850), ...
                 Size = 25, Scale = 1e-3);
 
 %% 1. Boundary dofs
 % A coupling on the tip face gives the beam an interface with 6 dofs, like
 % a flange. Its reference dofs, mapped into q, are the boundary.
-a = fem.Assembly();  a.add(beam);  a.fix('beam', @(X) X(:,1) < 1e-9);
+a = fembd.Assembly();  a.add(beam);  a.fix('beam', @(X) X(:,1) < 1e-9);
 tip = a.couple('beam', @(X) X(:,1) > 1 - 1e-9, Name = 'tip');
 [K, M, T] = a.system();
 ib = a.qdof(a.dof('tip'));                      % [ux uy uz rx ry rz] of the tip
-[~, f] = fem.modes(K, M, 8);
+[~, f] = fembd.modes(K, M, 8);
 fprintf('full model: %d dofs\n', size(K, 1));
 
 %% 2. Guyan reduction
@@ -220,7 +220,7 @@ fprintf('full model: %d dofs\n', size(K, 1));
 % statically (constraint modes). The static response at the boundary is
 % exact, but frequencies are overestimated because the interior inertia is
 % only approximated.
-[Kg, Mg, Vg] = fem.craigBampton(K, M, ib, 0);
+[Kg, Mg, Vg] = fembd.craigBampton(K, M, ib, 0);
 b = zeros(size(K, 1), 1);  b(ib(3)) = 1;        % 1 N in z at the tip
 bg = Vg'*b;                                     % load in reduced coordinates
 fprintf('static tip deflection: full %.6e m, Guyan %.6e m\n', b'*(K\b), bg'*(Kg\bg));
@@ -231,8 +231,8 @@ fprintf('static tip deflection: full %.6e m, Guyan %.6e m\n', b'*(K\b), bg'*(Kg\
 % quickly. The reduced coordinates are x = [u_b; eta], and q ~ Vc*x.
 nModes = [0 2 5 10];  err = zeros(4, numel(nModes));
 for k = 1:numel(nModes)
-    [Kc, Mc] = fem.craigBampton(K, M, ib, nModes(k));
-    [~, fc] = fem.modes(Kc, Mc, 4);
+    [Kc, Mc] = fembd.craigBampton(K, M, ib, nModes(k));
+    [~, fc] = fembd.modes(Kc, Mc, 4);
     err(:,k) = 100*(fc./f(1:4) - 1);
 end
 disp(array2table(err, 'VariableNames', compose('n=%d', nModes), ...
@@ -240,8 +240,8 @@ disp(array2table(err, 'VariableNames', compose('n=%d', nModes), ...
 
 %% 4. Recovering the full field
 % A reduced solution x maps back to the full displacements: u = T*Vc*x.
-[Kc, Mc, Vc] = fem.craigBampton(K, M, ib, 10);
-[Xc, fc] = fem.modes(Kc, Mc, 1);
+[Kc, Mc, Vc] = fembd.craigBampton(K, M, ib, 10);
+[Xc, fc] = fembd.modes(Kc, Mc, 1);
 u = T*Vc*Xc(:,1);
 figure('Color', 'w');  a.plot(u, 0.1/max(abs(u(1:3*size(a.X, 1)))));
 title(sprintf('Mode 1 from the %d-dof CB model: %.2f Hz', size(Kc, 1), fc));

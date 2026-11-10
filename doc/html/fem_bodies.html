@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>Bodies, Meshing and Materials</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-09">
+<meta name="DC.date" content="2026-11-10">
 <meta name="DC.source" content="fem_bodies.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -107,7 +107,7 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 </ul>
 </div>
 <h2 id="1">Creating a body</h2>
-<pre class="language-matlab">b = fem.Body(src, mat, Name=Value)
+<pre class="language-matlab">b = fembd.Body(src, mat, Name=Value)
 </pre>
 <p>
 <tt>src</tt> is an STL file (meshed with Gmsh), an ASCII Gmsh .msh file (version 2.2 or 4.1), or a struct with fields <tt>X</tt> (n x 3 nodes) and <tt>T</tt> (ne x 4 or ne x 10 tetrahedra, Gmsh node order).</p>
@@ -129,8 +129,8 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <p>Use the default Tet10 elements. Linear Tet4 elements are far too stiff in bending: on a cantilever, Tet4 is still about 9% off on a fine mesh where Tet10 is within 0.2% on a coarse one (see <a href="tut02_meshing.html">Tutorial 2</a>).</p>
 <p>Tet10 edge nodes are placed on the curved surface reconstructed from the STL. If that inverts elements (coarse meshes on small radii), meshSTL remeshes with straight-sided Tet10 and warns; a smaller <tt>Size</tt> keeps the curved geometry.</p>
 <h2 id="3">Materials</h2>
-<p>A material is a struct with a 6 x 6 stiffness <tt>D</tt> in Voigt notation (order xx yy zz yz xz xy, engineering shear strains) and a density <tt>rho</tt>. <tt>fem.material(E, nu, rho)</tt> gives an isotropic material; any symmetric positive-definite <tt>D</tt> works, e.g. orthotropic composites (see <a href="tut03_materials.html">Tutorial 3</a>).</p>
-<pre class="language-matlab">mat = fem.material(210e9, 0.3, 7850);
+<p>A material is a struct with a 6 x 6 stiffness <tt>D</tt> in Voigt notation (order xx yy zz yz xz xy, engineering shear strains) and a density <tt>rho</tt>. <tt>fembd.material(E, nu, rho)</tt> gives an isotropic material; any symmetric positive-definite <tt>D</tt> works, e.g. orthotropic composites (see <a href="tut03_materials.html">Tutorial 3</a>).</p>
+<pre class="language-matlab">mat = fembd.material(210e9, 0.3, 7850);
 cfrp = struct(<span class="string">'D'</span>, D, <span class="string">'rho'</span>, 1600);
 </pre>
 <h2 id="4">Mass matrix</h2>
@@ -139,8 +139,8 @@ cfrp = struct(<span class="string">'D'</span>, D, <span class="string">'rho'</sp
 <h2 id="5">Rigid bodies</h2>
 <p>With <tt>Rigid = true</tt> the body has no stiffness and 6 dofs [ux uy uz rx ry rz] at its reference point; all its nodes follow u = u_ref + r x (x - x_ref). The mesh only provides mass, inertia and the surface for ties and plots, so a coarse Tet4 mesh is enough.</p>
 <p>Rigid bodies do not need a volume mesh at all:</p>
-<pre class="language-matlab">b = fem.Body.rigidSurface(<span class="string">'lid.stl'</span>, 7850, Scale = 1e-3);   <span class="comment">% STL surface only</span>
-b = fem.Body.pointMass(m, c, J, Name = <span class="string">'motor'</span>);            <span class="comment">% mass properties only</span>
+<pre class="language-matlab">b = fembd.Body.rigidSurface(<span class="string">'lid.stl'</span>, 7850, Scale = 1e-3);   <span class="comment">% STL surface only</span>
+b = fembd.Body.pointMass(m, c, J, Name = <span class="string">'motor'</span>);            <span class="comment">% mass properties only</span>
 </pre>
 <p>
 <tt>rigidSurface</tt> computes mass, centre of mass and inertia exactly from the closed STL surface. <tt>pointMass</tt> takes mass <tt>m</tt>, centre of mass <tt>c</tt> and inertia tensor <tt>J</tt> (about <tt>c</tt>), e.g. from a CAD report; it has no surface and is connected with a joint. See <a href="tut06_rigidBodies.html">Tutorial 6</a>.</p>
@@ -156,7 +156,7 @@ b.setMass(1.25, CenterOfMass = cmm, Inertia = Jmm, LengthScale = 1e-3);   <span 
 <tt>b.transform(R, t)</tt> moves a body rigidly, x -&gt; R*x + t.</p>
 <h2 id="7">See also</h2>
 <p>
-<a href="matlab:doc('fem.Body')">fem.Body</a>, <a href="matlab:doc('fem.meshSTL')">fem.meshSTL</a>, <a href="matlab:doc('fem.readMsh')">fem.readMsh</a>, <a href="matlab:doc('fem.material')">fem.material</a>
+<a href="matlab:doc('fembd.Body')">fembd.Body</a>, <a href="matlab:doc('fembd.meshSTL')">fembd.meshSTL</a>, <a href="matlab:doc('fembd.readMsh')">fembd.readMsh</a>, <a href="matlab:doc('fembd.material')">fembd.material</a>
 </p>
 <p class="footer">
 <br>
@@ -172,7 +172,7 @@ b.setMass(1.25, CenterOfMass = cmm, Inertia = Jmm, LengthScale = 1e-3);   <span 
 %
 %% Creating a body
 %
-%   b = fem.Body(src, mat, Name=Value)
+%   b = fembd.Body(src, mat, Name=Value)
 %
 % |src| is an STL file (meshed with Gmsh), an ASCII Gmsh .msh file (version
 % 2.2 or 4.1), or a struct with fields |X| (n x 3 nodes) and |T| (ne x 4
@@ -207,11 +207,11 @@ b.setMass(1.25, CenterOfMass = cmm, Inertia = Jmm, LengthScale = 1e-3);   <span 
 %% Materials
 % A material is a struct with a 6 x 6 stiffness |D| in Voigt notation
 % (order xx yy zz yz xz xy, engineering shear strains) and a density
-% |rho|. |fem.material(E, nu, rho)| gives an isotropic material; any
+% |rho|. |fembd.material(E, nu, rho)| gives an isotropic material; any
 % symmetric positive-definite |D| works, e.g. orthotropic composites (see
 % <tut03_materials.html Tutorial 3>).
 %
-%   mat = fem.material(210e9, 0.3, 7850);
+%   mat = fembd.material(210e9, 0.3, 7850);
 %   cfrp = struct('D', D, 'rho', 1600);
 %
 %% Mass matrix
@@ -227,8 +227,8 @@ b.setMass(1.25, CenterOfMass = cmm, Inertia = Jmm, LengthScale = 1e-3);   <span 
 %
 % Rigid bodies do not need a volume mesh at all:
 %
-%   b = fem.Body.rigidSurface('lid.stl', 7850, Scale = 1e-3);   % STL surface only
-%   b = fem.Body.pointMass(m, c, J, Name = 'motor');            % mass properties only
+%   b = fembd.Body.rigidSurface('lid.stl', 7850, Scale = 1e-3);   % STL surface only
+%   b = fembd.Body.pointMass(m, c, J, Name = 'motor');            % mass properties only
 %
 % |rigidSurface| computes mass, centre of mass and inertia exactly from
 % the closed STL surface. |pointMass| takes mass |m|, centre of mass |c|
@@ -250,8 +250,8 @@ b.setMass(1.25, CenterOfMass = cmm, Inertia = Jmm, LengthScale = 1e-3);   <span 
 % |b.transform(R, t)| moves a body rigidly, x -> R*x + t.
 %
 %% See also
-% <matlab:doc('fem.Body') fem.Body>, <matlab:doc('fem.meshSTL') fem.meshSTL>,
-% <matlab:doc('fem.readMsh') fem.readMsh>, <matlab:doc('fem.material') fem.material>
+% <matlab:doc('fembd.Body') fembd.Body>, <matlab:doc('fembd.meshSTL') fembd.meshSTL>,
+% <matlab:doc('fembd.readMsh') fembd.readMsh>, <matlab:doc('fembd.material') fembd.material>
 
 ##### SOURCE END #####
 -->

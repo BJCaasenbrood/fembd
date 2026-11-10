@@ -2,7 +2,7 @@
 %
 %% Natural frequencies
 %
-%   [V, f] = fem.modes(K, M, n)
+%   [V, f] = fembd.modes(K, M, n)
 %
 % The lowest |n| frequencies (Hz) and mass-normalised mode shapes
 % (V'*M*V = I), by shift-invert Lanczos. Free and partly free systems
@@ -14,9 +14,9 @@
 %
 % $$M\ddot q + D\dot q + K q = T^\top f(t), \qquad u = T q .$$
 %
-% fem returns K and M, and D for body, joint and transmission dampers
+% fembd returns K and M, and D for body, joint and transmission dampers
 % (|[K, M, T, D] = a.system()|). Material damping of a body is Rayleigh
-% damping, D = alpha*M + beta*K, set with |fem.Body(..., Damping = [alpha beta])|;
+% damping, D = alpha*M + beta*K, set with |fembd.Body(..., Damping = [alpha beta])|;
 % |beta = 2*zeta/omega| gives the ratio zeta at omega. <tut08_dynamics.html Tutorial 8> shows frequency
 % responses (direct and modal), Newmark time integration, and state-space
 % forms. For explicit time integration use |a.system(Lumped = true)|.
@@ -68,7 +68,7 @@
 %
 %% Craig-Bampton reduction
 %
-%   [Kc, Mc, V, f] = fem.craigBampton(K, M, b, n)
+%   [Kc, Mc, V, f] = fembd.craigBampton(K, M, b, n)
 %
 % Keeps the dofs |b| (indices into K, e.g. from |a.qdof|) as physical
 % coordinates and adds |n| fixed-interface modes:
@@ -83,7 +83,7 @@
 % rigid body, or joint coordinates. See <tut09_reduction.html Tutorial 9>.
 %
 %   ib = a.qdof(a.dof('flange'));
-%   [Kc, Mc, Vc] = fem.craigBampton(K, M, ib, 20);
+%   [Kc, Mc, Vc] = fembd.craigBampton(K, M, ib, 20);
 %
 % The 6 x 6 stiffness at a rigid body follows from Guyan reduction onto its
-% dofs: |Ks = fem.craigBampton(K, M, a.qdof(a.dof('shuttle')), 0)|.
+% dofs: |Ks = fembd.craigBampton(K, M, a.qdof(a.dof('shuttle')), 0)|.

@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>Function Reference</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-08">
+<meta name="DC.date" content="2026-11-10">
 <meta name="DC.source" content="fem_reference.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -78,7 +78,7 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <div class="content">
 <h1>Function Reference</h1>
 <!--introduction-->
-<p>Click a name to open its reference page (generated from its help text), or type <tt>doc fem.Name</tt> in the Command Window.</p>
+<p>Click a name to open its reference page (generated from its help text), or type <tt>doc fembd.Name</tt> in the Command Window.</p>
 <!--/introduction-->
 <h2>Contents</h2>
 <div>
@@ -101,80 +101,80 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <div>
 <ul>
 <li>
-<a href="matlab:doc('fem.Body')">fem.Body</a> - elastic or rigid body: mesh, material, K and M</li>
+<a href="matlab:doc('fembd.Body')">fembd.Body</a> - elastic or rigid body: mesh, material, K and M</li>
 <li>
-<a href="matlab:doc('fem.Body.rigidSurface')">fem.Body.rigidSurface</a> - rigid body from an STL surface (no meshing)</li>
+<a href="matlab:doc('fembd.Body.rigidSurface')">fembd.Body.rigidSurface</a> - rigid body from an STL surface (no meshing)</li>
 <li>
-<a href="matlab:doc('fem.Body.pointMass')">fem.Body.pointMass</a> - rigid body from mass properties only</li>
+<a href="matlab:doc('fembd.Body.pointMass')">fembd.Body.pointMass</a> - rigid body from mass properties only</li>
 <li>
-<a href="matlab:doc('fem.Body/setMass')">setMass</a> - set a rigid body's mass properties (e.g. from CAD)</li>
+<a href="matlab:doc('fembd.Body/setMass')">setMass</a> - set a rigid body's mass properties (e.g. from CAD)</li>
 <li>
-<a href="matlab:doc('fem.Assembly')">fem.Assembly</a> - bodies, connections, supports; reduced K, M and u = T*q</li>
+<a href="matlab:doc('fembd.Assembly')">fembd.Assembly</a> - bodies, connections, supports; reduced K, M and u = T*q</li>
 <li>
-<a href="matlab:doc('fem.material')">fem.material</a> - isotropic linear-elastic material</li>
+<a href="matlab:doc('fembd.material')">fembd.material</a> - isotropic linear-elastic material</li>
 </ul>
 </div>
 <h2 id="2">Assembly methods</h2>
 <div>
 <ul>
 <li>
-<a href="matlab:doc('fem.Assembly/add')">add</a> - add a body</li>
+<a href="matlab:doc('fembd.Assembly/add')">add</a> - add a body</li>
 <li>
-<a href="matlab:doc('fem.Assembly/tie')">tie</a> - bonded tie or elastic interface</li>
+<a href="matlab:doc('fembd.Assembly/tie')">tie</a> - bonded tie or elastic interface</li>
 <li>
-<a href="matlab:doc('fem.Assembly/couple')">couple</a> - rigid coupling of nodes to a reference point</li>
+<a href="matlab:doc('fembd.Assembly/couple')">couple</a> - rigid coupling of nodes to a reference point</li>
 <li>
-<a href="matlab:doc('fem.Assembly/joint')">joint</a> - kinematic joint between reference points</li>
+<a href="matlab:doc('fembd.Assembly/joint')">joint</a> - kinematic joint between reference points</li>
 <li>
-<a href="matlab:doc('fem.Assembly/transmission')">transmission</a> - elastic or rigid ratio between joints or bodies (belts, gears)</li>
+<a href="matlab:doc('fembd.Assembly/transmission')">transmission</a> - elastic or rigid ratio between joints or bodies (belts, gears)</li>
 <li>
-<a href="matlab:doc('fem.Assembly/pose')">pose</a> - move a joint to a finite position</li>
+<a href="matlab:doc('fembd.Assembly/pose')">pose</a> - move a joint to a finite position</li>
 <li>
-<a href="matlab:doc('fem.Assembly/fix')">fix</a> - supports</li>
+<a href="matlab:doc('fembd.Assembly/fix')">fix</a> - supports</li>
 <li>
-<a href="matlab:doc('fem.Assembly/dof')">dof</a> - global dof indices</li>
+<a href="matlab:doc('fembd.Assembly/dof')">dof</a> - global dof indices</li>
 <li>
-<a href="matlab:doc('fem.Assembly/input')">input</a> - named input (actuator, load)</li>
+<a href="matlab:doc('fembd.Assembly/input')">input</a> - named input (actuator, load)</li>
 <li>
-<a href="matlab:doc('fem.Assembly/output')">output</a> - named output (sensor)</li>
+<a href="matlab:doc('fembd.Assembly/output')">output</a> - named output (sensor)</li>
 <li>
-<a href="matlab:doc('fem.Assembly/statespace')">statespace</a> - state-space model with the inputs and outputs</li>
+<a href="matlab:doc('fembd.Assembly/statespace')">statespace</a> - state-space model with the inputs and outputs</li>
 <li>
-<a href="matlab:doc('fem.Assembly/ioMatrices')">ioMatrices</a> - inputs and outputs in the full space</li>
+<a href="matlab:doc('fembd.Assembly/ioMatrices')">ioMatrices</a> - inputs and outputs in the full space</li>
 <li>
-<a href="matlab:doc('fem.Assembly/qdof')">qdof</a> - positions of dofs in q</li>
+<a href="matlab:doc('fembd.Assembly/qdof')">qdof</a> - positions of dofs in q</li>
 <li>
-<a href="matlab:doc('fem.Assembly/system')">system</a> - reduced K, M and T</li>
+<a href="matlab:doc('fembd.Assembly/system')">system</a> - reduced K, M and T</li>
 <li>
-<a href="matlab:doc('fem.Assembly/assemble')">assemble</a> - unconstrained K and M</li>
+<a href="matlab:doc('fembd.Assembly/assemble')">assemble</a> - unconstrained K and M</li>
 <li>
-<a href="matlab:doc('fem.Assembly/constraints')">constraints</a> - the map u = T*q</li>
+<a href="matlab:doc('fembd.Assembly/constraints')">constraints</a> - the map u = T*q</li>
 <li>
-<a href="matlab:doc('fem.Assembly/plot')">plot</a> - plot (deformed) bodies</li>
+<a href="matlab:doc('fembd.Assembly/plot')">plot</a> - plot (deformed) bodies</li>
 <li>
-<a href="matlab:doc('fem.Assembly/animate')">animate</a> - slow-motion mode animation</li>
+<a href="matlab:doc('fembd.Assembly/animate')">animate</a> - slow-motion mode animation</li>
 </ul>
 </div>
 <h2 id="3">Analysis</h2>
 <div>
 <ul>
 <li>
-<a href="matlab:doc('fem.modes')">fem.modes</a> - natural frequencies and mode shapes</li>
+<a href="matlab:doc('fembd.modes')">fembd.modes</a> - natural frequencies and mode shapes</li>
 <li>
-<a href="matlab:doc('fem.craigBampton')">fem.craigBampton</a> - Craig-Bampton and Guyan reduction</li>
+<a href="matlab:doc('fembd.craigBampton')">fembd.craigBampton</a> - Craig-Bampton and Guyan reduction</li>
 </ul>
 </div>
 <h2 id="4">Meshing and I/O</h2>
 <div>
 <ul>
 <li>
-<a href="matlab:doc('fem.meshSTL')">fem.meshSTL</a> - tetrahedral mesh of an STL with Gmsh</li>
+<a href="matlab:doc('fembd.meshSTL')">fembd.meshSTL</a> - tetrahedral mesh of an STL with Gmsh</li>
 <li>
-<a href="matlab:doc('fem.readMsh')">fem.readMsh</a> - read an ASCII Gmsh .msh file</li>
+<a href="matlab:doc('fembd.readMsh')">fembd.readMsh</a> - read an ASCII Gmsh .msh file</li>
 <li>
-<a href="matlab:doc('fem.gmsh')">fem.gmsh</a> - run Gmsh</li>
+<a href="matlab:doc('fembd.gmsh')">fembd.gmsh</a> - run Gmsh</li>
 <li>
-<a href="matlab:doc('fem.boxSTL')">fem.boxSTL</a>, <a href="matlab:doc('fem.cylinderSTL')">fem.cylinderSTL</a> - simple test geometry</li>
+<a href="matlab:doc('fembd.boxSTL')">fembd.boxSTL</a>, <a href="matlab:doc('fembd.cylinderSTL')">fembd.cylinderSTL</a> - simple test geometry</li>
 </ul>
 </div>
 <p class="footer">
@@ -187,49 +187,49 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 ##### SOURCE BEGIN #####
 %% Function Reference
 % Click a name to open its reference page (generated from its help text),
-% or type |doc fem.Name| in the Command Window.
+% or type |doc fembd.Name| in the Command Window.
 %
 %% Model
 %
-% * <matlab:doc('fem.Body') fem.Body> - elastic or rigid body: mesh, material, K and M
-% * <matlab:doc('fem.Body.rigidSurface') fem.Body.rigidSurface> - rigid body from an STL surface (no meshing)
-% * <matlab:doc('fem.Body.pointMass') fem.Body.pointMass> - rigid body from mass properties only
-% * <matlab:doc('fem.Body/setMass') setMass> - set a rigid body's mass properties (e.g. from CAD)
-% * <matlab:doc('fem.Assembly') fem.Assembly> - bodies, connections, supports; reduced K, M and u = T*q
-% * <matlab:doc('fem.material') fem.material> - isotropic linear-elastic material
+% * <matlab:doc('fembd.Body') fembd.Body> - elastic or rigid body: mesh, material, K and M
+% * <matlab:doc('fembd.Body.rigidSurface') fembd.Body.rigidSurface> - rigid body from an STL surface (no meshing)
+% * <matlab:doc('fembd.Body.pointMass') fembd.Body.pointMass> - rigid body from mass properties only
+% * <matlab:doc('fembd.Body/setMass') setMass> - set a rigid body's mass properties (e.g. from CAD)
+% * <matlab:doc('fembd.Assembly') fembd.Assembly> - bodies, connections, supports; reduced K, M and u = T*q
+% * <matlab:doc('fembd.material') fembd.material> - isotropic linear-elastic material
 %
 %% Assembly methods
 %
-% * <matlab:doc('fem.Assembly/add') add> - add a body
-% * <matlab:doc('fem.Assembly/tie') tie> - bonded tie or elastic interface
-% * <matlab:doc('fem.Assembly/couple') couple> - rigid coupling of nodes to a reference point
-% * <matlab:doc('fem.Assembly/joint') joint> - kinematic joint between reference points
-% * <matlab:doc('fem.Assembly/transmission') transmission> - elastic or rigid ratio between joints or bodies (belts, gears)
-% * <matlab:doc('fem.Assembly/pose') pose> - move a joint to a finite position
-% * <matlab:doc('fem.Assembly/fix') fix> - supports
-% * <matlab:doc('fem.Assembly/dof') dof> - global dof indices
-% * <matlab:doc('fem.Assembly/input') input> - named input (actuator, load)
-% * <matlab:doc('fem.Assembly/output') output> - named output (sensor)
-% * <matlab:doc('fem.Assembly/statespace') statespace> - state-space model with the inputs and outputs
-% * <matlab:doc('fem.Assembly/ioMatrices') ioMatrices> - inputs and outputs in the full space
-% * <matlab:doc('fem.Assembly/qdof') qdof> - positions of dofs in q
-% * <matlab:doc('fem.Assembly/system') system> - reduced K, M and T
-% * <matlab:doc('fem.Assembly/assemble') assemble> - unconstrained K and M
-% * <matlab:doc('fem.Assembly/constraints') constraints> - the map u = T*q
-% * <matlab:doc('fem.Assembly/plot') plot> - plot (deformed) bodies
-% * <matlab:doc('fem.Assembly/animate') animate> - slow-motion mode animation
+% * <matlab:doc('fembd.Assembly/add') add> - add a body
+% * <matlab:doc('fembd.Assembly/tie') tie> - bonded tie or elastic interface
+% * <matlab:doc('fembd.Assembly/couple') couple> - rigid coupling of nodes to a reference point
+% * <matlab:doc('fembd.Assembly/joint') joint> - kinematic joint between reference points
+% * <matlab:doc('fembd.Assembly/transmission') transmission> - elastic or rigid ratio between joints or bodies (belts, gears)
+% * <matlab:doc('fembd.Assembly/pose') pose> - move a joint to a finite position
+% * <matlab:doc('fembd.Assembly/fix') fix> - supports
+% * <matlab:doc('fembd.Assembly/dof') dof> - global dof indices
+% * <matlab:doc('fembd.Assembly/input') input> - named input (actuator, load)
+% * <matlab:doc('fembd.Assembly/output') output> - named output (sensor)
+% * <matlab:doc('fembd.Assembly/statespace') statespace> - state-space model with the inputs and outputs
+% * <matlab:doc('fembd.Assembly/ioMatrices') ioMatrices> - inputs and outputs in the full space
+% * <matlab:doc('fembd.Assembly/qdof') qdof> - positions of dofs in q
+% * <matlab:doc('fembd.Assembly/system') system> - reduced K, M and T
+% * <matlab:doc('fembd.Assembly/assemble') assemble> - unconstrained K and M
+% * <matlab:doc('fembd.Assembly/constraints') constraints> - the map u = T*q
+% * <matlab:doc('fembd.Assembly/plot') plot> - plot (deformed) bodies
+% * <matlab:doc('fembd.Assembly/animate') animate> - slow-motion mode animation
 %
 %% Analysis
 %
-% * <matlab:doc('fem.modes') fem.modes> - natural frequencies and mode shapes
-% * <matlab:doc('fem.craigBampton') fem.craigBampton> - Craig-Bampton and Guyan reduction
+% * <matlab:doc('fembd.modes') fembd.modes> - natural frequencies and mode shapes
+% * <matlab:doc('fembd.craigBampton') fembd.craigBampton> - Craig-Bampton and Guyan reduction
 %
 %% Meshing and I/O
 %
-% * <matlab:doc('fem.meshSTL') fem.meshSTL> - tetrahedral mesh of an STL with Gmsh
-% * <matlab:doc('fem.readMsh') fem.readMsh> - read an ASCII Gmsh .msh file
-% * <matlab:doc('fem.gmsh') fem.gmsh> - run Gmsh
-% * <matlab:doc('fem.boxSTL') fem.boxSTL>, <matlab:doc('fem.cylinderSTL') fem.cylinderSTL> - simple test geometry
+% * <matlab:doc('fembd.meshSTL') fembd.meshSTL> - tetrahedral mesh of an STL with Gmsh
+% * <matlab:doc('fembd.readMsh') fembd.readMsh> - read an ASCII Gmsh .msh file
+% * <matlab:doc('fembd.gmsh') fembd.gmsh> - run Gmsh
+% * <matlab:doc('fembd.boxSTL') fembd.boxSTL>, <matlab:doc('fembd.cylinderSTL') fembd.cylinderSTL> - simple test geometry
 
 ##### SOURCE END #####
 -->

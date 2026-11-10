@@ -1,5 +1,5 @@
 function buildDocs(opts)
-%BUILDDOCS Build the fem documentation for the MATLAB Help browser.
+%BUILDDOCS Build the fembd documentation for the MATLAB Help browser.
 %   buildDocs publishes the pages in doc/src, the tutorials and the examples
 %   to doc/html, copies the table of contents, and builds the search index.
 %   Tutorials and examples are run (Gmsh is needed) so that their output and

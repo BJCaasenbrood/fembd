@@ -8,13 +8,13 @@
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
 file = fullfile(out, 'beam.stl');
-fem.boxSTL(file, [0 0 0], [1000 50 50]);
+fembd.boxSTL(file, [0 0 0], [1000 50 50]);
 clampX0 = @(X) X(:,1) < 1e-9;
 
 %% 1. Isotropic material
 % A material is a struct with a 6x6 stiffness D in Voigt notation, order
 % [xx yy zz yz xz xy] with engineering shear strains, and a density rho.
-steel = fem.material(210e9, 0.3, 7850);
+steel = fembd.material(210e9, 0.3, 7850);
 disp('D of steel (GPa):');  disp(steel.D/1e9);
 
 %% 2. Orthotropic material
@@ -34,9 +34,9 @@ cfrp = struct('D', inv(blkdiag(S, diag(1./G))), 'rho', 1600);
 % CFRP beam is faster; its low shear moduli make it slightly softer than
 % beam theory predicts.
 for mat = {steel, cfrp}
-    b = fem.Body(file, mat{1}, Size = 25, Scale = 1e-3);
-    a = fem.Assembly();  a.add(b);  a.fix(1, clampX0);
-    [K, M] = a.system();  [~, f] = fem.modes(K, M, 1);
+    b = fembd.Body(file, mat{1}, Size = 25, Scale = 1e-3);
+    a = fembd.Assembly();  a.add(b);  a.fix(1, clampX0);
+    [K, M] = a.system();  [~, f] = fembd.modes(K, M, 1);
     C = inv(mat{1}.D);  Ex = 1/C(1,1);            % Young's modulus along x
     fEB = 1.875104^2/(2*pi)*sqrt(Ex*0.05^4/12/(mat{1}.rho*0.05^2));
     fprintf('f1 = %6.2f Hz (Euler-Bernoulli %6.2f Hz)\n', f, fEB);
@@ -47,7 +47,7 @@ end
 % unconstrained). A body that is not supported can move rigidly without
 % deforming: K*phi = 0 for the six rigid-body modes, and phi'*M*phi gives
 % its mass and inertia.
-b = fem.Body(file, steel, Size = 25, Scale = 1e-3);
+b = fembd.Body(file, steel, Size = 25, Scale = 1e-3);
 [Kb, Mb] = b.matrices();
 c = b.Ref;                                     % centroid
 r = b.X - c;  n = b.nNode;  Phi = zeros(3*n, 6);
@@ -72,7 +72,7 @@ fprintf('inertia %s kg m^2 (exact %s)\n', mat2str(diag(Phi(:,4:6)'*Mb*Phi(:,4:6)
 ml = full(diag(Ml));
 fprintf('lumped M diagonal: %d, min entry %.2e kg, total %.4f kg\n', isdiag(Ml), min(ml), sum(ml)/3);
 
-a = fem.Assembly();  a.add(b);  a.fix(1, clampX0);
-[K, M]  = a.system();               [~, fc] = fem.modes(K, M, 6);
-[K, Ml] = a.system(Lumped = true);  [~, fl] = fem.modes(K, Ml, 6);
+a = fembd.Assembly();  a.add(b);  a.fix(1, clampX0);
+[K, M]  = a.system();               [~, fc] = fembd.modes(K, M, 6);
+[K, Ml] = a.system(Lumped = true);  [~, fl] = fembd.modes(K, Ml, 6);
 disp(table(fc, fl, 100*(fl./fc - 1), 'VariableNames', {'consistent_Hz', 'lumped_Hz', 'diff_pct'}));

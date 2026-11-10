@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>tut04_ties</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-08">
+<meta name="DC.date" content="2026-11-10">
 <meta name="DC.source" content="tut04_ties.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -111,21 +111,21 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 </div>
 <pre class="codeinput">addpath(fileparts(fileparts(mfilename(<span class="string">'fullpath'</span>))));
 out = fullfile(tempdir, <span class="string">'femTutorials'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
-steel = fem.material(210e9, 0.3, 7850);
+steel = fembd.material(210e9, 0.3, 7850);
 clampX0 = @(X) X(:,1) &lt; 1e-9;
 
 <span class="comment">% reference: one-piece cantilever</span>
-fem.boxSTL(fullfile(out, <span class="string">'beam.stl'</span>), [0 0 0], [1000 50 50]);
-one = fem.Body(fullfile(out, <span class="string">'beam.stl'</span>), steel, Size = 25, Scale = 1e-3);
-a = fem.Assembly();  a.add(one);  a.fix(1, clampX0);
-[K, M] = a.system();  [~, fRef] = fem.modes(K, M, 6);
+fembd.boxSTL(fullfile(out, <span class="string">'beam.stl'</span>), [0 0 0], [1000 50 50]);
+one = fembd.Body(fullfile(out, <span class="string">'beam.stl'</span>), steel, Size = 25, Scale = 1e-3);
+a = fembd.Assembly();  a.add(one);  a.fix(1, clampX0);
+[K, M] = a.system();  [~, fRef] = fembd.modes(K, M, 6);
 </pre>
 <h2 id="2">1. Two parts with non-matching meshes</h2>
 <p>The same beam as two halves, meshed with different element sizes.</p>
-<pre class="codeinput">fem.boxSTL(fullfile(out, <span class="string">'left.stl'</span>),  [0 0 0],   [500 50 50]);
-fem.boxSTL(fullfile(out, <span class="string">'right.stl'</span>), [500 0 0], [1000 50 50]);
-left  = fem.Body(fullfile(out, <span class="string">'left.stl'</span>),  steel, Size = 25, Scale = 1e-3);
-right = fem.Body(fullfile(out, <span class="string">'right.stl'</span>), steel, Size = 15, Scale = 1e-3);
+<pre class="codeinput">fembd.boxSTL(fullfile(out, <span class="string">'left.stl'</span>),  [0 0 0],   [500 50 50]);
+fembd.boxSTL(fullfile(out, <span class="string">'right.stl'</span>), [500 0 0], [1000 50 50]);
+left  = fembd.Body(fullfile(out, <span class="string">'left.stl'</span>),  steel, Size = 25, Scale = 1e-3);
+right = fembd.Body(fullfile(out, <span class="string">'right.stl'</span>), steel, Size = 15, Scale = 1e-3);
 </pre>
 <h2 id="3">2. Bonded tie</h2>
 <p>
@@ -133,10 +133,10 @@ right = fem.Body(fullfile(out, <span class="string">'right.stl'</span>), steel, 
 <pre class="language-matlab">u_slave = sum_j N_j(xi) u_master,j
 </pre>
 <p>The constraint is exact (no penalty) and is removed in T. Use the finer mesh as slave, so that every slave node has a master face to follow.</p>
-<pre class="codeinput">a = fem.Assembly();  a.add(left);  a.add(right);
+<pre class="codeinput">a = fembd.Assembly();  a.add(left);  a.add(right);
 ns = a.tie(<span class="string">'left'</span>, <span class="string">'right'</span>);
 a.fix(<span class="string">'left'</span>, clampX0);
-[K, M, T] = a.system();  [V, f] = fem.modes(K, M, 6);
+[K, M, T] = a.system();  [V, f] = fembd.modes(K, M, 6);
 fprintf(<span class="string">'%d slave nodes tied\n'</span>, ns);
 disp(table(fRef, f, <span class="string">'VariableNames'</span>, {<span class="string">'one_piece_Hz'</span>, <span class="string">'tied_Hz'</span>}));
 
@@ -160,9 +160,9 @@ title(<span class="string">'Tied slave nodes'</span>);  hold <span class="string
 </pre>
 <img vspace="5" hspace="5" src="tut04_ties_01.png" alt=""> <h2 id="4">3. Tolerance</h2>
 <p>By default Tol is 10% of the median face edge of the finer surface (here about 1.5 mm), which absorbs small faceting gaps. Parts that are further apart are not tied: a 5 mm gap gives no tied nodes (with a warning) unless Tol is raised. Set Tol explicitly when it matters.</p>
-<pre class="codeinput">fem.boxSTL(fullfile(out, <span class="string">'gap.stl'</span>), [505 0 0], [1000 50 50]);
-gap = fem.Body(fullfile(out, <span class="string">'gap.stl'</span>), steel, Size = 15, Scale = 1e-3);
-b = fem.Assembly();  b.add(left);  b.add(gap);
+<pre class="codeinput">fembd.boxSTL(fullfile(out, <span class="string">'gap.stl'</span>), [505 0 0], [1000 50 50]);
+gap = fembd.Body(fullfile(out, <span class="string">'gap.stl'</span>), steel, Size = 15, Scale = 1e-3);
+b = fembd.Assembly();  b.add(left);  b.add(gap);
 fprintf(<span class="string">'default Tol: %d nodes\n'</span>, b.tie(<span class="string">'left'</span>, <span class="string">'gap'</span>));
 fprintf(<span class="string">'Tol = 6 mm: %d nodes\n'</span>, b.tie(<span class="string">'left'</span>, <span class="string">'gap'</span>, Tol = 6e-3));
 </pre>
@@ -172,10 +172,10 @@ Tol = 6 mm: 105 nodes
 </pre>
 <h2 id="5">4. Partial bonding with Select</h2>
 <p>Select restricts the slave nodes, e.g. to model an adhesive layer that covers only part of the interface. Gluing only the lower half (z &lt; 25 mm) makes the joint more flexible, mostly for bending in the xz plane.</p>
-<pre class="codeinput">b = fem.Assembly();  b.add(left);  b.add(right);
+<pre class="codeinput">b = fembd.Assembly();  b.add(left);  b.add(right);
 b.tie(<span class="string">'left'</span>, <span class="string">'right'</span>, Select = @(X) X(:,3) &lt; 0.025);
 b.fix(<span class="string">'left'</span>, clampX0);
-[Kb, Mb] = b.system();  [~, fp] = fem.modes(Kb, Mb, 2);
+[Kb, Mb] = b.system();  [~, fp] = fembd.modes(Kb, Mb, 2);
 fprintf(<span class="string">'half-bonded joint: f1, f2 = %.2f, %.2f Hz (fully bonded %.2f Hz)\n'</span>, fp, f(1));
 </pre>
 <pre class="codeoutput">half-bonded joint: f1, f2 = 40.60, 41.52 Hz (fully bonded 41.82 Hz)
@@ -184,10 +184,10 @@ fprintf(<span class="string">'half-bonded joint: f1, f2 = %.2f, %.2f Hz (fully b
 <p>With Stiffness = [kn kt] (N/m^3, per unit area) the slave nodes are connected by springs instead, normal (kn) and tangential (kt) to the master surface. This models a compliant layer such as glue, a rubber pad, or contact stiffness. A very stiff interface approaches the bonded tie.</p>
 <pre class="codeinput">kn = 10.^(10:2:16);  f1 = zeros(size(kn));
 <span class="keyword">for</span> k = 1:numel(kn)
-    b = fem.Assembly();  b.add(left);  b.add(right);
+    b = fembd.Assembly();  b.add(left);  b.add(right);
     b.tie(<span class="string">'left'</span>, <span class="string">'right'</span>, Stiffness = kn(k));          <span class="comment">% kt = kn</span>
     b.fix(<span class="string">'left'</span>, clampX0);
-    [Kb, Mb] = b.system();  [~, f1(k)] = fem.modes(Kb, Mb, 1);
+    [Kb, Mb] = b.system();  [~, f1(k)] = fembd.modes(Kb, Mb, 1);
 <span class="keyword">end</span>
 figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
 semilogx(kn, f1, <span class="string">'o-'</span>, kn, f(1) + 0*kn, <span class="string">'--'</span>);  grid <span class="string">on</span>
@@ -212,21 +212,21 @@ legend(<span class="string">'elastic interface'</span>, <span class="string">'bo
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
-steel = fem.material(210e9, 0.3, 7850);
+steel = fembd.material(210e9, 0.3, 7850);
 clampX0 = @(X) X(:,1) < 1e-9;
 
 % reference: one-piece cantilever
-fem.boxSTL(fullfile(out, 'beam.stl'), [0 0 0], [1000 50 50]);
-one = fem.Body(fullfile(out, 'beam.stl'), steel, Size = 25, Scale = 1e-3);
-a = fem.Assembly();  a.add(one);  a.fix(1, clampX0);
-[K, M] = a.system();  [~, fRef] = fem.modes(K, M, 6);
+fembd.boxSTL(fullfile(out, 'beam.stl'), [0 0 0], [1000 50 50]);
+one = fembd.Body(fullfile(out, 'beam.stl'), steel, Size = 25, Scale = 1e-3);
+a = fembd.Assembly();  a.add(one);  a.fix(1, clampX0);
+[K, M] = a.system();  [~, fRef] = fembd.modes(K, M, 6);
 
 %% 1. Two parts with non-matching meshes
 % The same beam as two halves, meshed with different element sizes.
-fem.boxSTL(fullfile(out, 'left.stl'),  [0 0 0],   [500 50 50]);
-fem.boxSTL(fullfile(out, 'right.stl'), [500 0 0], [1000 50 50]);
-left  = fem.Body(fullfile(out, 'left.stl'),  steel, Size = 25, Scale = 1e-3);
-right = fem.Body(fullfile(out, 'right.stl'), steel, Size = 15, Scale = 1e-3);
+fembd.boxSTL(fullfile(out, 'left.stl'),  [0 0 0],   [500 50 50]);
+fembd.boxSTL(fullfile(out, 'right.stl'), [500 0 0], [1000 50 50]);
+left  = fembd.Body(fullfile(out, 'left.stl'),  steel, Size = 25, Scale = 1e-3);
+right = fembd.Body(fullfile(out, 'right.stl'), steel, Size = 15, Scale = 1e-3);
 
 %% 2. Bonded tie
 % |a.tie(master, slave)| takes the slave's surface nodes that lie within
@@ -237,10 +237,10 @@ right = fem.Body(fullfile(out, 'right.stl'), steel, Size = 15, Scale = 1e-3);
 %
 % The constraint is exact (no penalty) and is removed in T. Use the finer
 % mesh as slave, so that every slave node has a master face to follow.
-a = fem.Assembly();  a.add(left);  a.add(right);
+a = fembd.Assembly();  a.add(left);  a.add(right);
 ns = a.tie('left', 'right');
 a.fix('left', clampX0);
-[K, M, T] = a.system();  [V, f] = fem.modes(K, M, 6);
+[K, M, T] = a.system();  [V, f] = fembd.modes(K, M, 6);
 fprintf('%d slave nodes tied\n', ns);
 disp(table(fRef, f, 'VariableNames', {'one_piece_Hz', 'tied_Hz'}));
 
@@ -255,9 +255,9 @@ title('Tied slave nodes');  hold off
 % about 1.5 mm), which absorbs small faceting gaps. Parts that are further
 % apart are not tied: a 5 mm gap gives no tied nodes (with a warning)
 % unless Tol is raised. Set Tol explicitly when it matters.
-fem.boxSTL(fullfile(out, 'gap.stl'), [505 0 0], [1000 50 50]);
-gap = fem.Body(fullfile(out, 'gap.stl'), steel, Size = 15, Scale = 1e-3);
-b = fem.Assembly();  b.add(left);  b.add(gap);
+fembd.boxSTL(fullfile(out, 'gap.stl'), [505 0 0], [1000 50 50]);
+gap = fembd.Body(fullfile(out, 'gap.stl'), steel, Size = 15, Scale = 1e-3);
+b = fembd.Assembly();  b.add(left);  b.add(gap);
 fprintf('default Tol: %d nodes\n', b.tie('left', 'gap'));
 fprintf('Tol = 6 mm: %d nodes\n', b.tie('left', 'gap', Tol = 6e-3));
 
@@ -265,10 +265,10 @@ fprintf('Tol = 6 mm: %d nodes\n', b.tie('left', 'gap', Tol = 6e-3));
 % Select restricts the slave nodes, e.g. to model an adhesive layer that
 % covers only part of the interface. Gluing only the lower half (z < 25 mm)
 % makes the joint more flexible, mostly for bending in the xz plane.
-b = fem.Assembly();  b.add(left);  b.add(right);
+b = fembd.Assembly();  b.add(left);  b.add(right);
 b.tie('left', 'right', Select = @(X) X(:,3) < 0.025);
 b.fix('left', clampX0);
-[Kb, Mb] = b.system();  [~, fp] = fem.modes(Kb, Mb, 2);
+[Kb, Mb] = b.system();  [~, fp] = fembd.modes(Kb, Mb, 2);
 fprintf('half-bonded joint: f1, f2 = %.2f, %.2f Hz (fully bonded %.2f Hz)\n', fp, f(1));
 
 %% 5. Elastic interfaces
@@ -278,10 +278,10 @@ fprintf('half-bonded joint: f1, f2 = %.2f, %.2f Hz (fully bonded %.2f Hz)\n', fp
 % or contact stiffness. A very stiff interface approaches the bonded tie.
 kn = 10.^(10:2:16);  f1 = zeros(size(kn));
 for k = 1:numel(kn)
-    b = fem.Assembly();  b.add(left);  b.add(right);
+    b = fembd.Assembly();  b.add(left);  b.add(right);
     b.tie('left', 'right', Stiffness = kn(k));          % kt = kn
     b.fix('left', clampX0);
-    [Kb, Mb] = b.system();  [~, f1(k)] = fem.modes(Kb, Mb, 1);
+    [Kb, Mb] = b.system();  [~, f1(k)] = fembd.modes(Kb, Mb, 1);
 end
 figure('Color', 'w');
 semilogx(kn, f1, 'o-', kn, f(1) + 0*kn, 'REPLACE_WITH_DASH_DASH');  grid on

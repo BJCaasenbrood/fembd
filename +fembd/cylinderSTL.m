@@ -1,6 +1,6 @@
 function cylinderSTL(file, c, r, z0, z1, n)
 %CYLINDERSTL Write a z-aligned cylinder as a closed STL.
-%   fem.cylinderSTL(file, c, r, z0, z1) with axis through c = [x y], radius
+%   fembd.cylinderSTL(file, c, r, z0, z1) with axis through c = [x y], radius
 %   r, from z0 to z1. Optional n: number of facets around (default 64).
 
 if nargin < 6, n = 64; end

@@ -12,12 +12,12 @@
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
-fem.boxSTL(fullfile(out, 'beam.stl'), [0 0 0], [1000 50 50]);
-beam = fem.Body(fullfile(out, 'beam.stl'), fem.material(210e9, 0.3, 7850), ...
+fembd.boxSTL(fullfile(out, 'beam.stl'), [0 0 0], [1000 50 50]);
+beam = fembd.Body(fullfile(out, 'beam.stl'), fembd.material(210e9, 0.3, 7850), ...
                 Size = 25, Scale = 1e-3);
-a = fem.Assembly();  a.add(beam);  a.fix('beam', @(X) X(:,1) < 1e-9);
+a = fembd.Assembly();  a.add(beam);  a.fix('beam', @(X) X(:,1) < 1e-9);
 [K, M, T] = a.system();
-[V, f] = fem.modes(K, M, 10);
+[V, f] = fembd.modes(K, M, 10);
 
 %% 1. Input and output
 % Input: 1 N vertical force spread over the tip face. Output: the average

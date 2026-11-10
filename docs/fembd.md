@@ -1,6 +1,6 @@
-# fem — reference manual
+# fembd — reference manual
 
-`fem` builds linear-elastic finite-element models of STL assemblies in MATLAB. Each part is
+`fembd` builds linear-elastic finite-element models of STL assemblies in MATLAB. Each part is
 meshed separately with Gmsh, as Tet4 or Tet10 elements. Parts can be elastic or rigid and are
 connected by bonded ties or elastic joints. The output is the sparse stiffness K and mass M,
 for modal, harmonic, transient or reduced-order analysis.
@@ -15,19 +15,19 @@ Contents: [1 Workflow](#1-workflow) · [2 Formulation](#2-formulation) ·
 ## 1 Workflow
 
 ```matlab
-steel = fem.material(210e9, 0.30, 7850);                     % E, nu, rho (SI)
-base  = fem.Body('base.stl',  steel, Size = 8, Scale = 1e-3); % mesh in mm, model in m
-arm   = fem.Body('arm.stl',   steel, Size = 4, Scale = 1e-3);
-tool  = fem.Body('tool.stl',  struct('rho', 2700), Scale = 1e-3, Rigid = true);
+steel = fembd.material(210e9, 0.30, 7850);                     % E, nu, rho (SI)
+base  = fembd.Body('base.stl',  steel, Size = 8, Scale = 1e-3); % mesh in mm, model in m
+arm   = fembd.Body('arm.stl',   steel, Size = 4, Scale = 1e-3);
+tool  = fembd.Body('tool.stl',  struct('rho', 2700), Scale = 1e-3, Rigid = true);
 
-a = fem.Assembly();
+a = fembd.Assembly();
 a.add(base);  a.add(arm);  a.add(tool);
 a.tie('base', 'arm');                         % bonded interface
 a.tie('arm', 'tool', Stiffness = 1e13);       % elastic joint (N/m^3)
 a.fix('base', @(X) X(:,3) < 1e-9);            % clamp the bottom face
 
 [K, M, T] = a.system();                       % reduced system, u = T*q
-[V, f] = fem.modes(K, M, 10);                 % f in Hz
+[V, f] = fembd.modes(K, M, 10);                 % f in Hz
 a.plot(T*V(:,1), 0.01);                       % deformed shape of mode 1
 ```
 
@@ -98,8 +98,8 @@ These node dofs are eliminated through T, just like tie slaves. Its stiffness is
 the rigid body is always made the master.
 
 A rigid body doesn't need a volume mesh:
-- `fem.Body.rigidSurface(file, rho)` reads the STL triangles and uses them for ties and plotting. Mass, centre of mass `c` and inertia `J_c` are computed exactly from the closed surface (divergence theorem).
-- `fem.Body.pointMass(m, c, J)` has only mass properties, e.g. taken from CAD. It has no surface, so connect it with a joint.
+- `fembd.Body.rigidSurface(file, rho)` reads the STL triangles and uses them for ties and plotting. Mass, centre of mass `c` and inertia `J_c` are computed exactly from the closed surface (divergence theorem).
+- `fembd.Body.pointMass(m, c, J)` has only mass properties, e.g. taken from CAD. It has no surface, so connect it with a joint.
 
 For both, the mass is added to the reference dofs as
 
@@ -124,7 +124,7 @@ joint coordinates.
 - The joint is exact: B's 6 dofs become dependent and `s` becomes independent dofs.
 - A `Stiffness` on the released directions adds `diag(k)` on `s`: a torsion spring for a revolute joint, an axial spring for a prismatic one, or a 6-dof bushing for `'free'`.
 - A `Damping` on the released directions adds `diag(c)` to the damping matrix `D`: viscous bearing or motor friction, or a damped bushing.
-- A released joint without stiffness is a mechanism: `fem.modes` returns it with f = 0.
+- A released joint without stiffness is a mechanism: `fembd.modes` returns it with f = 0.
 - **Closed loops** (e.g. four-bar linkages) are allowed in the linear model. Joints are processed in the order they were created. A joint becomes a *cut joint* if its two ends are already connected through earlier joints, if its B side already follows another joint, or if its B side is supported. Its released coordinates follow from the relative motion, `s = (R̂E)ᵀ(P_B q_B − P_A q_A)`, and its constrained directions give rows `C q = 0` (§2.6). Define driving joints first: earlier joints keep their coordinates independent where possible.
 - **Posing.** `a.pose(joint, value)` sets the joint to a finite position: an angle in rad or an offset in m, relative to the pose the joint was created in. Everything on its B side moves rigidly: bodies, couplings, downstream joints and tied bodies. The next `a.system()` then linearises about the new pose. Sweeping a pose shows how the dynamics depend on the configuration. If the moving side is attached elsewhere too (a closed loop or a support), `pose` gives an error: posing closed loops would need a loop-closure solve, which is not implemented yet.
 
@@ -187,7 +187,7 @@ $$q \approx V \begin{bmatrix} u_b \\ \eta \end{bmatrix},\qquad
 - `K_ii` must be non-singular: `b`, together with the supports, must prevent rigid motion.
 
 ### 2.8 Eigenvalues
-`fem.modes` uses shift-invert Lanczos (`eigs`) with a small negative shift, scaled to the softest
+`fembd.modes` uses shift-invert Lanczos (`eigs`) with a small negative shift, scaled to the softest
 dofs. This also works for free or partly free systems, where K is singular: rigid-body modes come
 out with f ≈ 0. Mode shapes are normalised so that `VᵀMV = I`.
 
@@ -198,23 +198,23 @@ out with f ≈ 0. Mode shapes are normalised so that `VᵀMV = I`.
 ### Package functions
 | Function | Description |
 |---|---|
-| `mat = fem.material(E, nu, rho)` | Isotropic material: struct with `E, nu, rho, D`. Custom: `struct('D', D, 'rho', rho)`; a rigid body needs only `rho`. |
-| `[X, T] = fem.meshSTL(file, ...)` | Gmsh volume mesh of a closed STL. Options: `Size` (max element size, STL units), `Order` (1 or 2, default 2), `Remesh` (default true; false keeps the STL triangles), `FeatureAngle` (40°). |
-| `[X, T] = fem.readMsh(file)` | Read tets from an ASCII Gmsh `.msh` file, version 2.2 or 4.1. |
-| `[status, out] = fem.gmsh(args)` | Run Gmsh with an argument string. Uses `$GMSH`, otherwise `gmsh` on the PATH. On Linux, MATLAB's own libraries are hidden from Gmsh. |
-| `fem.boxSTL(file, lo, hi)`, `fem.cylinderSTL(file, c, r, z0, z1)` | Write simple test geometry as STL |
-| `[V, f] = fem.modes(K, M, n)` | Lowest `n` modes: shapes `V` (mass-normalised) and frequencies `f` (Hz). |
-| `[Kr, Mr, V, f] = fem.craigBampton(K, M, b, n)` | Craig–Bampton reduction. `b`: boundary dofs (indices into K). `n`: number of fixed-interface modes. `f`: their frequencies. |
+| `mat = fembd.material(E, nu, rho)` | Isotropic material: struct with `E, nu, rho, D`. Custom: `struct('D', D, 'rho', rho)`; a rigid body needs only `rho`. |
+| `[X, T] = fembd.meshSTL(file, ...)` | Gmsh volume mesh of a closed STL. Options: `Size` (max element size, STL units), `Order` (1 or 2, default 2), `Remesh` (default true; false keeps the STL triangles), `FeatureAngle` (40°). |
+| `[X, T] = fembd.readMsh(file)` | Read tets from an ASCII Gmsh `.msh` file, version 2.2 or 4.1. |
+| `[status, out] = fembd.gmsh(args)` | Run Gmsh with an argument string. Uses `$GMSH`, otherwise `gmsh` on the PATH. On Linux, MATLAB's own libraries are hidden from Gmsh. |
+| `fembd.boxSTL(file, lo, hi)`, `fembd.cylinderSTL(file, c, r, z0, z1)` | Write simple test geometry as STL |
+| `[V, f] = fembd.modes(K, M, n)` | Lowest `n` modes: shapes `V` (mass-normalised) and frequencies `f` (Hz). |
+| `[Kr, Mr, V, f] = fembd.craigBampton(K, M, b, n)` | Craig–Bampton reduction. `b`: boundary dofs (indices into K). `n`: number of fixed-interface modes. `f`: their frequencies. |
 
-### `fem.Body`
-`b = fem.Body(src, mat, Name=Value)`. `src` is an `.stl` file, an ASCII `.msh` file, or
+### `fembd.Body`
+`b = fembd.Body(src, mat, Name=Value)`. `src` is an `.stl` file, an ASCII `.msh` file, or
 `struct('X', X, 'T', T)`.
 
 | Option | Default | |
 |---|---|---|
 | `Name` | file name | Name used to refer to the body in an assembly |
 | `Scale` | 1 | Coordinate factor, applied after meshing (e.g. `1e-3`: mm → m) |
-| `Size`, `Order`, `Remesh`, `FeatureAngle` | | Passed to `fem.meshSTL` |
+| `Size`, `Order`, `Remesh`, `FeatureAngle` | | Passed to `fembd.meshSTL` |
 | `Rigid` | false | Make the body rigid (§2.4) |
 | `RefPoint` | centroid | Reference point of a rigid body (after `Scale`) |
 | `Damping` | `[0 0]` | Rayleigh damping `[α β]` of an elastic body: `D = αM + βK`. `β = 2ζ/ω` gives ratio ζ at ω (rising with frequency); `α` also damps the body's rigid motion |
@@ -224,14 +224,14 @@ out with f ≈ 0. Mode shapes are normalised so that `VᵀMV = I`.
 | `X`, `T`, `F` | Nodes (n×3), tets (ne×4 or ne×10), outward boundary faces (Tri3 or Tri6) |
 | `Mat`, `Rigid`, `Ref`, `nNode`, `nDof` | Material, rigid flag, reference point, counts |
 | `[K, M] = b.matrices(Lumped=false)` | Body matrices (3·nNode square; K = 0 if rigid) |
-| `b = fem.Body.rigidSurface(file, rho, Name=, Scale=, RefPoint=)` | Rigid body from an STL surface, without meshing |
-| `b = fem.Body.pointMass(m, c, J, Name=, RefPoint=)` | Rigid body from mass properties only (`J` about `c`); connect it with a joint |
+| `b = fembd.Body.rigidSurface(file, rho, Name=, Scale=, RefPoint=)` | Rigid body from an STL surface, without meshing |
+| `b = fembd.Body.pointMass(m, c, J, Name=, RefPoint=)` | Rigid body from mass properties only (`J` about `c`); connect it with a joint |
 | `b.setMass(m, CenterOfMass=, Inertia=, InertiaPoint=, Axes=, LengthScale=)` | Override a rigid body's mass properties (e.g. from CAD). Inertia can be given about another point or in principal axes, and in mm; it is validated (symmetric, positive, triangle inequality). A meshed rigid body then ignores its mesh mass |
 | `M6 = b.rigidMass()`, `MassProps` | 6×6 mass about `Ref`, and `struct(m, c, J)`, of a mesh-free rigid body |
 | `b.transform(R, t)` | Rigid placement `x → R x + t` (also moves `Ref`) |
 | `idx = b.nodes(sel)` | Node indices for a selector |
 
-### `fem.Assembly`
+### `fembd.Assembly`
 | Method | |
 |---|---|
 | `a.add(body)` | Append a body |
@@ -333,7 +333,7 @@ fq = T'*(Mu*g);
 ```matlab
 H = arrayfun(@(w) C*((K - w^2*M + 1i*w*Dq)\fq), 2*pi*fHz);
 ```
-**Modal truncation:** `[V, f] = fem.modes(K, M, n);` then `Kn = diag((2*pi*f).^2)`,
+**Modal truncation:** `[V, f] = fembd.modes(K, M, n);` then `Kn = diag((2*pi*f).^2)`,
 `Mn = eye(n)`, `fn = V'*fq`, `Cn = C*V`.
 
 **Joints between parts:**
@@ -350,12 +350,12 @@ actuator-level model (see `examples/demoSerialArm.m`).
 **Craig–Bampton model** with a rigid flange as interface:
 ```matlab
 ib = a.qdof(a.dof('tool'));                        % 6 reference dofs
-[Kc, Mc, Vc] = fem.craigBampton(K, M, ib, 20);     % u = T*Vc*[u_b; eta]
+[Kc, Mc, Vc] = fembd.craigBampton(K, M, ib, 20);     % u = T*Vc*[u_b; eta]
 ```
 **Stiffness matrix at a rigid body** (e.g. a flexure stage's shuttle), by Guyan condensation onto
 its 6 dofs:
 ```matlab
-Ks = fem.craigBampton(K, M, a.qdof(a.dof('shuttle')), 0);   % 6x6, order [ux uy uz rx ry rz]
+Ks = fembd.craigBampton(K, M, a.qdof(a.dof('shuttle')), 0);   % 6x6, order [ux uy uz rx ry rz]
 Cs = inv(Ks);                                               % compliance at the reference point
 ```
 See `examples/demoParallelFlexure.m`.
@@ -370,7 +370,7 @@ For a small reduced model (e.g. CB), use `A = [0 I; -M\K -M\D]` with `ss(A, B, C
 spread slave mass onto master nodes; elastic joints keep it diagonal.
 
 **Meshing in Gmsh yourself:** save the mesh as ASCII `.msh` and pass it as `src`, or use
-`fem.readMsh` and pass `struct('X', X, 'T', T)`.
+`fembd.readMsh` and pass `struct('X', X, 'T', T)`.
 
 ---
 

@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>tut03_materials</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-08">
+<meta name="DC.date" content="2026-11-10">
 <meta name="DC.source" content="tut03_materials.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -108,12 +108,12 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <pre class="codeinput">addpath(fileparts(fileparts(mfilename(<span class="string">'fullpath'</span>))));
 out = fullfile(tempdir, <span class="string">'femTutorials'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
 file = fullfile(out, <span class="string">'beam.stl'</span>);
-fem.boxSTL(file, [0 0 0], [1000 50 50]);
+fembd.boxSTL(file, [0 0 0], [1000 50 50]);
 clampX0 = @(X) X(:,1) &lt; 1e-9;
 </pre>
 <h2 id="2">1. Isotropic material</h2>
 <p>A material is a struct with a 6x6 stiffness D in Voigt notation, order [xx yy zz yz xz xy] with engineering shear strains, and a density rho.</p>
-<pre class="codeinput">steel = fem.material(210e9, 0.3, 7850);
+<pre class="codeinput">steel = fembd.material(210e9, 0.3, 7850);
 disp(<span class="string">'D of steel (GPa):'</span>);  disp(steel.D/1e9);
 </pre>
 <pre class="codeoutput">D of steel (GPa):
@@ -140,9 +140,9 @@ cfrp = struct(<span class="string">'D'</span>, inv(blkdiag(S, diag(1./G))), <spa
 <span class="comment">% CFRP beam is faster; its low shear moduli make it slightly softer than</span>
 <span class="comment">% beam theory predicts.</span>
 <span class="keyword">for</span> mat = {steel, cfrp}
-    b = fem.Body(file, mat{1}, Size = 25, Scale = 1e-3);
-    a = fem.Assembly();  a.add(b);  a.fix(1, clampX0);
-    [K, M] = a.system();  [~, f] = fem.modes(K, M, 1);
+    b = fembd.Body(file, mat{1}, Size = 25, Scale = 1e-3);
+    a = fembd.Assembly();  a.add(b);  a.fix(1, clampX0);
+    [K, M] = a.system();  [~, f] = fembd.modes(K, M, 1);
     C = inv(mat{1}.D);  Ex = 1/C(1,1);            <span class="comment">% Young's modulus along x</span>
     fEB = 1.875104^2/(2*pi)*sqrt(Ex*0.05^4/12/(mat{1}.rho*0.05^2));
     fprintf(<span class="string">'f1 = %6.2f Hz (Euler-Bernoulli %6.2f Hz)\n'</span>, f, fEB);
@@ -154,7 +154,7 @@ f1 =  74.38 Hz (Euler-Bernoulli  75.55 Hz)
 <h2 id="4">3. Body matrices</h2>
 <p>
 <tt>body.matrices()</tt> returns the body's own K and M (3 dofs per node, unconstrained). A body that is not supported can move rigidly without deforming: K*phi = 0 for the six rigid-body modes, and phi'*M*phi gives its mass and inertia.</p>
-<pre class="codeinput">b = fem.Body(file, steel, Size = 25, Scale = 1e-3);
+<pre class="codeinput">b = fembd.Body(file, steel, Size = 25, Scale = 1e-3);
 [Kb, Mb] = b.matrices();
 c = b.Ref;                                     <span class="comment">% centroid</span>
 r = b.X - c;  n = b.nNode;  Phi = zeros(3*n, 6);
@@ -179,9 +179,9 @@ inertia [0.008177 1.64 1.64] kg m^2 (exact [0.008177 1.64 1.64])
 ml = full(diag(Ml));
 fprintf(<span class="string">'lumped M diagonal: %d, min entry %.2e kg, total %.4f kg\n'</span>, isdiag(Ml), min(ml), sum(ml)/3);
 
-a = fem.Assembly();  a.add(b);  a.fix(1, clampX0);
-[K, M]  = a.system();               [~, fc] = fem.modes(K, M, 6);
-[K, Ml] = a.system(Lumped = true);  [~, fl] = fem.modes(K, Ml, 6);
+a = fembd.Assembly();  a.add(b);  a.fix(1, clampX0);
+[K, M]  = a.system();               [~, fc] = fembd.modes(K, M, 6);
+[K, Ml] = a.system(Lumped = true);  [~, fl] = fembd.modes(K, Ml, 6);
 disp(table(fc, fl, 100*(fl./fc - 1), <span class="string">'VariableNames'</span>, {<span class="string">'consistent_Hz'</span>, <span class="string">'lumped_Hz'</span>, <span class="string">'diff_pct'</span>}));
 </pre>
 <pre class="codeoutput">lumped M diagonal: 1, min entry 8.54e-05 kg, total 19.6250 kg
@@ -214,13 +214,13 @@ disp(table(fc, fl, 100*(fl./fc - 1), <span class="string">'VariableNames'</span>
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
 file = fullfile(out, 'beam.stl');
-fem.boxSTL(file, [0 0 0], [1000 50 50]);
+fembd.boxSTL(file, [0 0 0], [1000 50 50]);
 clampX0 = @(X) X(:,1) < 1e-9;
 
 %% 1. Isotropic material
 % A material is a struct with a 6x6 stiffness D in Voigt notation, order
 % [xx yy zz yz xz xy] with engineering shear strains, and a density rho.
-steel = fem.material(210e9, 0.3, 7850);
+steel = fembd.material(210e9, 0.3, 7850);
 disp('D of steel (GPa):');  disp(steel.D/1e9);
 
 %% 2. Orthotropic material
@@ -240,9 +240,9 @@ cfrp = struct('D', inv(blkdiag(S, diag(1./G))), 'rho', 1600);
 % CFRP beam is faster; its low shear moduli make it slightly softer than
 % beam theory predicts.
 for mat = {steel, cfrp}
-    b = fem.Body(file, mat{1}, Size = 25, Scale = 1e-3);
-    a = fem.Assembly();  a.add(b);  a.fix(1, clampX0);
-    [K, M] = a.system();  [~, f] = fem.modes(K, M, 1);
+    b = fembd.Body(file, mat{1}, Size = 25, Scale = 1e-3);
+    a = fembd.Assembly();  a.add(b);  a.fix(1, clampX0);
+    [K, M] = a.system();  [~, f] = fembd.modes(K, M, 1);
     C = inv(mat{1}.D);  Ex = 1/C(1,1);            % Young's modulus along x
     fEB = 1.875104^2/(2*pi)*sqrt(Ex*0.05^4/12/(mat{1}.rho*0.05^2));
     fprintf('f1 = %6.2f Hz (Euler-Bernoulli %6.2f Hz)\n', f, fEB);
@@ -253,7 +253,7 @@ end
 % unconstrained). A body that is not supported can move rigidly without
 % deforming: K*phi = 0 for the six rigid-body modes, and phi'*M*phi gives
 % its mass and inertia.
-b = fem.Body(file, steel, Size = 25, Scale = 1e-3);
+b = fembd.Body(file, steel, Size = 25, Scale = 1e-3);
 [Kb, Mb] = b.matrices();
 c = b.Ref;                                     % centroid
 r = b.X - c;  n = b.nNode;  Phi = zeros(3*n, 6);
@@ -278,9 +278,9 @@ fprintf('inertia %s kg m^2 (exact %s)\n', mat2str(diag(Phi(:,4:6)'*Mb*Phi(:,4:6)
 ml = full(diag(Ml));
 fprintf('lumped M diagonal: %d, min entry %.2e kg, total %.4f kg\n', isdiag(Ml), min(ml), sum(ml)/3);
 
-a = fem.Assembly();  a.add(b);  a.fix(1, clampX0);
-[K, M]  = a.system();               [~, fc] = fem.modes(K, M, 6);
-[K, Ml] = a.system(Lumped = true);  [~, fl] = fem.modes(K, Ml, 6);
+a = fembd.Assembly();  a.add(b);  a.fix(1, clampX0);
+[K, M]  = a.system();               [~, fc] = fembd.modes(K, M, 6);
+[K, Ml] = a.system(Lumped = true);  [~, fl] = fembd.modes(K, Ml, 6);
 disp(table(fc, fl, 100*(fl./fc - 1), 'VariableNames', {'consistent_Hz', 'lumped_Hz', 'diff_pct'}));
 
 ##### SOURCE END #####

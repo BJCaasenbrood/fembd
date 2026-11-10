@@ -6,10 +6,10 @@
 This HTML was auto-generated from MATLAB code.
 To make changes, update the MATLAB code and republish this document.
       -->
-<title>fem: Linear-Elastic Assemblies</title>
+<title>fembd: Linear-Elastic Assemblies</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-08">
+<meta name="DC.date" content="2026-11-10">
 <meta name="DC.source" content="fem_landing.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -76,16 +76,16 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 </head>
 <body>
 <div class="content">
-<h1>fem: Linear-Elastic Assemblies</h1>
+<h1>fembd: Linear-Elastic Assemblies</h1>
 <!--introduction-->
 <p>
-<b>fem</b> builds linear-elastic finite-element models of assemblies of STL parts. Each part is meshed with Gmsh (quadratic Tet10 or linear Tet4 elements) or treated as rigid. Parts are connected by bonded ties, elastic interfaces, couplings and joints. The result is the sparse stiffness matrix K and mass matrix M, ready for modal, harmonic, transient or reduced-order analysis.</p>
-<pre class="language-matlab">steel = fem.material(210e9, 0.3, 7850);
-arm   = fem.Body(<span class="string">'arm.stl'</span>, steel, Size = 4, Scale = 1e-3);
-a = fem.Assembly();  a.add(arm);
+<b>fembd</b> builds linear-elastic finite-element models of assemblies of STL parts. Each part is meshed with Gmsh (quadratic Tet10 or linear Tet4 elements) or treated as rigid. Parts are connected by bonded ties, elastic interfaces, couplings and joints. The result is the sparse stiffness matrix K and mass matrix M, ready for modal, harmonic, transient or reduced-order analysis.</p>
+<pre class="language-matlab">steel = fembd.material(210e9, 0.3, 7850);
+arm   = fembd.Body(<span class="string">'arm.stl'</span>, steel, Size = 4, Scale = 1e-3);
+a = fembd.Assembly();  a.add(arm);
 a.fix(<span class="string">'arm'</span>, @(X) X(:,3) &lt; 1e-9);
 [K, M, T] = a.system();          <span class="comment">% u = T*q</span>
-[V, f] = fem.modes(K, M, 10);    <span class="comment">% natural frequencies (Hz)</span>
+[V, f] = fembd.modes(K, M, 10);    <span class="comment">% natural frequencies (Hz)</span>
 </pre>
 <!--/introduction-->
 <h2>Contents</h2>
@@ -143,7 +143,7 @@ a.fix(<span class="string">'arm'</span>, @(X) X(:,3) &lt; 1e-9);
 <a href="fem_reference.html">Function Reference</a>
 </li>
 <li>
-<a href="matlab:doc('fem.Body')">fem.Body</a> and <a href="matlab:doc('fem.Assembly')">fem.Assembly</a>
+<a href="matlab:doc('fembd.Body')">fembd.Body</a> and <a href="matlab:doc('fembd.Assembly')">fembd.Assembly</a>
 </li>
 </ul>
 </div>
@@ -166,20 +166,20 @@ a.fix(<span class="string">'arm'</span>, @(X) X(:,3) &lt; 1e-9);
 </div>
 <!--
 ##### SOURCE BEGIN #####
-%% fem: Linear-Elastic Assemblies
-% *fem* builds linear-elastic finite-element models of assemblies of STL
+%% fembd: Linear-Elastic Assemblies
+% *fembd* builds linear-elastic finite-element models of assemblies of STL
 % parts. Each part is meshed with Gmsh (quadratic Tet10 or linear Tet4
 % elements) or treated as rigid. Parts are connected by bonded ties,
 % elastic interfaces, couplings and joints. The result is the sparse
 % stiffness matrix K and mass matrix M, ready for modal, harmonic,
 % transient or reduced-order analysis.
 %
-%   steel = fem.material(210e9, 0.3, 7850);
-%   arm   = fem.Body('arm.stl', steel, Size = 4, Scale = 1e-3);
-%   a = fem.Assembly();  a.add(arm);
+%   steel = fembd.material(210e9, 0.3, 7850);
+%   arm   = fembd.Body('arm.stl', steel, Size = 4, Scale = 1e-3);
+%   a = fembd.Assembly();  a.add(arm);
 %   a.fix('arm', @(X) X(:,3) < 1e-9);
 %   [K, M, T] = a.system();          % u = T*q
-%   [V, f] = fem.modes(K, M, 10);    % natural frequencies (Hz)
+%   [V, f] = fembd.modes(K, M, 10);    % natural frequencies (Hz)
 %
 %% Get started
 %
@@ -198,7 +198,7 @@ a.fix(<span class="string">'arm'</span>, @(X) X(:,3) &lt; 1e-9);
 %% Reference
 %
 % * <fem_reference.html Function Reference>
-% * <matlab:doc('fem.Body') fem.Body> and <matlab:doc('fem.Assembly') fem.Assembly>
+% * <matlab:doc('fembd.Body') fembd.Body> and <matlab:doc('fembd.Assembly') fembd.Assembly>
 %
 %% Features
 %

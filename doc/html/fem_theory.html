@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>Formulation</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-08">
+<meta name="DC.date" content="2026-11-10">
 <meta name="DC.source" content="fem_theory.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -78,7 +78,7 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <div class="content">
 <h1>Formulation</h1>
 <!--introduction-->
-<p>A summary of the methods behind fem.</p>
+<p>A summary of the methods behind fembd.</p>
 <!--/introduction-->
 <h2>Contents</h2>
 <div>
@@ -126,8 +126,8 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <p>Dependent dofs (tie slaves, nodes of rigid bodies and couplings, B sides of joints) and supported dofs are eliminated: u = T q with T(I,:) = I and T(S,:) = R(:,I), after resolving chains. Cut-joint rows C q = 0 are then removed by coordinate partitioning: dependent columns are chosen greedily (non-joint dofs first, then later joints before earlier ones), each only if it raises the rank, and q_d = -C_d^+ C_i q_i. Finally K = T'*Kfull*T and M = T'*Mfull*T.</p>
 <h2 id="6">Eigenvalues and reduction</h2>
 <p>
-<tt>fem.modes</tt> uses shift-invert Lanczos with a small negative shift scaled to the softest dofs. <tt>fem.craigBampton</tt> combines static constraint modes and fixed-interface modes.</p>
-<p>The full manual with all details is docs/fem.md in the toolbox folder.</p>
+<tt>fembd.modes</tt> uses shift-invert Lanczos with a small negative shift scaled to the softest dofs. <tt>fembd.craigBampton</tt> combines static constraint modes and fixed-interface modes.</p>
+<p>The full manual with all details is docs/fembd.md in the toolbox folder.</p>
 <p class="footer">
 <br>
 <a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2024a</a>
@@ -137,7 +137,7 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <!--
 ##### SOURCE BEGIN #####
 %% Formulation
-% A summary of the methods behind fem.
+% A summary of the methods behind fembd.
 %
 %% Elements
 % Isoparametric Tet4 and Tet10 elements, small-strain linear elasticity,
@@ -187,11 +187,11 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 % and M = T'*Mfull*T.
 %
 %% Eigenvalues and reduction
-% |fem.modes| uses shift-invert Lanczos with a small negative shift scaled
-% to the softest dofs. |fem.craigBampton| combines static constraint modes
+% |fembd.modes| uses shift-invert Lanczos with a small negative shift scaled
+% to the softest dofs. |fembd.craigBampton| combines static constraint modes
 % and fixed-interface modes.
 %
-% The full manual with all details is docs/fem.md in the toolbox folder.
+% The full manual with all details is docs/fembd.md in the toolbox folder.
 
 ##### SOURCE END #####
 -->

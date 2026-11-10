@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>tut02_meshing</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-08">
+<meta name="DC.date" content="2026-11-10">
 <meta name="DC.source" content="tut02_meshing.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -107,10 +107,10 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <div>
 <ul>
 <li>
-<tt>fem.meshSTL</tt> options: <tt>Size</tt>, <tt>Order</tt>, <tt>Remesh</tt>, <tt>FeatureAngle</tt>
+<tt>fembd.meshSTL</tt> options: <tt>Size</tt>, <tt>Order</tt>, <tt>Remesh</tt>, <tt>FeatureAngle</tt>
 </li>
 <li>Tet4 vs Tet10 elements, and a mesh convergence study</li>
-<li>loading meshes made in the Gmsh GUI (<tt>fem.readMsh</tt>)</li>
+<li>loading meshes made in the Gmsh GUI (<tt>fembd.readMsh</tt>)</li>
 <li>placing parts with <tt>Scale</tt> and <tt>transform</tt>
 </li>
 </ul>
@@ -120,17 +120,17 @@ out = fullfile(tempdir, <span class="string">'femTutorials'</span>);  <span clas
 </pre>
 <h2 id="2">1. Checking Gmsh</h2>
 <p>The toolbox calls the Gmsh executable. It uses the GMSH environment variable if set, otherwise 'gmsh' on the PATH, e.g. setenv('GMSH', 'C:\gmsh-4.13.1-Windows64\gmsh.exe')</p>
-<pre class="codeinput">fem.gmsh(<span class="string">'--version'</span>);
+<pre class="codeinput">fembd.gmsh(<span class="string">'--version'</span>);
 </pre>
 <pre class="codeoutput">4.12.1
 </pre>
 <h2 id="3">2. Meshing an STL directly</h2>
 <p>
-<tt>fem.meshSTL</tt> returns nodes X (n x 3) and tetrahedra T (ne x 4 or 10). With Remesh = true (default), Gmsh splits the STL into smooth patches, using FeatureAngle to detect edges, and remeshes them to the requested Size. This helps with CAD STLs, which are full of long thin triangles. Remesh = false keeps the STL triangles as the boundary of the mesh.</p>
+<tt>fembd.meshSTL</tt> returns nodes X (n x 3) and tetrahedra T (ne x 4 or 10). With Remesh = true (default), Gmsh splits the STL into smooth patches, using FeatureAngle to detect edges, and remeshes them to the requested Size. This helps with CAD STLs, which are full of long thin triangles. Remesh = false keeps the STL triangles as the boundary of the mesh.</p>
 <pre class="codeinput">cyl = fullfile(out, <span class="string">'cylinder.stl'</span>);
-fem.cylinderSTL(cyl, [0 0], 10, 0, 60);               <span class="comment">% r = 10, height 60 (mm)</span>
-[X1, T1] = fem.meshSTL(cyl, Size = 4);
-[X2, T2] = fem.meshSTL(cyl, Remesh = false);
+fembd.cylinderSTL(cyl, [0 0], 10, 0, 60);               <span class="comment">% r = 10, height 60 (mm)</span>
+[X1, T1] = fembd.meshSTL(cyl, Size = 4);
+[X2, T2] = fembd.meshSTL(cyl, Remesh = false);
 fprintf(<span class="string">'remeshed: %d tets, STL kept as boundary: %d tets\n'</span>, size(T1, 1), size(T2, 1));
 
 figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
@@ -142,17 +142,17 @@ subplot(1, 2, 2);  tetramesh(T2(:,1:4), X2, <span class="string">'FaceAlpha'</sp
 <img vspace="5" hspace="5" src="tut02_meshing_01.png" alt=""> <h2 id="4">3. Tet4 vs Tet10: a convergence study</h2>
 <p>Linear tetrahedra (Tet4) are too stiff in bending ("locking") and need very fine meshes. Quadratic Tet10 elements are accurate on coarse meshes and are the default. We compute the first cantilever frequency on increasingly fine meshes and compare with Euler-Bernoulli.</p>
 <pre class="codeinput">beam = fullfile(out, <span class="string">'beam.stl'</span>);
-fem.boxSTL(beam, [0 0 0], [1000 50 50]);
-steel = fem.material(210e9, 0.3, 7850);
+fembd.boxSTL(beam, [0 0 0], [1000 50 50]);
+steel = fembd.material(210e9, 0.3, 7850);
 fEB = 1.875104^2/(2*pi)*sqrt(210e9*0.05^4/12/(7850*0.05^2));
 sizes = [50 25 12.5];
 err = zeros(2, numel(sizes));  ndof = err;
 <span class="keyword">for</span> order = 1:2
     <span class="keyword">for</span> k = 1:numel(sizes)
-        b = fem.Body(beam, steel, Size = sizes(k), Order = order, Scale = 1e-3);
-        a = fem.Assembly();  a.add(b);  a.fix(1, @(X) X(:,1) &lt; 1e-9);
+        b = fembd.Body(beam, steel, Size = sizes(k), Order = order, Scale = 1e-3);
+        a = fembd.Assembly();  a.add(b);  a.fix(1, @(X) X(:,1) &lt; 1e-9);
         [K, M] = a.system();
-        [~, f] = fem.modes(K, M, 1);
+        [~, f] = fembd.modes(K, M, 1);
         err(order, k) = f/fEB - 1;  ndof(order, k) = size(K, 1);
     <span class="keyword">end</span>
 <span class="keyword">end</span>
@@ -174,23 +174,23 @@ title(<span class="string">'Convergence of the first bending frequency'</span>);
 <img vspace="5" hspace="5" src="tut02_meshing_02.png" alt=""> <h2 id="5">4. Curved surfaces and Tet10</h2>
 <p>Tet10 edge nodes are placed on the curved surface that Gmsh reconstructs from the STL. On coarse meshes of small radii this can fold an element; meshSTL then remeshes with straight-sided Tet10 and gives a warning. A smaller Size keeps the curved geometry.</p>
 <h2 id="6">5. Meshes from the Gmsh GUI</h2>
-<p>For full control (local refinement, physical groups, ...), mesh in Gmsh yourself and save as ASCII .msh, version 2.2 or 4.1. Pass the .msh file to fem.Body, or read it with fem.readMsh. Here we create such a file through fem.gmsh, which takes any Gmsh command-line arguments.</p>
+<p>For full control (local refinement, physical groups, ...), mesh in Gmsh yourself and save as ASCII .msh, version 2.2 or 4.1. Pass the .msh file to fembd.Body, or read it with fembd.readMsh. Here we create such a file through fembd.gmsh, which takes any Gmsh command-line arguments.</p>
 <pre class="codeinput">geo = fullfile(out, <span class="string">'block.geo'</span>);
 writelines([<span class="string">'SetFactory("OpenCASCADE"); Box(1) = {0, 0, 0, 100, 40, 20};'</span> <span class="keyword">...</span>
             <span class="string">'Mesh.MeshSizeMax = 8; Mesh.ElementOrder = 2;'</span>], geo);
 msh = fullfile(out, <span class="string">'block.msh'</span>);
-fem.gmsh(sprintf(<span class="string">'"%s" -3 -format msh41 -o "%s" -v 0'</span>, geo, msh));
-block = fem.Body(msh, steel, Scale = 1e-3);
+fembd.gmsh(sprintf(<span class="string">'"%s" -3 -format msh41 -o "%s" -v 0'</span>, geo, msh));
+block = fembd.Body(msh, steel, Scale = 1e-3);
 fprintf(<span class="string">'%s.msh: %d nodes, %d elements\n'</span>, block.Name, block.nNode, size(block.T, 1));
 </pre>
 <pre class="codeoutput">block.msh: 1941 nodes, 980 elements
 </pre>
 <h2 id="7">6. Units and placement</h2>
 <p>Scale converts coordinates after meshing, so Size stays in file units. <tt>transform(R, t)</tt> moves a body rigidly (x -&gt; R*x + t), e.g. to place the same part twice in an assembly.</p>
-<pre class="codeinput">copy = fem.Body(msh, steel, Scale = 1e-3, Name = <span class="string">'block2'</span>);
+<pre class="codeinput">copy = fembd.Body(msh, steel, Scale = 1e-3, Name = <span class="string">'block2'</span>);
 Rz = [0 -1 0; 1 0 0; 0 0 1];                      <span class="comment">% 90 degrees about z</span>
 copy.transform(Rz, [0.2 0 0]);
-a = fem.Assembly();  a.add(block);  a.add(copy);
+a = fembd.Assembly();  a.add(block);  a.add(copy);
 figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);  a.plot();  title(<span class="string">'Two placed copies of one mesh'</span>);
 </pre>
 <img vspace="5" hspace="5" src="tut02_meshing_03.png" alt=""> <p class="footer">
@@ -204,9 +204,9 @@ figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);  a
 %% Tutorial 2 - Meshing: STL, Gmsh, element order and convergence
 % This tutorial covers:
 %
-% * |fem.meshSTL| options: |Size|, |Order|, |Remesh|, |FeatureAngle|
+% * |fembd.meshSTL| options: |Size|, |Order|, |Remesh|, |FeatureAngle|
 % * Tet4 vs Tet10 elements, and a mesh convergence study
-% * loading meshes made in the Gmsh GUI (|fem.readMsh|)
+% * loading meshes made in the Gmsh GUI (|fembd.readMsh|)
 % * placing parts with |Scale| and |transform|
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
@@ -216,18 +216,18 @@ out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
 % The toolbox calls the Gmsh executable. It uses the GMSH environment
 % variable if set, otherwise 'gmsh' on the PATH, e.g.
 %   setenv('GMSH', 'C:\gmsh-4.13.1-Windows64\gmsh.exe')
-fem.gmsh('REPLACE_WITH_DASH_DASHversion');
+fembd.gmsh('REPLACE_WITH_DASH_DASHversion');
 
 %% 2. Meshing an STL directly
-% |fem.meshSTL| returns nodes X (n x 3) and tetrahedra T (ne x 4 or 10).
+% |fembd.meshSTL| returns nodes X (n x 3) and tetrahedra T (ne x 4 or 10).
 % With Remesh = true (default), Gmsh splits the STL into smooth patches,
 % using FeatureAngle to detect edges, and remeshes them to the requested
 % Size. This helps with CAD STLs, which are full of long thin triangles.
 % Remesh = false keeps the STL triangles as the boundary of the mesh.
 cyl = fullfile(out, 'cylinder.stl');
-fem.cylinderSTL(cyl, [0 0], 10, 0, 60);               % r = 10, height 60 (mm)
-[X1, T1] = fem.meshSTL(cyl, Size = 4);
-[X2, T2] = fem.meshSTL(cyl, Remesh = false);
+fembd.cylinderSTL(cyl, [0 0], 10, 0, 60);               % r = 10, height 60 (mm)
+[X1, T1] = fembd.meshSTL(cyl, Size = 4);
+[X2, T2] = fembd.meshSTL(cyl, Remesh = false);
 fprintf('remeshed: %d tets, STL kept as boundary: %d tets\n', size(T1, 1), size(T2, 1));
 
 figure('Color', 'w');
@@ -240,17 +240,17 @@ subplot(1, 2, 2);  tetramesh(T2(:,1:4), X2, 'FaceAlpha', 0.1);  axis equal;  tit
 % and are the default. We compute the first cantilever frequency on
 % increasingly fine meshes and compare with Euler-Bernoulli.
 beam = fullfile(out, 'beam.stl');
-fem.boxSTL(beam, [0 0 0], [1000 50 50]);
-steel = fem.material(210e9, 0.3, 7850);
+fembd.boxSTL(beam, [0 0 0], [1000 50 50]);
+steel = fembd.material(210e9, 0.3, 7850);
 fEB = 1.875104^2/(2*pi)*sqrt(210e9*0.05^4/12/(7850*0.05^2));
 sizes = [50 25 12.5];
 err = zeros(2, numel(sizes));  ndof = err;
 for order = 1:2
     for k = 1:numel(sizes)
-        b = fem.Body(beam, steel, Size = sizes(k), Order = order, Scale = 1e-3);
-        a = fem.Assembly();  a.add(b);  a.fix(1, @(X) X(:,1) < 1e-9);
+        b = fembd.Body(beam, steel, Size = sizes(k), Order = order, Scale = 1e-3);
+        a = fembd.Assembly();  a.add(b);  a.fix(1, @(X) X(:,1) < 1e-9);
         [K, M] = a.system();
-        [~, f] = fem.modes(K, M, 1);
+        [~, f] = fembd.modes(K, M, 1);
         err(order, k) = f/fEB - 1;  ndof(order, k) = size(K, 1);
     end
 end
@@ -271,24 +271,24 @@ title('Convergence of the first bending frequency');
 %% 5. Meshes from the Gmsh GUI
 % For full control (local refinement, physical groups, ...), mesh in Gmsh
 % yourself and save as ASCII .msh, version 2.2 or 4.1. Pass the .msh file to
-% fem.Body, or read it with fem.readMsh. Here we create such a file
-% through fem.gmsh, which takes any Gmsh command-line arguments.
+% fembd.Body, or read it with fembd.readMsh. Here we create such a file
+% through fembd.gmsh, which takes any Gmsh command-line arguments.
 geo = fullfile(out, 'block.geo');
 writelines(['SetFactory("OpenCASCADE"); Box(1) = {0, 0, 0, 100, 40, 20};' ...
             'Mesh.MeshSizeMax = 8; Mesh.ElementOrder = 2;'], geo);
 msh = fullfile(out, 'block.msh');
-fem.gmsh(sprintf('"%s" -3 -format msh41 -o "%s" -v 0', geo, msh));
-block = fem.Body(msh, steel, Scale = 1e-3);
+fembd.gmsh(sprintf('"%s" -3 -format msh41 -o "%s" -v 0', geo, msh));
+block = fembd.Body(msh, steel, Scale = 1e-3);
 fprintf('%s.msh: %d nodes, %d elements\n', block.Name, block.nNode, size(block.T, 1));
 
 %% 6. Units and placement
 % Scale converts coordinates after meshing, so Size stays in file units.
 % |transform(R, t)| moves a body rigidly (x -> R*x + t), e.g. to place
 % the same part twice in an assembly.
-copy = fem.Body(msh, steel, Scale = 1e-3, Name = 'block2');
+copy = fembd.Body(msh, steel, Scale = 1e-3, Name = 'block2');
 Rz = [0 -1 0; 1 0 0; 0 0 1];                      % 90 degrees about z
 copy.transform(Rz, [0.2 0 0]);
-a = fem.Assembly();  a.add(block);  a.add(copy);
+a = fembd.Assembly();  a.add(block);  a.add(copy);
 figure('Color', 'w');  a.plot();  title('Two placed copies of one mesh');
 
 ##### SOURCE END #####

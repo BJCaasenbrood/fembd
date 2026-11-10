@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>tut07_joints</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-08">
+<meta name="DC.date" content="2026-11-10">
 <meta name="DC.source" content="tut07_joints.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -125,13 +125,13 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 </div>
 <pre class="codeinput">addpath(fileparts(fileparts(mfilename(<span class="string">'fullpath'</span>))));
 out = fullfile(tempdir, <span class="string">'femTutorials'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
-alu = fem.material(70e9, 0.33, 2700);
+alu = fembd.material(70e9, 0.33, 2700);
 </pre>
 <h2 id="2">1. An elastic door on two hinges</h2>
 <p>A 400 x 20 x 600 mm aluminium door, hinged along its x = 0 edge.</p>
-<pre class="codeinput">fem.boxSTL(fullfile(out, <span class="string">'door.stl'</span>), [0 0 0], [400 20 600]);
-door = fem.Body(fullfile(out, <span class="string">'door.stl'</span>), alu, Size = 20, Scale = 1e-3);
-a = fem.Assembly();  a.add(door);
+<pre class="codeinput">fembd.boxSTL(fullfile(out, <span class="string">'door.stl'</span>), [0 0 0], [400 20 600]);
+door = fembd.Body(fullfile(out, <span class="string">'door.stl'</span>), alu, Size = 20, Scale = 1e-3);
+a = fembd.Assembly();  a.add(door);
 </pre>
 <h2 id="3">2. Couplings</h2>
 <p>
@@ -150,7 +150,7 @@ disp({a.Refs.Name});
 <pre class="codeinput">k = 20;
 j1 = a.joint(<span class="string">'ground'</span>, r1, <span class="string">'revolute'</span>, Axis = [0 0 1], Stiffness = k);
 j2 = a.joint(<span class="string">'ground'</span>, r2, <span class="string">'revolute'</span>, Axis = [0 0 1]);
-[K, M, T] = a.system();  [V, f] = fem.modes(K, M, 4);
+[K, M, T] = a.system();  [V, f] = fembd.modes(K, M, 4);
 
 <span class="comment">% The first mode is the door swinging against the spring. Check it against</span>
 <span class="comment">% a rigid door: f = sqrt(k/I)/(2 pi), with I the inertia about the hinge.</span>
@@ -189,27 +189,27 @@ fprintf(<span class="string">'hinge rotations: %.4f and %.4f rad (tau/k = %.4f)\
 <h2 id="6">5. Locking a joint</h2>
 <p>Supporting a joint coordinate locks the joint: a.fix(joint, []) (or a.fix(joint, [], dirs) for some of its coordinates). With the lower hinge locked, the door can only twist, so the swing mode disappears.</p>
 <pre class="codeinput">a.fix(j1, []);
-[K, M] = a.system();  [~, fl] = fem.modes(K, M, 2);
+[K, M] = a.system();  [~, fl] = fembd.modes(K, M, 2);
 fprintf(<span class="string">'lower hinge locked: f1 = %.2f Hz\n'</span>, fl(1));
 </pre>
 <pre class="codeoutput">lower hinge locked: f1 = 39.34 Hz
 </pre>
 <h2 id="7">6. Other joint types and mechanism modes</h2>
 <p>Types, with their free directions in the joint frame: fixed (none), revolute (rz), prismatic (uz), cylindrical (uz rz), spherical (rx ry rz), planar (ux uy rz), free (all six: a bushing when combined with Stiffness). Any mask is possible with Free = [ux uy uz rx ry rz] (logical). Free directions without stiffness are mechanisms: they show up as 0 Hz modes. A ball joint (spherical) leaves three.</p>
-<pre class="codeinput">fem.boxSTL(fullfile(out, <span class="string">'cart.stl'</span>), [0 0 0], [100 100 50]);
-cart = fem.Body(fullfile(out, <span class="string">'cart.stl'</span>), struct(<span class="string">'rho'</span>, 7850), Size = 50, <span class="keyword">...</span>
+<pre class="codeinput">fembd.boxSTL(fullfile(out, <span class="string">'cart.stl'</span>), [0 0 0], [100 100 50]);
+cart = fembd.Body(fullfile(out, <span class="string">'cart.stl'</span>), struct(<span class="string">'rho'</span>, 7850), Size = 50, <span class="keyword">...</span>
                 Order = 1, Scale = 1e-3, Rigid = true);
 mc = 7850*0.1*0.1*0.05;
 
-b = fem.Assembly();  b.add(cart);
+b = fembd.Assembly();  b.add(cart);
 b.joint(<span class="string">'ground'</span>, <span class="string">'cart'</span>, <span class="string">'prismatic'</span>, Axis = [1 0 0], Stiffness = 1e5);
 [K, M] = b.system();
 fprintf(<span class="string">'prismatic + spring: %d dof, f = %.3f Hz (sqrt(k/m): %.3f Hz)\n'</span>, <span class="keyword">...</span>
         size(K, 1), full(sqrt(K/M))/(2*pi), sqrt(1e5/mc)/(2*pi));
 
-b = fem.Assembly();  b.add(cart);
+b = fembd.Assembly();  b.add(cart);
 b.joint(<span class="string">'ground'</span>, <span class="string">'cart'</span>, <span class="string">'spherical'</span>, Point = [0 0 0]);
-[K, M] = b.system();  [~, fs] = fem.modes(K, M, 3);
+[K, M] = b.system();  [~, fs] = fembd.modes(K, M, 3);
 fprintf(<span class="string">'spherical joint: %d dofs, frequencies %s Hz (mechanism)\n'</span>, size(K, 1), mat2str(fs', 3));
 </pre>
 <pre class="codeoutput">prismatic + spring: 1 dof, f = 25.404 Hz (sqrt(k/m): 25.404 Hz)
@@ -217,8 +217,8 @@ spherical joint: 3 dofs, frequencies [0 0 0] Hz (mechanism)
 </pre>
 <h2 id="8">7. Posing joints</h2>
 <p>Joint coordinates are small motions about the current geometry. To analyse another configuration, set the joint to a finite position with <tt>a.pose(joint, value)</tt> (rad or m, relative to where the joint was created). Everything on the B side moves rigidly, and a.system() then gives K and M about the new pose. Here a rigid pendulum (a point mass on an arm) hangs from a revolute joint with a torsion spring: its frequency depends on the pose only through the inertia, so it stays the same.</p>
-<pre class="codeinput">c = fem.Body.pointMass(1, [0.5 0 0], zeros(3), Name = <span class="string">'bob'</span>);
-b = fem.Assembly();  b.add(c);
+<pre class="codeinput">c = fembd.Body.pointMass(1, [0.5 0 0], zeros(3), Name = <span class="string">'bob'</span>);
+b = fembd.Assembly();  b.add(c);
 b.joint(<span class="string">'ground'</span>, <span class="string">'bob'</span>, <span class="string">'revolute'</span>, Point = [0 0 0], Axis = [0 0 1], <span class="keyword">...</span>
         Stiffness = 10, Name = <span class="string">'pivot'</span>);
 <span class="keyword">for</span> ang = [0 45 90]
@@ -238,9 +238,9 @@ pivot at 90 deg: bob at [0 0.5 0] m, f = 1.0066 Hz
 <p>Joints may close kinematic loops. Here three point-mass links form a planar four-bar with a torsion spring in the crank joint. The fourth joint closes the loop and becomes a cut joint: its constraint is removed by QR coordinate partitioning. The planar loop is overconstrained in 3D (redundant out-of-plane rows), which is detected automatically. One dof remains: the crank angle, because the crank joint was defined first.</p>
 <pre class="codeinput">P = {[0 0 0], [0.05 0.1 0], [0.3 0.15 0], [0.25 0 0]};   <span class="comment">% O2, A, B, O4</span>
 mk = [0.2 0.5 0.3];  Jz = [1e-4 4e-4 2e-4];
-b = fem.Assembly();
+b = fembd.Assembly();
 <span class="keyword">for</span> i = 1:3
-    b.add(fem.Body.pointMass(mk(i), (P{i} + P{i+1})/2, Jz(i)*eye(3), <span class="keyword">...</span>
+    b.add(fembd.Body.pointMass(mk(i), (P{i} + P{i+1})/2, Jz(i)*eye(3), <span class="keyword">...</span>
           Name = sprintf(<span class="string">'link%d'</span>, i)));
 <span class="keyword">end</span>
 b.joint(<span class="string">'ground'</span>, <span class="string">'link1'</span>, <span class="string">'revolute'</span>, Point = P{1}, Stiffness = 50, Name = <span class="string">'crank'</span>);
@@ -257,13 +257,13 @@ fprintf(<span class="string">'four-bar: %d dof, f = %.3f Hz, crank coordinate in
 <p>
 <tt>a.transmission</tt> relates coordinates of different joints through the stretch delta = sum_i c_i s_i: a spring with Stiffness, or exact without. Here a motor rotor drives a rigid arm through a belt with ratio N = 3 (motor turns 3x): delta = theta_motor/N - theta_arm. The belt mode is the two inertias oscillating against each other.</p>
 <pre class="codeinput">Jm = 2e-4;  Ja = 0.05;  N = 3;  kBelt = 2e4;
-b = fem.Assembly();
-b.add(fem.Body.pointMass(0.1, [0.1 0 0], Jm*eye(3), Name = <span class="string">'rotor'</span>));
-b.add(fem.Body.pointMass(1e-9, [0 0 0], Ja*eye(3), Name = <span class="string">'arm'</span>));
+b = fembd.Assembly();
+b.add(fembd.Body.pointMass(0.1, [0.1 0 0], Jm*eye(3), Name = <span class="string">'rotor'</span>));
+b.add(fembd.Body.pointMass(1e-9, [0 0 0], Ja*eye(3), Name = <span class="string">'arm'</span>));
 b.joint(<span class="string">'ground'</span>, <span class="string">'rotor'</span>, <span class="string">'revolute'</span>, Point = [0.1 0 0], Name = <span class="string">'motor'</span>);
 b.joint(<span class="string">'ground'</span>, <span class="string">'arm'</span>,   <span class="string">'revolute'</span>, Point = [0 0 0],   Name = <span class="string">'axis'</span>);
 b.transmission({<span class="string">'motor'</span>, <span class="string">'axis'</span>}, [1/N -1], Stiffness = kBelt);
-[K, M] = b.system();  [~, fb] = fem.modes(K, M, 2);
+[K, M] = b.system();  [~, fb] = fembd.modes(K, M, 2);
 fprintf(<span class="string">'belt mode: FE %.2f Hz, two-inertia formula %.2f Hz\n'</span>, fb(2), <span class="keyword">...</span>
         sqrt(kBelt*(1/Ja + 1/(N^2*Jm)))/(2*pi));
 <span class="comment">% Without Stiffness the belt is rigid (an ideal gear): one dof remains,</span>
@@ -301,13 +301,13 @@ fprintf(<span class="string">'belt mode: FE %.2f Hz, two-inertia formula %.2f Hz
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
-alu = fem.material(70e9, 0.33, 2700);
+alu = fembd.material(70e9, 0.33, 2700);
 
 %% 1. An elastic door on two hinges
 % A 400 x 20 x 600 mm aluminium door, hinged along its x = 0 edge.
-fem.boxSTL(fullfile(out, 'door.stl'), [0 0 0], [400 20 600]);
-door = fem.Body(fullfile(out, 'door.stl'), alu, Size = 20, Scale = 1e-3);
-a = fem.Assembly();  a.add(door);
+fembd.boxSTL(fullfile(out, 'door.stl'), [0 0 0], [400 20 600]);
+door = fembd.Body(fullfile(out, 'door.stl'), alu, Size = 20, Scale = 1e-3);
+a = fembd.Assembly();  a.add(door);
 
 %% 2. Couplings
 % |a.couple(body, sel)| makes the selected nodes follow a new 6-dof
@@ -327,7 +327,7 @@ disp({a.Refs.Name});
 k = 20;
 j1 = a.joint('ground', r1, 'revolute', Axis = [0 0 1], Stiffness = k);
 j2 = a.joint('ground', r2, 'revolute', Axis = [0 0 1]);
-[K, M, T] = a.system();  [V, f] = fem.modes(K, M, 4);
+[K, M, T] = a.system();  [V, f] = fembd.modes(K, M, 4);
 
 % The first mode is the door swinging against the spring. Check it against
 % a rigid door: f = sqrt(k/I)/(2 pi), with I the inertia about the hinge.
@@ -358,7 +358,7 @@ fprintf('hinge rotations: %.4f and %.4f rad (tau/k = %.4f)\n', u(a.dof(j1)), u(a
 % a.fix(joint, [], dirs) for some of its coordinates). With the lower hinge
 % locked, the door can only twist, so the swing mode disappears.
 a.fix(j1, []);
-[K, M] = a.system();  [~, fl] = fem.modes(K, M, 2);
+[K, M] = a.system();  [~, fl] = fembd.modes(K, M, 2);
 fprintf('lower hinge locked: f1 = %.2f Hz\n', fl(1));
 
 %% 6. Other joint types and mechanism modes
@@ -369,20 +369,20 @@ fprintf('lower hinge locked: f1 = %.2f Hz\n', fl(1));
 % Any mask is possible with Free = [ux uy uz rx ry rz] (logical).
 % Free directions without stiffness are mechanisms: they show up as 0 Hz
 % modes. A ball joint (spherical) leaves three.
-fem.boxSTL(fullfile(out, 'cart.stl'), [0 0 0], [100 100 50]);
-cart = fem.Body(fullfile(out, 'cart.stl'), struct('rho', 7850), Size = 50, ...
+fembd.boxSTL(fullfile(out, 'cart.stl'), [0 0 0], [100 100 50]);
+cart = fembd.Body(fullfile(out, 'cart.stl'), struct('rho', 7850), Size = 50, ...
                 Order = 1, Scale = 1e-3, Rigid = true);
 mc = 7850*0.1*0.1*0.05;
 
-b = fem.Assembly();  b.add(cart);
+b = fembd.Assembly();  b.add(cart);
 b.joint('ground', 'cart', 'prismatic', Axis = [1 0 0], Stiffness = 1e5);
 [K, M] = b.system();
 fprintf('prismatic + spring: %d dof, f = %.3f Hz (sqrt(k/m): %.3f Hz)\n', ...
         size(K, 1), full(sqrt(K/M))/(2*pi), sqrt(1e5/mc)/(2*pi));
 
-b = fem.Assembly();  b.add(cart);
+b = fembd.Assembly();  b.add(cart);
 b.joint('ground', 'cart', 'spherical', Point = [0 0 0]);
-[K, M] = b.system();  [~, fs] = fem.modes(K, M, 3);
+[K, M] = b.system();  [~, fs] = fembd.modes(K, M, 3);
 fprintf('spherical joint: %d dofs, frequencies %s Hz (mechanism)\n', size(K, 1), mat2str(fs', 3));
 
 %% 7. Posing joints
@@ -393,8 +393,8 @@ fprintf('spherical joint: %d dofs, frequencies %s Hz (mechanism)\n', size(K, 1),
 % gives K and M about the new pose. Here a rigid pendulum (a point mass on
 % an arm) hangs from a revolute joint with a torsion spring: its frequency
 % depends on the pose only through the inertia, so it stays the same.
-c = fem.Body.pointMass(1, [0.5 0 0], zeros(3), Name = 'bob');
-b = fem.Assembly();  b.add(c);
+c = fembd.Body.pointMass(1, [0.5 0 0], zeros(3), Name = 'bob');
+b = fembd.Assembly();  b.add(c);
 b.joint('ground', 'bob', 'revolute', Point = [0 0 0], Axis = [0 0 1], ...
         Stiffness = 10, Name = 'pivot');
 for ang = [0 45 90]
@@ -415,9 +415,9 @@ end
 % remains: the crank angle, because the crank joint was defined first.
 P = {[0 0 0], [0.05 0.1 0], [0.3 0.15 0], [0.25 0 0]};   % O2, A, B, O4
 mk = [0.2 0.5 0.3];  Jz = [1e-4 4e-4 2e-4];
-b = fem.Assembly();
+b = fembd.Assembly();
 for i = 1:3
-    b.add(fem.Body.pointMass(mk(i), (P{i} + P{i+1})/2, Jz(i)*eye(3), ...
+    b.add(fembd.Body.pointMass(mk(i), (P{i} + P{i+1})/2, Jz(i)*eye(3), ...
           Name = sprintf('link%d', i)));
 end
 b.joint('ground', 'link1', 'revolute', Point = P{1}, Stiffness = 50, Name = 'crank');
@@ -435,13 +435,13 @@ fprintf('four-bar: %d dof, f = %.3f Hz, crank coordinate in q: %d\n', size(K, 1)
 % (motor turns 3x): delta = theta_motor/N - theta_arm. The belt mode is
 % the two inertias oscillating against each other.
 Jm = 2e-4;  Ja = 0.05;  N = 3;  kBelt = 2e4;
-b = fem.Assembly();
-b.add(fem.Body.pointMass(0.1, [0.1 0 0], Jm*eye(3), Name = 'rotor'));
-b.add(fem.Body.pointMass(1e-9, [0 0 0], Ja*eye(3), Name = 'arm'));
+b = fembd.Assembly();
+b.add(fembd.Body.pointMass(0.1, [0.1 0 0], Jm*eye(3), Name = 'rotor'));
+b.add(fembd.Body.pointMass(1e-9, [0 0 0], Ja*eye(3), Name = 'arm'));
 b.joint('ground', 'rotor', 'revolute', Point = [0.1 0 0], Name = 'motor');
 b.joint('ground', 'arm',   'revolute', Point = [0 0 0],   Name = 'axis');
 b.transmission({'motor', 'axis'}, [1/N -1], Stiffness = kBelt);
-[K, M] = b.system();  [~, fb] = fem.modes(K, M, 2);
+[K, M] = b.system();  [~, fb] = fembd.modes(K, M, 2);
 fprintf('belt mode: FE %.2f Hz, two-inertia formula %.2f Hz\n', fb(2), ...
         sqrt(kBelt*(1/Ja + 1/(N^2*Jm)))/(2*pi));
 % Without Stiffness the belt is rigid (an ideal gear): one dof remains,

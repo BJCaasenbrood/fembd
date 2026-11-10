@@ -15,20 +15,20 @@ out = fullfile(tempdir, 'femFlexure');  if ~isfolder(out), mkdir(out); end
 
 % geometry (mm)
 L = 40;  b = 10;  t = 0.1;  s = 20;            % leaf length, width, thickness; half spacing
-fem.boxSTL(fullfile(out, 'base.stl'),    [-s-5 -b/2 -10],   [s+5 b/2 0]);
-fem.boxSTL(fullfile(out, 'shuttle.stl'), [-s-5 -b/2 L],     [s+5 b/2 L+10]);
-fem.boxSTL(fullfile(out, 'leaf1.stl'),   [-s-t/2 -b/2 0],   [-s+t/2 b/2 L]);
-fem.boxSTL(fullfile(out, 'leaf2.stl'),   [ s-t/2 -b/2 0],   [ s+t/2 b/2 L]);
+fembd.boxSTL(fullfile(out, 'base.stl'),    [-s-5 -b/2 -10],   [s+5 b/2 0]);
+fembd.boxSTL(fullfile(out, 'shuttle.stl'), [-s-5 -b/2 L],     [s+5 b/2 L+10]);
+fembd.boxSTL(fullfile(out, 'leaf1.stl'),   [-s-t/2 -b/2 0],   [-s+t/2 b/2 L]);
+fembd.boxSTL(fullfile(out, 'leaf2.stl'),   [ s-t/2 -b/2 0],   [ s+t/2 b/2 L]);
 
 % bodies: rigid parts need only a coarse mesh and a density
-steel = fem.material(210e9, 0.3, 7850);
+steel = fembd.material(210e9, 0.3, 7850);
 mesh  = {'Scale', 1e-3};
-base    = fem.Body(fullfile(out, 'base.stl'),    steel, mesh{:}, Size = 5, Order = 1, Rigid = true);
-shuttle = fem.Body(fullfile(out, 'shuttle.stl'), steel, mesh{:}, Size = 5, Order = 1, Rigid = true);
-leaf1   = fem.Body(fullfile(out, 'leaf1.stl'),   steel, mesh{:}, Size = 0.8);
-leaf2   = fem.Body(fullfile(out, 'leaf2.stl'),   steel, mesh{:}, Size = 0.8);
+base    = fembd.Body(fullfile(out, 'base.stl'),    steel, mesh{:}, Size = 5, Order = 1, Rigid = true);
+shuttle = fembd.Body(fullfile(out, 'shuttle.stl'), steel, mesh{:}, Size = 5, Order = 1, Rigid = true);
+leaf1   = fembd.Body(fullfile(out, 'leaf1.stl'),   steel, mesh{:}, Size = 0.8);
+leaf2   = fembd.Body(fullfile(out, 'leaf2.stl'),   steel, mesh{:}, Size = 0.8);
 
-a = fem.Assembly();
+a = fembd.Assembly();
 cellfun(@(x) a.add(x), {base, shuttle, leaf1, leaf2});
 for leaf = {'leaf1', 'leaf2'}
     a.tie('base', leaf{1});                  % leaves clamped into the rigid parts
@@ -42,12 +42,12 @@ fprintf('%d dofs, %d after constraints\n', a.nDof, size(K, 1));
 % 6x6 stiffness at the shuttle centroid: static condensation (Guyan) onto
 % its reference dofs [ux uy uz rx ry rz]
 ib = a.qdof(a.dof('shuttle'));
-Ks = fem.craigBampton(K, M, ib, 0);
+Ks = fembd.craigBampton(K, M, ib, 0);
 disp(array2table(diag(Ks)', 'VariableNames', ...
      {'kx_N_m', 'ky_N_m', 'kz_N_m', 'krx_Nm', 'kry_Nm', 'krz_Nm'}));
 
 % first modes
-[V, f] = fem.modes(K, M, 4);
+[V, f] = fembd.modes(K, M, 4);
 
 % clamped-guided beam theory (plate value E/(1-nu^2) as upper bound)
 I  = b*t^3/12*1e-12;  Lm = L*1e-3;

@@ -7,9 +7,9 @@
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
-fem.boxSTL(fullfile(out, 'beam.stl'), [0 0 0], [1000 50 50]);
-steel = fem.material(210e9, 0.3, 7850);
-beam  = fem.Body(fullfile(out, 'beam.stl'), steel, Size = 25, Scale = 1e-3);
+fembd.boxSTL(fullfile(out, 'beam.stl'), [0 0 0], [1000 50 50]);
+steel = fembd.material(210e9, 0.3, 7850);
+beam  = fembd.Body(fullfile(out, 'beam.stl'), steel, Size = 25, Scale = 1e-3);
 L = 1;  h = 0.05;  EI = 210e9*h^4/12;
 
 %% 1. Dofs and selections
@@ -18,7 +18,7 @@ L = 1;  h = 0.05;  EI = 210e9*h^4/12;
 % tutorials 6 and 7.) |a.dof(body, sel, dirs)| returns global dof indices.
 % A selector is a function of the coordinates X (n x 3) or a list of node
 % indices; dirs is a subset of 1:3.
-a = fem.Assembly();  a.add(beam);
+a = fembd.Assembly();  a.add(beam);
 clamp = @(X) X(:,1) < 1e-9;
 tip   = @(X) X(:,1) > L - 1e-9;
 dTip  = a.dof('beam', tip, 3);                  % z dofs of the tip face

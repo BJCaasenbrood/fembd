@@ -96,4 +96,4 @@
 % <demoSerialArm.html two-link arm example>.
 %
 %% See also
-% <matlab:doc('fem.Assembly') fem.Assembly>, <fem_system.html Dofs, Supports, Loads and the System>
+% <matlab:doc('fembd.Assembly') fembd.Assembly>, <fem_system.html Dofs, Supports, Loads and the System>

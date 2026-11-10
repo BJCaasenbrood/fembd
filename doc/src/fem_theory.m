@@ -1,5 +1,5 @@
 %% Formulation
-% A summary of the methods behind fem.
+% A summary of the methods behind fembd.
 %
 %% Elements
 % Isoparametric Tet4 and Tet10 elements, small-strain linear elasticity,
@@ -49,8 +49,8 @@
 % and M = T'*Mfull*T.
 %
 %% Eigenvalues and reduction
-% |fem.modes| uses shift-invert Lanczos with a small negative shift scaled
-% to the softest dofs. |fem.craigBampton| combines static constraint modes
+% |fembd.modes| uses shift-invert Lanczos with a small negative shift scaled
+% to the softest dofs. |fembd.craigBampton| combines static constraint modes
 % and fixed-interface modes.
 %
-% The full manual with all details is docs/fem.md in the toolbox folder.
+% The full manual with all details is docs/fembd.md in the toolbox folder.

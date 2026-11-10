@@ -15,14 +15,14 @@ addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'femArm');  if ~isfolder(out), mkdir(out); end
 
 % geometry (mm): links along x, 200 x 20 x 10
-fem.boxSTL(fullfile(out, 'link1.stl'), [0 -10 -5],   [200 10 5]);
-fem.boxSTL(fullfile(out, 'link2.stl'), [200 -10 -5], [400 10 5]);
-alu = fem.material(70e9, 0.33, 2700);
+fembd.boxSTL(fullfile(out, 'link1.stl'), [0 -10 -5],   [200 10 5]);
+fembd.boxSTL(fullfile(out, 'link2.stl'), [200 -10 -5], [400 10 5]);
+alu = fembd.material(70e9, 0.33, 2700);
 opt = {'Scale', 1e-3, 'Size', 5, 'Rigid', rigidLinks};
-link1 = fem.Body(fullfile(out, 'link1.stl'), alu, opt{:});
-link2 = fem.Body(fullfile(out, 'link2.stl'), alu, opt{:});
+link1 = fembd.Body(fullfile(out, 'link1.stl'), alu, opt{:});
+link2 = fembd.Body(fullfile(out, 'link2.stl'), alu, opt{:});
 
-a = fem.Assembly();
+a = fembd.Assembly();
 a.add(link1);  a.add(link2);
 
 % joint attachment points: the rigid body itself, or a coupling of an end face
@@ -38,14 +38,14 @@ j1 = a.joint('ground', p1, 'revolute', Point = [0 0 0],   Axis = [0 0 1], Stiffn
 j2 = a.joint(p2a, p2b,     'revolute', Point = [0.2 0 0], Axis = [0 0 1], Stiffness = kj);
 
 [K, M, T] = a.system();
-[V, f] = fem.modes(K, M, 6);
+[V, f] = fembd.modes(K, M, 6);
 fprintf('%d dofs after constraints\n', size(K, 1));
 disp(table((1:6)', f, 'VariableNames', {'mode', 'f_Hz'}));
 
 % actuator-level model: joint coordinates as boundary + 4 elastic modes
 ib = a.qdof([a.dof(j1); a.dof(j2)]);
-[Kc, Mc, Vc] = fem.craigBampton(K, M, ib, 4);
-[~, fc] = fem.modes(Kc, Mc, 4);
+[Kc, Mc, Vc] = fembd.craigBampton(K, M, ib, 4);
+[~, fc] = fembd.modes(Kc, Mc, 4);
 fprintf('Craig-Bampton (%d dofs): %s Hz\n', size(Kc, 1), mat2str(fc', 4));
 disp('Joint-space stiffness (Nm/rad):');  disp(Kc(1:2, 1:2));
 
@@ -63,7 +63,7 @@ angles = 0:15:90;  fa = zeros(numel(angles), 2);
 for k = 1:numel(angles)
     a.pose(j2, deg2rad(angles(k)));
     [Kp, Mp, Tp] = a.system();
-    [Vp, fp] = fem.modes(Kp, Mp, 6);
+    [Vp, fp] = fembd.modes(Kp, Mp, 6);
     U = Tp*Vp;  nz = 3*size(a.X, 1);                      % in-plane: little z motion
     inPlane = vecnorm(U(3:3:nz, :)) < 0.5*vecnorm(U(1:nz, :));
     fi = fp(inPlane);  fa(k,:) = fi(1:2);
@@ -71,7 +71,7 @@ end
 disp(table(angles', fa(:,1), fa(:,2), 'VariableNames', {'elbow_deg', 'inplane1_Hz', 'inplane2_Hz'}));
 
 a.pose(j1, deg2rad(30));  a.pose(j2, deg2rad(60));       % shoulder 30, elbow 60
-[Kp, Mp, Tp] = a.system();  [Vp, fp] = fem.modes(Kp, Mp, 1);
+[Kp, Mp, Tp] = a.system();  [Vp, fp] = fembd.modes(Kp, Mp, 1);
 figure('Color', 'w');
 u = Tp*Vp(:,1);
 a.plot(u, 0.03/max(abs(u(1:3*size(a.X, 1)))));

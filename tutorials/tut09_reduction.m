@@ -12,18 +12,18 @@
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
-fem.boxSTL(fullfile(out, 'beam.stl'), [0 0 0], [1000 50 50]);
-beam = fem.Body(fullfile(out, 'beam.stl'), fem.material(210e9, 0.3, 7850), ...
+fembd.boxSTL(fullfile(out, 'beam.stl'), [0 0 0], [1000 50 50]);
+beam = fembd.Body(fullfile(out, 'beam.stl'), fembd.material(210e9, 0.3, 7850), ...
                 Size = 25, Scale = 1e-3);
 
 %% 1. Boundary dofs
 % A coupling on the tip face gives the beam an interface with 6 dofs, like
 % a flange. Its reference dofs, mapped into q, are the boundary.
-a = fem.Assembly();  a.add(beam);  a.fix('beam', @(X) X(:,1) < 1e-9);
+a = fembd.Assembly();  a.add(beam);  a.fix('beam', @(X) X(:,1) < 1e-9);
 tip = a.couple('beam', @(X) X(:,1) > 1 - 1e-9, Name = 'tip');
 [K, M, T] = a.system();
 ib = a.qdof(a.dof('tip'));                      % [ux uy uz rx ry rz] of the tip
-[~, f] = fem.modes(K, M, 8);
+[~, f] = fembd.modes(K, M, 8);
 fprintf('full model: %d dofs\n', size(K, 1));
 
 %% 2. Guyan reduction
@@ -31,7 +31,7 @@ fprintf('full model: %d dofs\n', size(K, 1));
 % statically (constraint modes). The static response at the boundary is
 % exact, but frequencies are overestimated because the interior inertia is
 % only approximated.
-[Kg, Mg, Vg] = fem.craigBampton(K, M, ib, 0);
+[Kg, Mg, Vg] = fembd.craigBampton(K, M, ib, 0);
 b = zeros(size(K, 1), 1);  b(ib(3)) = 1;        % 1 N in z at the tip
 bg = Vg'*b;                                     % load in reduced coordinates
 fprintf('static tip deflection: full %.6e m, Guyan %.6e m\n', b'*(K\b), bg'*(Kg\bg));
@@ -42,8 +42,8 @@ fprintf('static tip deflection: full %.6e m, Guyan %.6e m\n', b'*(K\b), bg'*(Kg\
 % quickly. The reduced coordinates are x = [u_b; eta], and q ~ Vc*x.
 nModes = [0 2 5 10];  err = zeros(4, numel(nModes));
 for k = 1:numel(nModes)
-    [Kc, Mc] = fem.craigBampton(K, M, ib, nModes(k));
-    [~, fc] = fem.modes(Kc, Mc, 4);
+    [Kc, Mc] = fembd.craigBampton(K, M, ib, nModes(k));
+    [~, fc] = fembd.modes(Kc, Mc, 4);
     err(:,k) = 100*(fc./f(1:4) - 1);
 end
 disp(array2table(err, 'VariableNames', compose('n=%d', nModes), ...
@@ -51,8 +51,8 @@ disp(array2table(err, 'VariableNames', compose('n=%d', nModes), ...
 
 %% 4. Recovering the full field
 % A reduced solution x maps back to the full displacements: u = T*Vc*x.
-[Kc, Mc, Vc] = fem.craigBampton(K, M, ib, 10);
-[Xc, fc] = fem.modes(Kc, Mc, 1);
+[Kc, Mc, Vc] = fembd.craigBampton(K, M, ib, 10);
+[Xc, fc] = fembd.modes(Kc, Mc, 1);
 u = T*Vc*Xc(:,1);
 figure('Color', 'w');  a.plot(u, 0.1/max(abs(u(1:3*size(a.X, 1)))));
 title(sprintf('Mode 1 from the %d-dof CB model: %.2f Hz', size(Kc, 1), fc));

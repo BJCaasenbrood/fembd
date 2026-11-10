@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>Modal Analysis, Dynamics and Reduction</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-09">
+<meta name="DC.date" content="2026-11-10">
 <meta name="DC.source" content="fem_analysis.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -100,14 +100,14 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 </ul>
 </div>
 <h2 id="1">Natural frequencies</h2>
-<pre class="language-matlab">[V, f] = fem.modes(K, M, n)
+<pre class="language-matlab">[V, f] = fembd.modes(K, M, n)
 </pre>
 <p>The lowest <tt>n</tt> frequencies (Hz) and mass-normalised mode shapes (V'*M*V = I), by shift-invert Lanczos. Free and partly free systems (singular K) are handled: rigid-body and mechanism modes appear with f = 0. Small systems are solved densely.</p>
 <h2 id="2">Dynamics</h2>
 <p>The equations of motion in q are</p>
 <p>
-<img src="fem_analysis_eq09385788491283767730.png" alt="$$M\ddot q + D\dot q + K q = T^\top f(t), \qquad u = T q .$$" style="width:263px;height:20px;"></p>
-<p>fem returns K and M, and D for body, joint and transmission dampers (<tt>[K, M, T, D] = a.system()</tt>). Material damping of a body is Rayleigh damping, D = alpha*M + beta*K, set with <tt>fem.Body(..., Damping = [alpha beta])</tt>; <tt>beta = 2*zeta/omega</tt> gives the ratio zeta at omega. <a href="tut08_dynamics.html">Tutorial 8</a> shows frequency responses (direct and modal), Newmark time integration, and state-space forms. For explicit time integration use <tt>a.system(Lumped = true)</tt>.</p>
+<img src="fem_analysis_eq09385788491283767730.png" alt="$$M\ddot q + D\dot q + K q = T^\top f(t), \qquad u = T q .$$" style="width:295px;height:22px;"></p>
+<p>fembd returns K and M, and D for body, joint and transmission dampers (<tt>[K, M, T, D] = a.system()</tt>). Material damping of a body is Rayleigh damping, D = alpha*M + beta*K, set with <tt>fembd.Body(..., Damping = [alpha beta])</tt>; <tt>beta = 2*zeta/omega</tt> gives the ratio zeta at omega. <a href="tut08_dynamics.html">Tutorial 8</a> shows frequency responses (direct and modal), Newmark time integration, and state-space forms. For explicit time integration use <tt>a.system(Lumped = true)</tt>.</p>
 <h2 id="3">State-space models</h2>
 <p>With inputs and outputs defined (<tt>a.input</tt>, <tt>a.output</tt>), one call gives a reduced modal state-space model, including static correction, damping and acceleration feedthrough:</p>
 <pre class="language-matlab">sys = a.statespace(Modes = 20, Damping = 0.02);
@@ -140,17 +140,17 @@ margin(C(1,1)*P(1,1))                        <span class="comment">% loop-at-a-t
 </ul>
 </div>
 <h2 id="5">Craig-Bampton reduction</h2>
-<pre class="language-matlab">[Kc, Mc, V, f] = fem.craigBampton(K, M, b, n)
+<pre class="language-matlab">[Kc, Mc, V, f] = fembd.craigBampton(K, M, b, n)
 </pre>
 <p>Keeps the dofs <tt>b</tt> (indices into K, e.g. from <tt>a.qdof</tt>) as physical coordinates and adds <tt>n</tt> fixed-interface modes:</p>
 <p>
-<img src="fem_analysis_eq04802420464473604444.png" alt="$$q \approx V \left[\begin{array}{c} u_b \\ \eta \end{array}\right], \quad&#10;  V = \left[\begin{array}{cc} I &amp; 0 \\ \Psi &amp; \Phi \end{array}\right], \quad&#10;  \Psi = -K_{ii}^{-1} K_{ib}.$$" style="width:344px;height:40px;"></p>
+<img src="fem_analysis_eq04802420464473604444.png" alt="$$q \approx V \left[\begin{array}{c} u_b \\ \eta \end{array}\right], \quad&#10;  V = \left[\begin{array}{cc} I &amp; 0 \\ \Psi &amp; \Phi \end{array}\right], \quad&#10;  \Psi = -K_{ii}^{-1} K_{ib}.$$" style="width:385px;height:45px;"></p>
 <p>
 <tt>n = 0</tt> gives Guyan reduction, which is exact for static loads at the boundary. The full field follows from u = T*V*x. Good boundary dofs are interfaces, actuators and sensors: e.g. the 6 dofs of a coupling or rigid body, or joint coordinates. See <a href="tut09_reduction.html">Tutorial 9</a>.</p>
 <pre class="language-matlab">ib = a.qdof(a.dof(<span class="string">'flange'</span>));
-[Kc, Mc, Vc] = fem.craigBampton(K, M, ib, 20);
+[Kc, Mc, Vc] = fembd.craigBampton(K, M, ib, 20);
 </pre>
-<p>The 6 x 6 stiffness at a rigid body follows from Guyan reduction onto its dofs: <tt>Ks = fem.craigBampton(K, M, a.qdof(a.dof('shuttle')), 0)</tt>.</p>
+<p>The 6 x 6 stiffness at a rigid body follows from Guyan reduction onto its dofs: <tt>Ks = fembd.craigBampton(K, M, a.qdof(a.dof('shuttle')), 0)</tt>.</p>
 <p class="footer">
 <br>
 <a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2024a</a>
@@ -163,7 +163,7 @@ margin(C(1,1)*P(1,1))                        <span class="comment">% loop-at-a-t
 %
 %% Natural frequencies
 %
-%   [V, f] = fem.modes(K, M, n)
+%   [V, f] = fembd.modes(K, M, n)
 %
 % The lowest |n| frequencies (Hz) and mass-normalised mode shapes
 % (V'*M*V = I), by shift-invert Lanczos. Free and partly free systems
@@ -175,9 +175,9 @@ margin(C(1,1)*P(1,1))                        <span class="comment">% loop-at-a-t
 %
 % $$M\ddot q + D\dot q + K q = T^\top f(t), \qquad u = T q .$$
 %
-% fem returns K and M, and D for body, joint and transmission dampers
+% fembd returns K and M, and D for body, joint and transmission dampers
 % (|[K, M, T, D] = a.system()|). Material damping of a body is Rayleigh
-% damping, D = alpha*M + beta*K, set with |fem.Body(..., Damping = [alpha beta])|;
+% damping, D = alpha*M + beta*K, set with |fembd.Body(..., Damping = [alpha beta])|;
 % |beta = 2*zeta/omega| gives the ratio zeta at omega. <tut08_dynamics.html Tutorial 8> shows frequency
 % responses (direct and modal), Newmark time integration, and state-space
 % forms. For explicit time integration use |a.system(Lumped = true)|.
@@ -229,7 +229,7 @@ margin(C(1,1)*P(1,1))                        <span class="comment">% loop-at-a-t
 %
 %% Craig-Bampton reduction
 %
-%   [Kc, Mc, V, f] = fem.craigBampton(K, M, b, n)
+%   [Kc, Mc, V, f] = fembd.craigBampton(K, M, b, n)
 %
 % Keeps the dofs |b| (indices into K, e.g. from |a.qdof|) as physical
 % coordinates and adds |n| fixed-interface modes:
@@ -244,10 +244,10 @@ margin(C(1,1)*P(1,1))                        <span class="comment">% loop-at-a-t
 % rigid body, or joint coordinates. See <tut09_reduction.html Tutorial 9>.
 %
 %   ib = a.qdof(a.dof('flange'));
-%   [Kc, Mc, Vc] = fem.craigBampton(K, M, ib, 20);
+%   [Kc, Mc, Vc] = fembd.craigBampton(K, M, ib, 20);
 %
 % The 6 x 6 stiffness at a rigid body follows from Guyan reduction onto its
-% dofs: |Ks = fem.craigBampton(K, M, a.qdof(a.dof('shuttle')), 0)|.
+% dofs: |Ks = fembd.craigBampton(K, M, a.qdof(a.dof('shuttle')), 0)|.
 
 ##### SOURCE END #####
 -->

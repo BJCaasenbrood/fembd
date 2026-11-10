@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>tut01_firstModel</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-08">
+<meta name="DC.date" content="2026-11-10">
 <meta name="DC.source" content="tut01_firstModel.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -109,10 +109,10 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <p>This tutorial goes through the basic workflow:</p>
 <div>
 <ol>
-<li>geometry (STL) -&gt; <tt>fem.Body</tt> (mesh + material)</li>
-<li>bodies -&gt; <tt>fem.Assembly</tt> (supports, connections)</li>
+<li>geometry (STL) -&gt; <tt>fembd.Body</tt> (mesh + material)</li>
+<li>bodies -&gt; <tt>fembd.Assembly</tt> (supports, connections)</li>
 <li>
-<tt>a.system()</tt> -&gt; stiffness K and mass M -&gt; <tt>fem.modes</tt>
+<tt>a.system()</tt> -&gt; stiffness K and mass M -&gt; <tt>fembd.modes</tt>
 </li>
 </ol>
 </div>
@@ -123,11 +123,11 @@ out = fullfile(tempdir, <span class="string">'femTutorials'</span>);  <span clas
 <h2 id="2">1. Geometry</h2>
 <p>Any closed (watertight) STL works, for example a CAD export. Here we write a 1000 x 50 x 50 mm steel beam. STL files have no units: we model in millimetres and convert to metres when the body is created.</p>
 <pre class="codeinput">file = fullfile(out, <span class="string">'beam.stl'</span>);
-fem.boxSTL(file, [0 0 0], [1000 50 50]);
+fembd.boxSTL(file, [0 0 0], [1000 50 50]);
 </pre>
 <h2 id="3">2. Material and body</h2>
 <p>
-<tt>fem.material(E, nu, rho)</tt> gives an isotropic linear-elastic material, in SI units. <tt>fem.Body</tt> meshes the STL with Gmsh:</p>
+<tt>fembd.material(E, nu, rho)</tt> gives an isotropic linear-elastic material, in SI units. <tt>fembd.Body</tt> meshes the STL with Gmsh:</p>
 <div>
 <ul>
 <li>
@@ -138,8 +138,8 @@ fem.boxSTL(file, [0 0 0], [1000 50 50]);
 <tt>Scale</tt> - coordinate factor applied after meshing (mm -&gt; m)</li>
 </ul>
 </div>
-<pre class="codeinput">steel = fem.material(210e9, 0.3, 7850);
-beam  = fem.Body(file, steel, Size = 25, Scale = 1e-3);
+<pre class="codeinput">steel = fembd.material(210e9, 0.3, 7850);
+beam  = fembd.Body(file, steel, Size = 25, Scale = 1e-3);
 fprintf(<span class="string">'%s: %d nodes, %d Tet%d elements\n'</span>, beam.Name, beam.nNode, <span class="keyword">...</span>
         size(beam.T, 1), size(beam.T, 2));
 </pre>
@@ -147,7 +147,7 @@ fprintf(<span class="string">'%s: %d nodes, %d Tet%d elements\n'</span>, beam.Na
 </pre>
 <h2 id="4">3. Assembly and supports</h2>
 <p>An assembly holds the bodies and everything that connects or supports them. Here there is one body, clamped at x = 0. Nodes are selected with a function of their coordinates X (n x 3, in metres after scaling).</p>
-<pre class="codeinput">a = fem.Assembly();
+<pre class="codeinput">a = fembd.Assembly();
 a.add(beam);
 a.fix(<span class="string">'beam'</span>, @(X) X(:,1) &lt; 1e-9);       <span class="comment">% all 3 directions of the x = 0 face</span>
 
@@ -163,8 +163,8 @@ fprintf(<span class="string">'full dofs: %d, independent dofs: %d\n'</span>, a.n
 </pre>
 <h2 id="6">5. Natural frequencies</h2>
 <p>
-<tt>fem.modes</tt> returns the lowest frequencies (Hz) and mass-normalised mode shapes (V'*M*V = I).</p>
-<pre class="codeinput">[V, f] = fem.modes(K, M, 6);
+<tt>fembd.modes</tt> returns the lowest frequencies (Hz) and mass-normalised mode shapes (V'*M*V = I).</p>
+<pre class="codeinput">[V, f] = fembd.modes(K, M, 6);
 disp(table((1:6)', f, <span class="string">'VariableNames'</span>, {<span class="string">'mode'</span>, <span class="string">'f_Hz'</span>}));
 </pre>
 <pre class="codeoutput">    mode     f_Hz 
@@ -207,9 +207,9 @@ a.plot(u, 0.1/max(abs(u)));  title(sprintf(<span class="string">'Mode 1: %.1f Hz
 %% Tutorial 1 - Your first model: a cantilever beam
 % This tutorial goes through the basic workflow:
 %
-% # geometry (STL) -> |fem.Body| (mesh + material)
-% # bodies -> |fem.Assembly| (supports, connections)
-% # |a.system()| -> stiffness K and mass M -> |fem.modes|
+% # geometry (STL) -> |fembd.Body| (mesh + material)
+% # bodies -> |fembd.Assembly| (supports, connections)
+% # |a.system()| -> stiffness K and mass M -> |fembd.modes|
 %
 % The result is checked against Euler-Bernoulli beam theory.
 % Run it section by section (Ctrl+Enter), or render it with
@@ -223,17 +223,17 @@ out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
 % a 1000 x 50 x 50 mm steel beam. STL files have no units: we model in
 % millimetres and convert to metres when the body is created.
 file = fullfile(out, 'beam.stl');
-fem.boxSTL(file, [0 0 0], [1000 50 50]);
+fembd.boxSTL(file, [0 0 0], [1000 50 50]);
 
 %% 2. Material and body
-% |fem.material(E, nu, rho)| gives an isotropic linear-elastic material, in
-% SI units. |fem.Body| meshes the STL with Gmsh:
+% |fembd.material(E, nu, rho)| gives an isotropic linear-elastic material, in
+% SI units. |fembd.Body| meshes the STL with Gmsh:
 %
 % * |Size|  - maximum element size, in STL units (mm here)
 % * |Order| - 2 = quadratic Tet10 elements (default), 1 = linear Tet4
 % * |Scale| - coordinate factor applied after meshing (mm -> m)
-steel = fem.material(210e9, 0.3, 7850);
-beam  = fem.Body(file, steel, Size = 25, Scale = 1e-3);
+steel = fembd.material(210e9, 0.3, 7850);
+beam  = fembd.Body(file, steel, Size = 25, Scale = 1e-3);
 fprintf('%s: %d nodes, %d Tet%d elements\n', beam.Name, beam.nNode, ...
         size(beam.T, 1), size(beam.T, 2));
 
@@ -241,7 +241,7 @@ fprintf('%s: %d nodes, %d Tet%d elements\n', beam.Name, beam.nNode, ...
 % An assembly holds the bodies and everything that connects or supports
 % them. Here there is one body, clamped at x = 0. Nodes are selected with a
 % function of their coordinates X (n x 3, in metres after scaling).
-a = fem.Assembly();
+a = fembd.Assembly();
 a.add(beam);
 a.fix('beam', @(X) X(:,1) < 1e-9);       % all 3 directions of the x = 0 face
 
@@ -256,9 +256,9 @@ figure('Color', 'w');  a.plot();  title('Mesh');
 fprintf('full dofs: %d, independent dofs: %d\n', a.nDof, size(K, 1));
 
 %% 5. Natural frequencies
-% |fem.modes| returns the lowest frequencies (Hz) and mass-normalised mode
+% |fembd.modes| returns the lowest frequencies (Hz) and mass-normalised mode
 % shapes (V'*M*V = I).
-[V, f] = fem.modes(K, M, 6);
+[V, f] = fembd.modes(K, M, 6);
 disp(table((1:6)', f, 'VariableNames', {'mode', 'f_Hz'}));
 
 %% 6. Check against beam theory

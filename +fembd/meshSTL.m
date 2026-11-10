@@ -1,6 +1,6 @@
 function [X, T] = meshSTL(file, opts)
 %MESHSTL Tetrahedral volume mesh of a closed STL surface using Gmsh.
-%   [X, T] = fem.meshSTL(file) returns nodes X (n x 3) and quadratic
+%   [X, T] = fembd.meshSTL(file) returns nodes X (n x 3) and quadratic
 %   tetrahedra T (ne x 10, Gmsh ordering).
 %
 %   Options (name-value):
@@ -10,7 +10,7 @@ function [X, T] = meshSTL(file, opts)
 %                   surface (default); false: keep the STL triangles as-is
 %     FeatureAngle  angle (deg) used to split the STL into patches (40)
 %
-%   The Gmsh executable is taken from $GMSH, otherwise 'gmsh' (see fem.gmsh).
+%   The Gmsh executable is taken from $GMSH, otherwise 'gmsh' (see fembd.gmsh).
 
 arguments
     file (1,:) char
@@ -21,7 +21,7 @@ arguments
 end
 
 file = strrep(char(java.io.File(file).getCanonicalPath()), '\', '/');
-assert(isfile(file), 'fem:meshSTL', 'File not found: %s', file);
+assert(isfile(file), 'fembd:meshSTL', 'File not found: %s', file);
 
 if opts.Remesh
     surf = sprintf(['ClassifySurfaces{%g*Pi/180, 1, 1, Pi};\n' ...
@@ -44,15 +44,15 @@ if isfinite(opts.Size), args = sprintf('%s -clmax %g', args, opts.Size); end
 % elements, remesh with straight-sided Tet10
 for straight = [0 1]
     writelines(geo(straight), [base '.geo']);
-    [status, out] = fem.gmsh(args);
-    assert(status == 0 && isfile([base '.msh']), 'fem:meshSTL', ...
+    [status, out] = fembd.gmsh(args);
+    assert(status == 0 && isfile([base '.msh']), 'fembd:meshSTL', ...
            'Gmsh failed on %s:\n%s', file, out);
     if ~contains(out, 'jac. < 0') || opts.Order == 1, break, end
     if ~straight
-        warning('fem:meshSTL', ['%s: curved Tet10 mesh has inverted elements; ' ...
+        warning('fembd:meshSTL', ['%s: curved Tet10 mesh has inverted elements; ' ...
                 'using straight-sided Tet10 instead.'], file);
     end
 end
 
-[X, T] = fem.readMsh([base '.msh']);
+[X, T] = fembd.readMsh([base '.msh']);
 end

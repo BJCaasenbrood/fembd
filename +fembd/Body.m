@@ -1,15 +1,15 @@
 classdef Body < handle
 %BODY Linear-elastic (or rigid) solid discretised with Tet4/Tet10 elements.
-%   b = fem.Body(src, mat) creates a body from
+%   b = fembd.Body(src, mat) creates a body from
 %     src  an .stl file (meshed with Gmsh), an ASCII .msh file, or a struct
 %          with fields X (n x 3 nodes) and T (ne x 4|10 tets, Gmsh order)
-%     mat  material struct with fields D (6x6 Voigt) and rho, see fem.material
+%     mat  material struct with fields D (6x6 Voigt) and rho, see fembd.material
 %          (a rigid body only needs rho)
 %
 %   Options (name-value):
 %     Name     body name (default: file name)
 %     Scale    factor applied to the coordinates, e.g. 1e-3 for mm -> m
-%     Size, Order, Remesh, FeatureAngle   passed to fem.meshSTL
+%     Size, Order, Remesh, FeatureAngle   passed to fembd.meshSTL
 %     Rigid    true: non-deformable body with 6 dofs at RefPoint; its mesh
 %              is only used for mass, inertia, interfaces and plotting
 %     RefPoint reference point of a rigid body (default: centroid)
@@ -19,8 +19,8 @@ classdef Body < handle
 %              alpha also damps the body's rigid-body motion (like a drag)
 %
 %   Rigid bodies without a volume mesh:
-%     b = fem.Body.rigidSurface(file, rho, ...)  STL surface only (no Gmsh)
-%     b = fem.Body.pointMass(m, c, J, ...)       mass properties only
+%     b = fembd.Body.rigidSurface(file, rho, ...)  STL surface only (no Gmsh)
+%     b = fembd.Body.pointMass(m, c, J, ...)       mass properties only
 %
 %   Degrees of freedom are node-wise interleaved: [ux1 uy1 uz1 ux2 ...].
 
@@ -62,16 +62,16 @@ methods
             [~, name, ext] = fileparts(src);
             if isempty(opts.Name), opts.Name = name; end
             if strcmpi(ext, '.msh')
-                [X, T] = fem.readMsh(src);
+                [X, T] = fembd.readMsh(src);
             else
-                [X, T] = fem.meshSTL(src, Size = opts.Size, Order = opts.Order, ...
+                [X, T] = fembd.meshSTL(src, Size = opts.Size, Order = opts.Order, ...
                     Remesh = opts.Remesh, FeatureAngle = opts.FeatureAngle);
             end
         end
-        assert(opts.Rigid || isfield(mat, 'D'), 'fem:Body', ['%s: an elastic body needs ' ...
-            'a material with stiffness D, e.g. fem.material(E, nu, rho). For a rigid ' ...
+        assert(opts.Rigid || isfield(mat, 'D'), 'fembd:Body', ['%s: an elastic body needs ' ...
+            'a material with stiffness D, e.g. fembd.material(E, nu, rho). For a rigid ' ...
             'body set Rigid = true.'], opts.Name);
-        assert(~opts.Rigid || ~any(opts.Damping), 'fem:Body', ['%s: Damping is ' ...
+        assert(~opts.Rigid || ~any(opts.Damping), 'fembd:Body', ['%s: Damping is ' ...
             'material damping of an elastic body; damp rigid bodies with joint ' ...
             'dampers.'], opts.Name);
         b.Name = opts.Name;
@@ -125,7 +125,7 @@ methods
             opts.Axes (3,3) double = eye(3)
             opts.LengthScale (1,1) double {mustBePositive} = 1
         end
-        assert(b.Rigid, 'fem:setMass', '%s: setMass is for rigid bodies only.', b.Name);
+        assert(b.Rigid, 'fembd:setMass', '%s: setMass is for rigid bodies only.', b.Name);
         p = b.MassProps;
         if isempty(p)                            % meshed rigid body: from its surface
             [p.m, p.c, p.J] = surfaceMass(b.X, b.F(:, 1:3), b.Mat.rho);
@@ -143,10 +143,10 @@ methods
                 J = J - m*(dot(r, r)*eye(3) - r'*r);
             end
         end
-        assert(norm(J - J', 'fro') <= 1e-6*norm(J, 'fro'), 'fem:setMass', ...
+        assert(norm(J - J', 'fro') <= 1e-6*norm(J, 'fro'), 'fembd:setMass', ...
             '%s: the inertia tensor must be symmetric.', b.Name);
         J = (J + J')/2;  Jp = sort(eig(J));
-        assert(Jp(1) > 0 && Jp(3) <= (Jp(1) + Jp(2))*(1 + 1e-9), 'fem:setMass', ...
+        assert(Jp(1) > 0 && Jp(3) <= (Jp(1) + Jp(2))*(1 + 1e-9), 'fembd:setMass', ...
             ['%s: invalid inertia (principal moments %s): they must be positive and ' ...
              'satisfy J3 <= J1 + J2. Check that it is about the centre of mass.'], ...
             b.Name, mat2str(Jp', 4));
@@ -214,7 +214,7 @@ methods
             end
         end
         if any(bad)
-            warning('fem:Body', '%s: %d element(s) with det(J) <= 0; results are unreliable.', ...
+            warning('fembd:Body', '%s: %d element(s) with det(J) <= 0; results are unreliable.', ...
                     b.Name, nnz(bad));
         end
         K = (K + K')/2;
@@ -228,7 +228,7 @@ end
 methods (Static)
     function b = rigidSurface(file, rho, opts)
     %RIGIDSURFACE Rigid body from a closed STL surface, without volume mesh.
-    %   b = fem.Body.rigidSurface(file, rho) reads the STL triangles, which
+    %   b = fembd.Body.rigidSurface(file, rho) reads the STL triangles, which
     %   are used for ties and plotting; mass, centre of mass and inertia are
     %   computed exactly from the surface (divergence theorem).
     %   Options: Name, Scale, RefPoint (default: centre of mass).
@@ -245,7 +245,7 @@ methods (Static)
         if flip, F = F(:, [1 3 2]); end
         if isempty(opts.Name), [~, opts.Name] = fileparts(file); end
         if isempty(opts.RefPoint), opts.RefPoint = c; end
-        b = fem.Body(struct('X', X, 'T', zeros(0, 4)), struct('rho', rho), ...
+        b = fembd.Body(struct('X', X, 'T', zeros(0, 4)), struct('rho', rho), ...
                      Name = opts.Name, Rigid = true, RefPoint = opts.RefPoint);
         b.F = F;
         b.MassProps = struct('m', m, 'c', c, 'J', J);
@@ -264,7 +264,7 @@ methods (Static)
             opts.RefPoint double = []
         end
         if isempty(opts.RefPoint), opts.RefPoint = c; end
-        b = fem.Body(struct('X', zeros(0, 3), 'T', zeros(0, 4)), struct('rho', 0), ...
+        b = fembd.Body(struct('X', zeros(0, 3), 'T', zeros(0, 4)), struct('rho', 0), ...
                      Name = opts.Name, Rigid = true, RefPoint = opts.RefPoint);
         b.MassProps = struct('m', m, 'c', c, 'J', (J + J')/2);
     end

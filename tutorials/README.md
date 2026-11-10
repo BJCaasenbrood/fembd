@@ -18,4 +18,4 @@ first (see the main README).
 | 9 | [`tut09_reduction`](tut09_reduction.m) | Guyan and Craig–Bampton reduction, convergence with the number of modes, recovering the full field, reduced state space. |
 
 The full examples in `../examples` combine these features. The reference manual is
-[`../docs/fem.md`](../docs/fem.md).
+[`../docs/fembd.md`](../docs/fembd.md).

@@ -8,21 +8,21 @@
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
-steel = fem.material(210e9, 0.3, 7850);
+steel = fembd.material(210e9, 0.3, 7850);
 clampX0 = @(X) X(:,1) < 1e-9;
 
 % reference: one-piece cantilever
-fem.boxSTL(fullfile(out, 'beam.stl'), [0 0 0], [1000 50 50]);
-one = fem.Body(fullfile(out, 'beam.stl'), steel, Size = 25, Scale = 1e-3);
-a = fem.Assembly();  a.add(one);  a.fix(1, clampX0);
-[K, M] = a.system();  [~, fRef] = fem.modes(K, M, 6);
+fembd.boxSTL(fullfile(out, 'beam.stl'), [0 0 0], [1000 50 50]);
+one = fembd.Body(fullfile(out, 'beam.stl'), steel, Size = 25, Scale = 1e-3);
+a = fembd.Assembly();  a.add(one);  a.fix(1, clampX0);
+[K, M] = a.system();  [~, fRef] = fembd.modes(K, M, 6);
 
 %% 1. Two parts with non-matching meshes
 % The same beam as two halves, meshed with different element sizes.
-fem.boxSTL(fullfile(out, 'left.stl'),  [0 0 0],   [500 50 50]);
-fem.boxSTL(fullfile(out, 'right.stl'), [500 0 0], [1000 50 50]);
-left  = fem.Body(fullfile(out, 'left.stl'),  steel, Size = 25, Scale = 1e-3);
-right = fem.Body(fullfile(out, 'right.stl'), steel, Size = 15, Scale = 1e-3);
+fembd.boxSTL(fullfile(out, 'left.stl'),  [0 0 0],   [500 50 50]);
+fembd.boxSTL(fullfile(out, 'right.stl'), [500 0 0], [1000 50 50]);
+left  = fembd.Body(fullfile(out, 'left.stl'),  steel, Size = 25, Scale = 1e-3);
+right = fembd.Body(fullfile(out, 'right.stl'), steel, Size = 15, Scale = 1e-3);
 
 %% 2. Bonded tie
 % |a.tie(master, slave)| takes the slave's surface nodes that lie within
@@ -33,10 +33,10 @@ right = fem.Body(fullfile(out, 'right.stl'), steel, Size = 15, Scale = 1e-3);
 %
 % The constraint is exact (no penalty) and is removed in T. Use the finer
 % mesh as slave, so that every slave node has a master face to follow.
-a = fem.Assembly();  a.add(left);  a.add(right);
+a = fembd.Assembly();  a.add(left);  a.add(right);
 ns = a.tie('left', 'right');
 a.fix('left', clampX0);
-[K, M, T] = a.system();  [V, f] = fem.modes(K, M, 6);
+[K, M, T] = a.system();  [V, f] = fembd.modes(K, M, 6);
 fprintf('%d slave nodes tied\n', ns);
 disp(table(fRef, f, 'VariableNames', {'one_piece_Hz', 'tied_Hz'}));
 
@@ -51,9 +51,9 @@ title('Tied slave nodes');  hold off
 % about 1.5 mm), which absorbs small faceting gaps. Parts that are further
 % apart are not tied: a 5 mm gap gives no tied nodes (with a warning)
 % unless Tol is raised. Set Tol explicitly when it matters.
-fem.boxSTL(fullfile(out, 'gap.stl'), [505 0 0], [1000 50 50]);
-gap = fem.Body(fullfile(out, 'gap.stl'), steel, Size = 15, Scale = 1e-3);
-b = fem.Assembly();  b.add(left);  b.add(gap);
+fembd.boxSTL(fullfile(out, 'gap.stl'), [505 0 0], [1000 50 50]);
+gap = fembd.Body(fullfile(out, 'gap.stl'), steel, Size = 15, Scale = 1e-3);
+b = fembd.Assembly();  b.add(left);  b.add(gap);
 fprintf('default Tol: %d nodes\n', b.tie('left', 'gap'));
 fprintf('Tol = 6 mm: %d nodes\n', b.tie('left', 'gap', Tol = 6e-3));
 
@@ -61,10 +61,10 @@ fprintf('Tol = 6 mm: %d nodes\n', b.tie('left', 'gap', Tol = 6e-3));
 % Select restricts the slave nodes, e.g. to model an adhesive layer that
 % covers only part of the interface. Gluing only the lower half (z < 25 mm)
 % makes the joint more flexible, mostly for bending in the xz plane.
-b = fem.Assembly();  b.add(left);  b.add(right);
+b = fembd.Assembly();  b.add(left);  b.add(right);
 b.tie('left', 'right', Select = @(X) X(:,3) < 0.025);
 b.fix('left', clampX0);
-[Kb, Mb] = b.system();  [~, fp] = fem.modes(Kb, Mb, 2);
+[Kb, Mb] = b.system();  [~, fp] = fembd.modes(Kb, Mb, 2);
 fprintf('half-bonded joint: f1, f2 = %.2f, %.2f Hz (fully bonded %.2f Hz)\n', fp, f(1));
 
 %% 5. Elastic interfaces
@@ -74,10 +74,10 @@ fprintf('half-bonded joint: f1, f2 = %.2f, %.2f Hz (fully bonded %.2f Hz)\n', fp
 % or contact stiffness. A very stiff interface approaches the bonded tie.
 kn = 10.^(10:2:16);  f1 = zeros(size(kn));
 for k = 1:numel(kn)
-    b = fem.Assembly();  b.add(left);  b.add(right);
+    b = fembd.Assembly();  b.add(left);  b.add(right);
     b.tie('left', 'right', Stiffness = kn(k));          % kt = kn
     b.fix('left', clampX0);
-    [Kb, Mb] = b.system();  [~, f1(k)] = fem.modes(Kb, Mb, 1);
+    [Kb, Mb] = b.system();  [~, f1(k)] = fembd.modes(Kb, Mb, 1);
 end
 figure('Color', 'w');
 semilogx(kn, f1, 'o-', kn, f(1) + 0*kn, '--');  grid on

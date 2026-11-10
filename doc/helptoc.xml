@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <toc version="2.0">
-    <tocitem target="fem_landing.html">fem: Linear-Elastic Assemblies
+    <tocitem target="fem_landing.html">fembd: Linear-Elastic Assemblies
         <tocitem target="fem_gettingStarted.html">Getting Started</tocitem>
         <tocitem target="fem_bodies.html">Bodies, Meshing and Materials</tocitem>
         <tocitem target="fem_connections.html">Connections: Ties, Couplings and Joints</tocitem>

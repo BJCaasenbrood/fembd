@@ -1,9 +1,9 @@
 %% Tutorial 1 - Your first model: a cantilever beam
 % This tutorial goes through the basic workflow:
 %
-% # geometry (STL) -> |fem.Body| (mesh + material)
-% # bodies -> |fem.Assembly| (supports, connections)
-% # |a.system()| -> stiffness K and mass M -> |fem.modes|
+% # geometry (STL) -> |fembd.Body| (mesh + material)
+% # bodies -> |fembd.Assembly| (supports, connections)
+% # |a.system()| -> stiffness K and mass M -> |fembd.modes|
 %
 % The result is checked against Euler-Bernoulli beam theory.
 % Run it section by section (Ctrl+Enter), or render it with
@@ -17,17 +17,17 @@ out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
 % a 1000 x 50 x 50 mm steel beam. STL files have no units: we model in
 % millimetres and convert to metres when the body is created.
 file = fullfile(out, 'beam.stl');
-fem.boxSTL(file, [0 0 0], [1000 50 50]);
+fembd.boxSTL(file, [0 0 0], [1000 50 50]);
 
 %% 2. Material and body
-% |fem.material(E, nu, rho)| gives an isotropic linear-elastic material, in
-% SI units. |fem.Body| meshes the STL with Gmsh:
+% |fembd.material(E, nu, rho)| gives an isotropic linear-elastic material, in
+% SI units. |fembd.Body| meshes the STL with Gmsh:
 %
 % * |Size|  - maximum element size, in STL units (mm here)
 % * |Order| - 2 = quadratic Tet10 elements (default), 1 = linear Tet4
 % * |Scale| - coordinate factor applied after meshing (mm -> m)
-steel = fem.material(210e9, 0.3, 7850);
-beam  = fem.Body(file, steel, Size = 25, Scale = 1e-3);
+steel = fembd.material(210e9, 0.3, 7850);
+beam  = fembd.Body(file, steel, Size = 25, Scale = 1e-3);
 fprintf('%s: %d nodes, %d Tet%d elements\n', beam.Name, beam.nNode, ...
         size(beam.T, 1), size(beam.T, 2));
 
@@ -35,7 +35,7 @@ fprintf('%s: %d nodes, %d Tet%d elements\n', beam.Name, beam.nNode, ...
 % An assembly holds the bodies and everything that connects or supports
 % them. Here there is one body, clamped at x = 0. Nodes are selected with a
 % function of their coordinates X (n x 3, in metres after scaling).
-a = fem.Assembly();
+a = fembd.Assembly();
 a.add(beam);
 a.fix('beam', @(X) X(:,1) < 1e-9);       % all 3 directions of the x = 0 face
 
@@ -50,9 +50,9 @@ figure('Color', 'w');  a.plot();  title('Mesh');
 fprintf('full dofs: %d, independent dofs: %d\n', a.nDof, size(K, 1));
 
 %% 5. Natural frequencies
-% |fem.modes| returns the lowest frequencies (Hz) and mass-normalised mode
+% |fembd.modes| returns the lowest frequencies (Hz) and mass-normalised mode
 % shapes (V'*M*V = I).
-[V, f] = fem.modes(K, M, 6);
+[V, f] = fembd.modes(K, M, 6);
 disp(table((1:6)', f, 'VariableNames', {'mode', 'f_Hz'}));
 
 %% 6. Check against beam theory

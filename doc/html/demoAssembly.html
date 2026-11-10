@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>demoAssembly</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-08">
+<meta name="DC.date" content="2026-11-10">
 <meta name="DC.source" content="demoAssembly.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -86,19 +86,19 @@ addpath(fileparts(fileparts(mfilename(<span class="string">'fullpath'</span>))))
 out = fullfile(tempdir, <span class="string">'femDemo'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
 
 <span class="comment">% geometry in mm, written as STL files (stand-in for a CAD export)</span>
-fem.boxSTL(fullfile(out, <span class="string">'base.stl'</span>), [-40 -40 0], [40 40 10]);
-fem.cylinderSTL(fullfile(out, <span class="string">'pillar.stl'</span>), [0 0], 8, 10, 110);
-fem.boxSTL(fullfile(out, <span class="string">'top.stl'</span>),  [-25 -25 110], [25 25 116]);
+fembd.boxSTL(fullfile(out, <span class="string">'base.stl'</span>), [-40 -40 0], [40 40 10]);
+fembd.cylinderSTL(fullfile(out, <span class="string">'pillar.stl'</span>), [0 0], 8, 10, 110);
+fembd.boxSTL(fullfile(out, <span class="string">'top.stl'</span>),  [-25 -25 110], [25 25 116]);
 
 <span class="comment">% bodies: mesh with Gmsh, mm -&gt; m, assign materials</span>
-steel = fem.material(210e9, 0.30, 7850);
-alu   = fem.material(70e9,  0.33, 2700);
-base   = fem.Body(fullfile(out, <span class="string">'base.stl'</span>),   steel, Size = 8, Scale = 1e-3);
-pillar = fem.Body(fullfile(out, <span class="string">'pillar.stl'</span>), alu,   Size = 3, Scale = 1e-3);
-top    = fem.Body(fullfile(out, <span class="string">'top.stl'</span>),    steel, Size = 6, Scale = 1e-3, Rigid = true);
+steel = fembd.material(210e9, 0.30, 7850);
+alu   = fembd.material(70e9,  0.33, 2700);
+base   = fembd.Body(fullfile(out, <span class="string">'base.stl'</span>),   steel, Size = 8, Scale = 1e-3);
+pillar = fembd.Body(fullfile(out, <span class="string">'pillar.stl'</span>), alu,   Size = 3, Scale = 1e-3);
+top    = fembd.Body(fullfile(out, <span class="string">'top.stl'</span>),    steel, Size = 6, Scale = 1e-3, Rigid = true);
 
 <span class="comment">% assembly: connections and boundary conditions</span>
-a = fem.Assembly();
+a = fembd.Assembly();
 a.add(base);  a.add(pillar);  a.add(top);
 a.tie(<span class="string">'base'</span>, <span class="string">'pillar'</span>);                    <span class="comment">% bonded (finer mesh as slave)</span>
 a.tie(<span class="string">'pillar'</span>, <span class="string">'top'</span>, Stiffness = 1e13);   <span class="comment">% elastic joint to the rigid plate, N/m^3</span>
@@ -108,7 +108,7 @@ tic;  [K, M, T] = a.system();  t = toc;
 fprintf(<span class="string">'%d dofs (%d after constraints), assembled in %.1f s\n'</span>, a.nDof, size(K, 1), t);
 
 <span class="comment">% natural frequencies and modes</span>
-[V, f] = fem.modes(K, M, 6);
+[V, f] = fembd.modes(K, M, 6);
 
 figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
 <span class="keyword">for</span> k = 1:4
@@ -121,12 +121,12 @@ figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
 <span class="comment">% Craig-Bampton model: the 6 dofs of the rigid top plate (at its centroid)</span>
 <span class="comment">% are kept as boundary, plus 20 fixed-interface modes</span>
 ib = a.qdof(a.dof(<span class="string">'top'</span>));                   <span class="comment">% [ux uy uz rx ry rz], indices into q</span>
-[Kc, Mc, Vc] = fem.craigBampton(K, M, ib, 20);
-[~, fc] = fem.modes(Kc, Mc, 6);
+[Kc, Mc, Vc] = fembd.craigBampton(K, M, ib, 20);
+[~, fc] = fembd.modes(Kc, Mc, 6);
 
 <span class="comment">% lumped-mass model, e.g. for explicit time integration</span>
 [Kl, Ml] = a.system(Lumped = true);
-[~, fl] = fem.modes(Kl, Ml, 6);
+[~, fl] = fembd.modes(Kl, Ml, 6);
 disp(table((1:6)', f, fc, fl, <span class="string">'VariableNames'</span>, {<span class="string">'mode'</span>, <span class="string">'full_Hz'</span>, <span class="string">'CB_Hz'</span>, <span class="string">'lumped_Hz'</span>}));
 
 <span class="comment">% state space of the 26-dof CB model: vertical force in, vertical displacement out.</span>
@@ -165,19 +165,19 @@ addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'femDemo');  if ~isfolder(out), mkdir(out); end
 
 % geometry in mm, written as STL files (stand-in for a CAD export)
-fem.boxSTL(fullfile(out, 'base.stl'), [-40 -40 0], [40 40 10]);
-fem.cylinderSTL(fullfile(out, 'pillar.stl'), [0 0], 8, 10, 110);
-fem.boxSTL(fullfile(out, 'top.stl'),  [-25 -25 110], [25 25 116]);
+fembd.boxSTL(fullfile(out, 'base.stl'), [-40 -40 0], [40 40 10]);
+fembd.cylinderSTL(fullfile(out, 'pillar.stl'), [0 0], 8, 10, 110);
+fembd.boxSTL(fullfile(out, 'top.stl'),  [-25 -25 110], [25 25 116]);
 
 % bodies: mesh with Gmsh, mm -> m, assign materials
-steel = fem.material(210e9, 0.30, 7850);
-alu   = fem.material(70e9,  0.33, 2700);
-base   = fem.Body(fullfile(out, 'base.stl'),   steel, Size = 8, Scale = 1e-3);
-pillar = fem.Body(fullfile(out, 'pillar.stl'), alu,   Size = 3, Scale = 1e-3);
-top    = fem.Body(fullfile(out, 'top.stl'),    steel, Size = 6, Scale = 1e-3, Rigid = true);
+steel = fembd.material(210e9, 0.30, 7850);
+alu   = fembd.material(70e9,  0.33, 2700);
+base   = fembd.Body(fullfile(out, 'base.stl'),   steel, Size = 8, Scale = 1e-3);
+pillar = fembd.Body(fullfile(out, 'pillar.stl'), alu,   Size = 3, Scale = 1e-3);
+top    = fembd.Body(fullfile(out, 'top.stl'),    steel, Size = 6, Scale = 1e-3, Rigid = true);
 
 % assembly: connections and boundary conditions
-a = fem.Assembly();
+a = fembd.Assembly();
 a.add(base);  a.add(pillar);  a.add(top);
 a.tie('base', 'pillar');                    % bonded (finer mesh as slave)
 a.tie('pillar', 'top', Stiffness = 1e13);   % elastic joint to the rigid plate, N/m^3
@@ -187,7 +187,7 @@ tic;  [K, M, T] = a.system();  t = toc;
 fprintf('%d dofs (%d after constraints), assembled in %.1f s\n', a.nDof, size(K, 1), t);
 
 % natural frequencies and modes
-[V, f] = fem.modes(K, M, 6);
+[V, f] = fembd.modes(K, M, 6);
 
 figure('Color', 'w');
 for k = 1:4
@@ -200,12 +200,12 @@ end
 % Craig-Bampton model: the 6 dofs of the rigid top plate (at its centroid)
 % are kept as boundary, plus 20 fixed-interface modes
 ib = a.qdof(a.dof('top'));                   % [ux uy uz rx ry rz], indices into q
-[Kc, Mc, Vc] = fem.craigBampton(K, M, ib, 20);
-[~, fc] = fem.modes(Kc, Mc, 6);
+[Kc, Mc, Vc] = fembd.craigBampton(K, M, ib, 20);
+[~, fc] = fembd.modes(Kc, Mc, 6);
 
 % lumped-mass model, e.g. for explicit time integration
 [Kl, Ml] = a.system(Lumped = true);
-[~, fl] = fem.modes(Kl, Ml, 6);
+[~, fl] = fembd.modes(Kl, Ml, 6);
 disp(table((1:6)', f, fc, fl, 'VariableNames', {'mode', 'full_Hz', 'CB_Hz', 'lumped_Hz'}));
 
 % state space of the 26-dof CB model: vertical force in, vertical displacement out.

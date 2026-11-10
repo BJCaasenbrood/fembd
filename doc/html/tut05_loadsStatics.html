@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>tut05_loadsStatics</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-08">
+<meta name="DC.date" content="2026-11-10">
 <meta name="DC.source" content="tut05_loadsStatics.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -114,14 +114,14 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 </div>
 <pre class="codeinput">addpath(fileparts(fileparts(mfilename(<span class="string">'fullpath'</span>))));
 out = fullfile(tempdir, <span class="string">'femTutorials'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
-fem.boxSTL(fullfile(out, <span class="string">'beam.stl'</span>), [0 0 0], [1000 50 50]);
-steel = fem.material(210e9, 0.3, 7850);
-beam  = fem.Body(fullfile(out, <span class="string">'beam.stl'</span>), steel, Size = 25, Scale = 1e-3);
+fembd.boxSTL(fullfile(out, <span class="string">'beam.stl'</span>), [0 0 0], [1000 50 50]);
+steel = fembd.material(210e9, 0.3, 7850);
+beam  = fembd.Body(fullfile(out, <span class="string">'beam.stl'</span>), steel, Size = 25, Scale = 1e-3);
 L = 1;  h = 0.05;  EI = 210e9*h^4/12;
 </pre>
 <h2 id="2">1. Dofs and selections</h2>
 <p>The full vector u holds 3 dofs per node, [ux1 uy1 uz1 ux2 ...], body after body. (Rigid bodies, couplings and joints add dofs at the end; see tutorials 6 and 7.) <tt>a.dof(body, sel, dirs)</tt> returns global dof indices. A selector is a function of the coordinates X (n x 3) or a list of node indices; dirs is a subset of 1:3.</p>
-<pre class="codeinput">a = fem.Assembly();  a.add(beam);
+<pre class="codeinput">a = fembd.Assembly();  a.add(beam);
 clamp = @(X) X(:,1) &lt; 1e-9;
 tip   = @(X) X(:,1) &gt; L - 1e-9;
 dTip  = a.dof(<span class="string">'beam'</span>, tip, 3);                  <span class="comment">% z dofs of the tip face</span>
@@ -193,9 +193,9 @@ fprintf(<span class="string">'point compliance at a tip node: %.3e m/N\n'</span>
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
-fem.boxSTL(fullfile(out, 'beam.stl'), [0 0 0], [1000 50 50]);
-steel = fem.material(210e9, 0.3, 7850);
-beam  = fem.Body(fullfile(out, 'beam.stl'), steel, Size = 25, Scale = 1e-3);
+fembd.boxSTL(fullfile(out, 'beam.stl'), [0 0 0], [1000 50 50]);
+steel = fembd.material(210e9, 0.3, 7850);
+beam  = fembd.Body(fullfile(out, 'beam.stl'), steel, Size = 25, Scale = 1e-3);
 L = 1;  h = 0.05;  EI = 210e9*h^4/12;
 
 %% 1. Dofs and selections
@@ -204,7 +204,7 @@ L = 1;  h = 0.05;  EI = 210e9*h^4/12;
 % tutorials 6 and 7.) |a.dof(body, sel, dirs)| returns global dof indices.
 % A selector is a function of the coordinates X (n x 3) or a list of node
 % indices; dirs is a subset of 1:3.
-a = fem.Assembly();  a.add(beam);
+a = fembd.Assembly();  a.add(beam);
 clamp = @(X) X(:,1) < 1e-9;
 tip   = @(X) X(:,1) > L - 1e-9;
 dTip  = a.dof('beam', tip, 3);                  % z dofs of the tip face

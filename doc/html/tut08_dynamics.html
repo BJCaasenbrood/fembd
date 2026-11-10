@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>tut08_dynamics</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-08">
+<meta name="DC.date" content="2026-11-10">
 <meta name="DC.source" content="tut08_dynamics.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -120,12 +120,12 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 </div>
 <pre class="codeinput">addpath(fileparts(fileparts(mfilename(<span class="string">'fullpath'</span>))));
 out = fullfile(tempdir, <span class="string">'femTutorials'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
-fem.boxSTL(fullfile(out, <span class="string">'beam.stl'</span>), [0 0 0], [1000 50 50]);
-beam = fem.Body(fullfile(out, <span class="string">'beam.stl'</span>), fem.material(210e9, 0.3, 7850), <span class="keyword">...</span>
+fembd.boxSTL(fullfile(out, <span class="string">'beam.stl'</span>), [0 0 0], [1000 50 50]);
+beam = fembd.Body(fullfile(out, <span class="string">'beam.stl'</span>), fembd.material(210e9, 0.3, 7850), <span class="keyword">...</span>
                 Size = 25, Scale = 1e-3);
-a = fem.Assembly();  a.add(beam);  a.fix(<span class="string">'beam'</span>, @(X) X(:,1) &lt; 1e-9);
+a = fembd.Assembly();  a.add(beam);  a.fix(<span class="string">'beam'</span>, @(X) X(:,1) &lt; 1e-9);
 [K, M, T] = a.system();
-[V, f] = fem.modes(K, M, 10);
+[V, f] = fembd.modes(K, M, 10);
 </pre>
 <h2 id="2">1. Input and output</h2>
 <p>Input: 1 N vertical force spread over the tip face. Output: the average vertical displacement of the tip face. Both are built in the full space and projected: b = T'*f_u and c = c_u*T.</p>
@@ -241,12 +241,12 @@ legend(<span class="string">'full model'</span>, <span class="string">'statespac
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
-fem.boxSTL(fullfile(out, 'beam.stl'), [0 0 0], [1000 50 50]);
-beam = fem.Body(fullfile(out, 'beam.stl'), fem.material(210e9, 0.3, 7850), ...
+fembd.boxSTL(fullfile(out, 'beam.stl'), [0 0 0], [1000 50 50]);
+beam = fembd.Body(fullfile(out, 'beam.stl'), fembd.material(210e9, 0.3, 7850), ...
                 Size = 25, Scale = 1e-3);
-a = fem.Assembly();  a.add(beam);  a.fix('beam', @(X) X(:,1) < 1e-9);
+a = fembd.Assembly();  a.add(beam);  a.fix('beam', @(X) X(:,1) < 1e-9);
 [K, M, T] = a.system();
-[V, f] = fem.modes(K, M, 10);
+[V, f] = fembd.modes(K, M, 10);
 
 %% 1. Input and output
 % Input: 1 N vertical force spread over the tip face. Output: the average

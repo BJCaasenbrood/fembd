@@ -1,13 +1,13 @@
 function [X, T] = readMsh(file)
 %READMSH Read tetrahedra from an ASCII Gmsh mesh file (format 2.2 or 4.1).
-%   [X, T] = fem.readMsh(file) returns nodes X (n x 3) and tetrahedra T
+%   [X, T] = fembd.readMsh(file) returns nodes X (n x 3) and tetrahedra T
 %   (ne x 4 or ne x 10, Gmsh node ordering). Only the highest-order tet
 %   type present is returned; unused nodes are removed.
 
 txt = string(fileread(file));
 sec = @(name) sscanf(extractBetween(txt, "$" + name, "$End" + name), '%f');
 fmt = sec('MeshFormat');
-assert(fmt(2) == 0, 'fem:readMsh', 'Binary .msh files are not supported.');
+assert(fmt(2) == 0, 'fembd:readMsh', 'Binary .msh files are not supported.');
 
 if fmt(1) < 3                                   % ---- MSH 2.2
     v = sec('Nodes');
@@ -17,7 +17,7 @@ if fmt(1) < 3                                   % ---- MSH 2.2
     e = cellfun(@(l) sscanf(l, '%f')', lines(2:end), 'UniformOutput', false);
     type = cellfun(@(r) r(2), e);
     tet = max(type(type == 4 | type == 11));
-    assert(~isempty(tet), 'fem:readMsh', 'No tetrahedra in %s.', file);
+    assert(~isempty(tet), 'fembd:readMsh', 'No tetrahedra in %s.', file);
     e = vertcat(e{type == tet});
     T = e(:, end - (tet == 11)*6 - 3 : end);
 else                                            % ---- MSH 4.1
@@ -42,7 +42,7 @@ else                                            % ---- MSH 4.1
         end
         p = p + m*n;
     end
-    assert(~isempty(blk), 'fem:readMsh', 'No tetrahedra in %s.', file);
+    assert(~isempty(blk), 'fembd:readMsh', 'No tetrahedra in %s.', file);
     tet = max([blk{:,1}]);
     T = vertcat(blk{[blk{:,1}] == tet, 2});
     T = T(:, 2:end);

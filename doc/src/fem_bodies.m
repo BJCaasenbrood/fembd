@@ -4,7 +4,7 @@
 %
 %% Creating a body
 %
-%   b = fem.Body(src, mat, Name=Value)
+%   b = fembd.Body(src, mat, Name=Value)
 %
 % |src| is an STL file (meshed with Gmsh), an ASCII Gmsh .msh file (version
 % 2.2 or 4.1), or a struct with fields |X| (n x 3 nodes) and |T| (ne x 4
@@ -39,11 +39,11 @@
 %% Materials
 % A material is a struct with a 6 x 6 stiffness |D| in Voigt notation
 % (order xx yy zz yz xz xy, engineering shear strains) and a density
-% |rho|. |fem.material(E, nu, rho)| gives an isotropic material; any
+% |rho|. |fembd.material(E, nu, rho)| gives an isotropic material; any
 % symmetric positive-definite |D| works, e.g. orthotropic composites (see
 % <tut03_materials.html Tutorial 3>).
 %
-%   mat = fem.material(210e9, 0.3, 7850);
+%   mat = fembd.material(210e9, 0.3, 7850);
 %   cfrp = struct('D', D, 'rho', 1600);
 %
 %% Mass matrix
@@ -59,8 +59,8 @@
 %
 % Rigid bodies do not need a volume mesh at all:
 %
-%   b = fem.Body.rigidSurface('lid.stl', 7850, Scale = 1e-3);   % STL surface only
-%   b = fem.Body.pointMass(m, c, J, Name = 'motor');            % mass properties only
+%   b = fembd.Body.rigidSurface('lid.stl', 7850, Scale = 1e-3);   % STL surface only
+%   b = fembd.Body.pointMass(m, c, J, Name = 'motor');            % mass properties only
 %
 % |rigidSurface| computes mass, centre of mass and inertia exactly from
 % the closed STL surface. |pointMass| takes mass |m|, centre of mass |c|
@@ -82,5 +82,5 @@
 % |b.transform(R, t)| moves a body rigidly, x -> R*x + t.
 %
 %% See also
-% <matlab:doc('fem.Body') fem.Body>, <matlab:doc('fem.meshSTL') fem.meshSTL>,
-% <matlab:doc('fem.readMsh') fem.readMsh>, <matlab:doc('fem.material') fem.material>
+% <matlab:doc('fembd.Body') fembd.Body>, <matlab:doc('fembd.meshSTL') fembd.meshSTL>,
+% <matlab:doc('fembd.readMsh') fembd.readMsh>, <matlab:doc('fembd.material') fembd.material>

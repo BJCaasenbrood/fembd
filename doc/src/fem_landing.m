@@ -1,17 +1,17 @@
-%% fem: Linear-Elastic Assemblies
-% *fem* builds linear-elastic finite-element models of assemblies of STL
+%% fembd: Linear-Elastic Assemblies
+% *fembd* builds linear-elastic finite-element models of assemblies of STL
 % parts. Each part is meshed with Gmsh (quadratic Tet10 or linear Tet4
 % elements) or treated as rigid. Parts are connected by bonded ties,
 % elastic interfaces, couplings and joints. The result is the sparse
 % stiffness matrix K and mass matrix M, ready for modal, harmonic,
 % transient or reduced-order analysis.
 %
-%   steel = fem.material(210e9, 0.3, 7850);
-%   arm   = fem.Body('arm.stl', steel, Size = 4, Scale = 1e-3);
-%   a = fem.Assembly();  a.add(arm);
+%   steel = fembd.material(210e9, 0.3, 7850);
+%   arm   = fembd.Body('arm.stl', steel, Size = 4, Scale = 1e-3);
+%   a = fembd.Assembly();  a.add(arm);
 %   a.fix('arm', @(X) X(:,3) < 1e-9);
 %   [K, M, T] = a.system();          % u = T*q
-%   [V, f] = fem.modes(K, M, 10);    % natural frequencies (Hz)
+%   [V, f] = fembd.modes(K, M, 10);    % natural frequencies (Hz)
 %
 %% Get started
 %
@@ -30,7 +30,7 @@
 %% Reference
 %
 % * <fem_reference.html Function Reference>
-% * <matlab:doc('fem.Body') fem.Body> and <matlab:doc('fem.Assembly') fem.Assembly>
+% * <matlab:doc('fembd.Body') fembd.Body> and <matlab:doc('fembd.Assembly') fembd.Assembly>
 %
 %% Features
 %

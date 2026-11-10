@@ -1,6 +1,6 @@
 classdef Assembly < handle
 %ASSEMBLY Elastic and rigid bodies with ties, couplings, joints and supports.
-%   a = fem.Assembly();  a.add(body);  a.tie(master, slave);  a.fix(...);
+%   a = fembd.Assembly();  a.add(body);  a.tie(master, slave);  a.fix(...);
 %   r = a.couple(body, sel);  a.joint(A, B, 'revolute', Axis = ...);
 %   [K, M, T] = a.system();   % reduced matrices, full displacement u = T*q
 %
@@ -30,7 +30,7 @@ end
 
 methods
     function b = add(a, b)
-    %ADD Append a fem.Body. A rigid body also gets a reference point with
+    %ADD Append a fembd.Body. A rigid body also gets a reference point with
     %   the body's name.
         a.Bodies{end+1} = b;
         if b.Rigid
@@ -78,11 +78,11 @@ methods
         nodes = [];
         if strcmp(kind, 'body')
             b = a.Bodies{k};  id = b;
-            assert(~b.Rigid, 'fem:fix', ...
+            assert(~b.Rigid, 'fembd:fix', ...
                 'Rigid bodies are supported via their reference dofs: a.fix(body, [], dirs).');
             nodes = (1:b.nNode)';
             if ~isempty(sel), nodes = b.nodes(sel); end
-            if isempty(nodes), warning('fem:fix', 'No nodes selected.'); return, end
+            if isempty(nodes), warning('fembd:fix', 'No nodes selected.'); return, end
         end
         a.Fixes(end+1) = struct('id', {id}, 'nodes', nodes, 'dirs', dirs);
     end
@@ -100,9 +100,9 @@ methods
             opts.Point double = []
         end
         b = a.body(body);
-        assert(~b.Rigid, 'fem:couple', 'Rigid bodies already have a reference point.');
+        assert(~b.Rigid, 'fembd:couple', 'Rigid bodies already have a reference point.');
         nodes = b.nodes(sel);
-        assert(~isempty(nodes), 'fem:couple', 'No nodes selected.');
+        assert(~isempty(nodes), 'fembd:couple', 'No nodes selected.');
         x = opts.Point;
         if isempty(x), x = mean(b.X(nodes,:), 1); end
         name = opts.Name;
@@ -143,7 +143,7 @@ methods
             opts.Name (1,:) char = ''
         end
         iA = a.refIndex(A);  iB = a.refIndex(B);
-        assert(iB > 0 && iA ~= iB, 'fem:joint', 'B must be a reference point other than A.');
+        assert(iB > 0 && iA ~= iB, 'fembd:joint', 'B must be a reference point other than A.');
         mask = struct('fixed', [0 0 0 0 0 0], 'revolute', [0 0 0 0 0 1], ...
             'prismatic', [0 0 1 0 0 0], 'cylindrical', [0 0 1 0 0 1], ...
             'spherical', [0 0 0 1 1 1], 'planar', [1 1 0 0 0 1], 'free', [1 1 1 1 1 1]);
@@ -185,10 +185,10 @@ methods
             opts.Select = []
         end
         [bm, offm] = a.body(master);  [bs, offs] = a.body(slave);
-        assert(~isempty(bm.F) && ~isempty(bs.F), 'fem:tie', ...
+        assert(~isempty(bm.F) && ~isempty(bs.F), 'fembd:tie', ...
             'A point mass has no surface; connect it with a.joint.');
         if bs.Rigid && isempty(opts.Stiffness)
-            assert(~bm.Rigid, 'fem:tie', ['Two rigid bodies cannot be tied rigidly; ' ...
+            assert(~bm.Rigid, 'fembd:tie', ['Two rigid bodies cannot be tied rigidly; ' ...
                 'make them one body or use Stiffness.']);
             [bm, offm, bs, offs] = deal(bs, offs, bm, offm);
         end
@@ -215,7 +215,7 @@ methods
         end
         on = d <= tol;  s = s(on);  f = f(on);  l = l(on,:);
         ns = numel(s);
-        if ns == 0, warning('fem:tie', 'No slave nodes within tolerance %g.', tol); return, end
+        if ns == 0, warning('fembd:tie', 'No slave nodes within tolerance %g.', tol); return, end
 
         n = cross(B(f,:) - A(f,:), C(f,:) - A(f,:), 2);
         n = n./vecnorm(n, 2, 2);
@@ -336,7 +336,7 @@ methods
             if nnz(C) == 0, break, end
             R = R - R*mask + C*R;
         end
-        assert(nnz(R(:, S)) == 0, 'fem:constraints', 'Cyclic constraints (e.g. a closed loop of ties or joints).');
+        assert(nnz(R(:, S)) == 0, 'fembd:constraints', 'Cyclic constraints (e.g. a closed loop of ties or joints).');
 
         I = setdiff((1:n)', [S; fixed]);
         [i, j, v] = find(R(:, I));
@@ -402,24 +402,24 @@ methods
             opts.Name (1,:) char = ''
         end
         nj = numel(ids);
-        assert(numel(coeffs) == nj, 'fem:transmission', 'One coefficient per entry.');
+        assert(numel(coeffs) == nj, 'fembd:transmission', 'One coefficient per entry.');
         dirs = ones(1, nj);
         if iscell(opts.Dirs), dirs = [opts.Dirs{:}];
         elseif ~isempty(opts.Dirs), dirs = opts.Dirs(:)'; end
-        assert(numel(dirs) == nj, 'fem:transmission', 'One entry of Dirs per coordinate.');
+        assert(numel(dirs) == nj, 'fembd:transmission', 'One entry of Dirs per coordinate.');
         kind = cell(1, nj);  idx = zeros(1, nj);
         for i = 1:nj
             [kind{i}, idx(i)] = a.lookup(ids{i}, true);
-            assert(ismember(kind{i}, {'joint', 'ref'}), 'fem:transmission', ...
+            assert(ismember(kind{i}, {'joint', 'ref'}), 'fembd:transmission', ...
                 '%s is not a joint, rigid body or coupling.', string(ids{i}));
             nd = 6;
             if strcmp(kind{i}, 'joint'), nd = nnz(a.Joints(idx(i)).free); end
-            assert(dirs(i) >= 1 && dirs(i) <= nd, 'fem:transmission', ...
+            assert(dirs(i) >= 1 && dirs(i) <= nd, 'fembd:transmission', ...
                 '%s has %d coordinate(s).', string(ids{i}), nd);
         end
-        assert(isempty(opts.Stiffness) || isscalar(opts.Stiffness), 'fem:transmission', ...
+        assert(isempty(opts.Stiffness) || isscalar(opts.Stiffness), 'fembd:transmission', ...
             'Stiffness must be a scalar (or empty for a rigid transmission).');
-        assert(~isempty(opts.Stiffness) || opts.Damping == 0, 'fem:transmission', ...
+        assert(~isempty(opts.Stiffness) || opts.Damping == 0, 'fembd:transmission', ...
             'Damping needs an elastic transmission (give Stiffness, possibly 0).');
         name = opts.Name;
         if isempty(name), name = sprintf('transmission%d', numel(a.Transmissions) + 1); end
@@ -438,9 +438,9 @@ methods
     %   K and M from a.system() are then linearised about the new pose. For
     %   several rotations (spherical joint) value is a rotation vector.
         [kind, k] = a.lookup(name, true);
-        assert(strcmp(kind, 'joint'), 'fem:pose', '%s is not a joint.', name);
+        assert(strcmp(kind, 'joint'), 'fembd:pose', '%s is not a joint.', name);
         J = a.Joints(k);  value = value(:);
-        assert(numel(value) == nnz(J.free), 'fem:pose', ...
+        assert(numel(value) == nnz(J.free), 'fembd:pose', ...
             '%s has %d joint coordinate(s).', J.Name, nnz(J.free));
         [Rc, tc] = jointMotion(J, J.value);  [Rn, tn] = jointMotion(J, value);
         Rd = Rn*Rc';  td = J.p(:) + tn - Rd*(J.p(:) + tc);  % x -> Rd*x + td
@@ -528,13 +528,13 @@ methods
             opts.Lumped (1,1) logical = false
             opts.Format (1,1) string {mustBeMember(opts.Format, ["struct", "ss"])} = "struct"
         end
-        assert(~isempty(a.Inputs) || ~isempty(a.Outputs), 'fem:statespace', ...
+        assert(~isempty(a.Inputs) || ~isempty(a.Outputs), 'fembd:statespace', ...
             'Define inputs and outputs first (a.input, a.output).');
         [K, M, T, Dq] = a.system(Lumped = opts.Lumped);
         [Bu, Cu, inName, outName, type] = a.ioMatrices();
         B = T'*Bu;  C = Cu*T;  n = size(K, 1);
 
-        [V, f] = fem.modes(K, M, min(opts.Modes, n));
+        [V, f] = fembd.modes(K, M, min(opts.Modes, n));
         W = V;
         if opts.StaticCorrection && size(V, 2) < n && ~isempty(B)
             lam = (2*pi*f).^2;                   % quasi-static shapes; shifted if K is singular
@@ -554,7 +554,7 @@ methods
 
         zeta = opts.Damping(:);
         if isscalar(zeta), zeta = zeta*ones(nr, 1); end
-        assert(numel(zeta) == nr, 'fem:statespace', 'Damping: scalar or %d values.', nr);
+        assert(numel(zeta) == nr, 'fembd:statespace', 'Damping: scalar or %d values.', nr);
         Om2 = diag(lam);  Z = diag(2*zeta.*w) + full(Phi'*Dq*Phi);   % modal + discrete dampers
         Bm = Phi'*B;  Cm = C*Phi;  no = size(C, 1);
         A = [zeros(nr), eye(nr); -Om2, -Z];
@@ -582,7 +582,7 @@ methods
     %   eliminated by a closed loop.
         [~, I] = a.constraints();
         [ok, j] = ismember(d, I);
-        assert(all(ok), 'fem:qdof', ['Some dofs are supported, dependent, or ' ...
+        assert(all(ok), 'fembd:qdof', ['Some dofs are supported, dependent, or ' ...
             'eliminated by a closed loop.']);
     end
 
@@ -631,14 +631,14 @@ methods
     %   Options:
     %     Amplitude  largest displacement shown (default 0.05, model units)
     %     Frequency  real frequency in Hz, shown in the title with the
-    %                slow-motion factor (e.g. f(k) from fem.modes)
+    %                slow-motion factor (e.g. f(k) from fembd.modes)
     %     Rate       playback rate in cycles per second (default 1)
     %     Duration   length in seconds (default 3; inf until closed)
     %     Title      title text, e.g. 'Mode 4'; with Frequency it is
     %                followed by the frequency and slow-motion factor
     %
     %   Example:
-    %     [V, f] = fem.modes(K, M, 6);
+    %     [V, f] = fembd.modes(K, M, 6);
     %     a.animate(T*V(:,4), Frequency = f(4), Title = 'Mode 4');
         arguments
             a
@@ -649,7 +649,7 @@ methods
             opts.Duration (1,1) double {mustBePositive} = 3
             opts.Title = []
         end
-        assert(numel(u) == a.nDof, 'fem:animate', 'u must have a.nDof = %d entries.', a.nDof);
+        assert(numel(u) == a.nDof, 'fembd:animate', 'u must have a.nDof = %d entries.', a.nDof);
         off = a.offsets;  nU = 3*off(end);
         umax = max(abs(u(1:nU)));
         sc = opts.Amplitude/max(umax, eps);
@@ -695,7 +695,7 @@ end
 methods (Access = private)
     function spec = ioSpec(a, name, id, sel, dirs)
     % Store an input/output selection; node sets are resolved now.
-        assert(~any(strcmp([{a.Inputs.Name}, {a.Outputs.Name}], name)), 'fem:io', ...
+        assert(~any(strcmp([{a.Inputs.Name}, {a.Outputs.Name}], name)), 'fembd:io', ...
             'Signal name %s is already used.', name);
         [kind, k] = a.lookup(id, isempty(sel));
         nodes = [];
@@ -703,7 +703,7 @@ methods (Access = private)
             b = a.Bodies{k};  id = b;
             nodes = (1:b.nNode)';
             if ~isempty(sel), nodes = b.nodes(sel); end
-            assert(~isempty(nodes), 'fem:io', '%s: no nodes selected.', name);
+            assert(~isempty(nodes), 'fembd:io', '%s: no nodes selected.', name);
             if isempty(dirs), dirs = 1:3; end
         end
         spec = struct('Name', name, 'id', {id}, 'nodes', nodes, 'dirs', dirs);
@@ -736,14 +736,14 @@ methods (Access = private)
     end
 
     function [b, off, i] = body(a, id)
-        if isa(id, 'fem.Body')
+        if isa(id, 'fembd.Body')
             i = find(cellfun(@(b) b == id, a.Bodies));
         elseif ischar(id) || isstring(id)
             i = find(strcmp(cellfun(@(b) b.Name, a.Bodies, 'UniformOutput', false), id));
         else
             i = id;
         end
-        assert(isscalar(i), 'fem:Assembly', 'Body not found or ambiguous.');
+        assert(isscalar(i), 'fembd:Assembly', 'Body not found or ambiguous.');
         b = a.Bodies{i};  off = a.offsets;  off = off(i);
     end
 
@@ -789,7 +789,7 @@ methods (Access = private)
             if strcmp(kind, 'ref'), i = a.refBody(i); end
             loop = loop || (~strcmp(kind, 'joint') && moving(i));
         end
-        assert(~loop, 'fem:pose', ['%s: the moving side is also attached elsewhere ' ...
+        assert(~loop, 'fembd:pose', ['%s: the moving side is also attached elsewhere ' ...
             '(closed loop or support), so it cannot be posed.'], J.Name);
     end
 
@@ -821,7 +821,7 @@ methods (Access = private)
         k = 0;
         if isempty(id) || (ischar(id) || isstring(id)) && strcmpi(id, 'ground'), return, end
         [kind, k] = a.lookup(id, true);
-        assert(strcmp(kind, 'ref'), 'fem:joint', ...
+        assert(strcmp(kind, 'ref'), 'fembd:joint', ...
             'Joint ends must be rigid bodies, couplings (a.couple) or ''ground''.');
     end
 

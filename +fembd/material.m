@@ -1,6 +1,6 @@
 function mat = material(E, nu, rho)
 %MATERIAL Isotropic linear-elastic material.
-%   mat = fem.material(E, nu, rho) returns a struct with Young's modulus E,
+%   mat = fembd.material(E, nu, rho) returns a struct with Young's modulus E,
 %   Poisson ratio nu, density rho and the 6x6 Voigt stiffness D. Voigt order
 %   is [xx yy zz yz xz xy] with engineering shear strains.
 %

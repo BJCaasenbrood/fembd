@@ -74,7 +74,7 @@
 % in slow motion (vibration modes are far too fast for real time); the
 % phase follows the wall clock, so the speed does not depend on rendering:
 %
-%   [V, f] = fem.modes(K, M, 6);
+%   [V, f] = fembd.modes(K, M, 6);
 %   a.animate(T*V(:,4), Frequency = f(4), Title = 'Mode 4', Rate = 1, Duration = 3);
 %
 % Since u also holds rotation dofs (radians), scale with the node dofs

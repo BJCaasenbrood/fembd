@@ -1,5 +1,5 @@
 % FEM  Linear-elastic finite elements for STL assemblies
-%   Documentation: Help browser, Supplemental Software    Manual: docs/fem.md
+%   Documentation: Help browser, Supplemental Software    Manual: docs/fembd.md
 %
 % Model
 %   Body          - Elastic or rigid body: Gmsh Tet4/Tet10 mesh, material, K and M
@@ -19,7 +19,7 @@
 
 %
 % Example
-%   steel = fem.material(210e9, 0.3, 7850);
-%   b = fem.Body('part.stl', steel, Size = 5, Scale = 1e-3);
-%   a = fem.Assembly();  a.add(b);  a.fix(1, @(X) X(:,3) < 1e-9);
-%   [K, M, T] = a.system();  [V, f] = fem.modes(K, M, 6);
+%   steel = fembd.material(210e9, 0.3, 7850);
+%   b = fembd.Body('part.stl', steel, Size = 5, Scale = 1e-3);
+%   a = fembd.Assembly();  a.add(b);  a.fix(1, @(X) X(:,3) < 1e-9);
+%   [K, M, T] = a.system();  [V, f] = fembd.modes(K, M, 6);

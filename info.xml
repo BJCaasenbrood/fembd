@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Registers the fem documentation with the MATLAB Help browser
+<!-- Registers the fembd documentation with the MATLAB Help browser
      (Supplemental Software). The folder containing this file must be on
      the MATLAB path; build the pages with doc/buildDocs.m. -->
 <productinfo xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
              xsi:noNamespaceSchemaLocation="optional">
     <?xml-stylesheet type="text/xsl" href="optional"?>
     <matlabrelease>2022a</matlabrelease>
-    <name>fem</name>
+    <name>fembd</name>
     <type>toolbox</type>
     <icon></icon>
     <help_location>doc/html</help_location>

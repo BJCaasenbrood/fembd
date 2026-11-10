@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>Getting Started</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-08">
+<meta name="DC.date" content="2026-11-10">
 <meta name="DC.source" content="fem_gettingStarted.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -97,12 +97,12 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 </ul>
 </div>
 <h2 id="1">Installation</h2>
-<p>Add the toolbox folder (the folder containing the <tt>+fem</tt> package and <tt>info.xml</tt>) to the MATLAB path, for example in <tt>startup.m</tt>:</p>
+<p>Add the toolbox folder (the folder containing the <tt>+fembd</tt> package and <tt>info.xml</tt>) to the MATLAB path, for example in <tt>startup.m</tt>:</p>
 <pre class="language-matlab">addpath(<span class="string">'C:\path\to\PDEToolbox'</span>)
 </pre>
 <p>Requirements: MATLAB R2022a or later, and Gmsh 4 for meshing STL files.</p>
 <h2 id="2">Gmsh</h2>
-<p>Bodies are meshed by calling the Gmsh executable. fem uses the GMSH environment variable if it is set, otherwise <tt>gmsh</tt> on the system path.</p>
+<p>Bodies are meshed by calling the Gmsh executable. fembd uses the GMSH environment variable if it is set, otherwise <tt>gmsh</tt> on the system path.</p>
 <div>
 <ul>
 <li>
@@ -114,30 +114,30 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 </ul>
 </div>
 <p>Put the <tt>setenv</tt> line in <tt>startup.m</tt>. Check the setup with:</p>
-<pre class="language-matlab">fem.gmsh(<span class="string">'--version'</span>)
+<pre class="language-matlab">fembd.gmsh(<span class="string">'--version'</span>)
 </pre>
-<p>Rigid bodies created with <tt>fem.Body.rigidSurface</tt> or <tt>fem.Body.pointMass</tt> do not need Gmsh.</p>
+<p>Rigid bodies created with <tt>fembd.Body.rigidSurface</tt> or <tt>fembd.Body.pointMass</tt> do not need Gmsh.</p>
 <h2 id="3">A first model</h2>
 <p>A 1000 x 50 x 50 mm steel cantilever. The STL is in millimetres, so <tt>Scale = 1e-3</tt> converts the mesh to metres; <tt>Size</tt> stays in file units.</p>
-<pre class="codeinput">fem.boxSTL(<span class="string">'beam.stl'</span>, [0 0 0], [1000 50 50]);
-steel = fem.material(210e9, 0.3, 7850);              <span class="comment">% E, nu, rho</span>
-beam  = fem.Body(<span class="string">'beam.stl'</span>, steel, Size = 25, Scale = 1e-3);
+<pre class="codeinput">fembd.boxSTL(<span class="string">'beam.stl'</span>, [0 0 0], [1000 50 50]);
+steel = fembd.material(210e9, 0.3, 7850);              <span class="comment">% E, nu, rho</span>
+beam  = fembd.Body(<span class="string">'beam.stl'</span>, steel, Size = 25, Scale = 1e-3);
 
-a = fem.Assembly();
+a = fembd.Assembly();
 a.add(beam);
 a.fix(<span class="string">'beam'</span>, @(X) X(:,1) &lt; 1e-9);                    <span class="comment">% clamp x = 0</span>
 
 [K, M, T] = a.system();                               <span class="comment">% reduced K, M; u = T*q</span>
-[V, f] = fem.modes(K, M, 6);                          <span class="comment">% Hz, mass-normalised</span>
+[V, f] = fembd.modes(K, M, 6);                          <span class="comment">% Hz, mass-normalised</span>
 a.plot(T*V(:,1), 0.1);                                <span class="comment">% mode 1, scaled</span>
 </pre>
 <p>The workflow has three stages:</p>
 <div>
 <ol>
 <li>
-<b>Bodies</b> (<tt>fem.Body</tt>): mesh, material, and the body's own K and M.</li>
+<b>Bodies</b> (<tt>fembd.Body</tt>): mesh, material, and the body's own K and M.</li>
 <li>
-<b>Assembly</b> (<tt>fem.Assembly</tt>): bodies plus connections and supports.</li>
+<b>Assembly</b> (<tt>fembd.Assembly</tt>): bodies plus connections and supports.</li>
 <li>
 <b>System</b> (<tt>a.system</tt>): constraints are eliminated, u = T*q, giving the reduced matrices K = T'*Kfull*T and M = T'*Mfull*T.</li>
 </ol>
@@ -166,7 +166,7 @@ a.plot(T*V(:,1), 0.1);                                <span class="comment">% mo
 %% Getting Started
 %
 %% Installation
-% Add the toolbox folder (the folder containing the |+fem| package and
+% Add the toolbox folder (the folder containing the |+fembd| package and
 % |info.xml|) to the MATLAB path, for example in |startup.m|:
 %
 %   addpath('C:\path\to\PDEToolbox')
@@ -174,7 +174,7 @@ a.plot(T*V(:,1), 0.1);                                <span class="comment">% mo
 % Requirements: MATLAB R2022a or later, and Gmsh 4 for meshing STL files.
 %
 %% Gmsh
-% Bodies are meshed by calling the Gmsh executable. fem uses the GMSH
+% Bodies are meshed by calling the Gmsh executable. fembd uses the GMSH
 % environment variable if it is set, otherwise |gmsh| on the system path.
 %
 % * *Windows*: download the Windows 64-bit zip from
@@ -186,30 +186,30 @@ a.plot(T*V(:,1), 0.1);                                <span class="comment">% mo
 %
 % Put the |setenv| line in |startup.m|. Check the setup with:
 %
-%   fem.gmsh('REPLACE_WITH_DASH_DASHversion')
+%   fembd.gmsh('REPLACE_WITH_DASH_DASHversion')
 %
-% Rigid bodies created with |fem.Body.rigidSurface| or |fem.Body.pointMass|
+% Rigid bodies created with |fembd.Body.rigidSurface| or |fembd.Body.pointMass|
 % do not need Gmsh.
 %
 %% A first model
 % A 1000 x 50 x 50 mm steel cantilever. The STL is in millimetres, so
 % |Scale = 1e-3| converts the mesh to metres; |Size| stays in file units.
-fem.boxSTL('beam.stl', [0 0 0], [1000 50 50]);
-steel = fem.material(210e9, 0.3, 7850);              % E, nu, rho
-beam  = fem.Body('beam.stl', steel, Size = 25, Scale = 1e-3);
+fembd.boxSTL('beam.stl', [0 0 0], [1000 50 50]);
+steel = fembd.material(210e9, 0.3, 7850);              % E, nu, rho
+beam  = fembd.Body('beam.stl', steel, Size = 25, Scale = 1e-3);
 
-a = fem.Assembly();
+a = fembd.Assembly();
 a.add(beam);
 a.fix('beam', @(X) X(:,1) < 1e-9);                    % clamp x = 0
 
 [K, M, T] = a.system();                               % reduced K, M; u = T*q
-[V, f] = fem.modes(K, M, 6);                          % Hz, mass-normalised
+[V, f] = fembd.modes(K, M, 6);                          % Hz, mass-normalised
 a.plot(T*V(:,1), 0.1);                                % mode 1, scaled
 %%
 % The workflow has three stages:
 %
-% # *Bodies* (|fem.Body|): mesh, material, and the body's own K and M.
-% # *Assembly* (|fem.Assembly|): bodies plus connections and supports.
+% # *Bodies* (|fembd.Body|): mesh, material, and the body's own K and M.
+% # *Assembly* (|fembd.Assembly|): bodies plus connections and supports.
 % # *System* (|a.system|): constraints are eliminated, u = T*q, giving
 %   the reduced matrices K = T'*Kfull*T and M = T'*Mfull*T.
 %
