@@ -459,6 +459,61 @@ a.joint('ground', 'slider', 'prismatic', Axis = [0 0 1], Name = 'z');
 a.output('z', 'z');
 [t, y] = a.nonlinear(Gravity = [1 2 -g]).simulate([0 0.3], Step = 1e-2);
 check('Nonlinear: free fall on a prismatic joint', y.z, -0.5*g*t.^2, 1e-12);
+
+% nonlinear elastic: cantilever with a tip mass on its second coupling == linear
+Lb = 0.5;  hb = 0.02;  beam = fullfile(tmp, 'nlbeam.stl');
+fembd.boxSTL(beam, [0 0 0], [Lb hb hb]);
+a = elasticBeam(beam, steel, Lb, [0 2e-5]);
+a.add(fembd.Body.pointMass(0.3, [Lb + 0.03, hb/2, hb/2], 1e-4*eye(3), Name = 'mass'));
+a.joint('ground', 'root', 'fixed');  a.joint('tip', 'mass', 'fixed', Point = [Lb hb/2 hb/2]);
+a.input('Fz', 'mass', [], 3);  a.output('uz', 'mass', [], 3);
+a.output('mid', 'beam', @(X) abs(X(:,1) - Lb/2) < 0.006, 3);
+sys = a.statespace(Modes = 30, Damping = 0);
+[t, y] = a.nonlinear(Modes = 10).simulate([0 0.02], Step = 4e-5, Input = @(t, y) 1, Rho = 0.95);
+Ad = expm(sys.A*(t(2) - t(1)));  Bd = sys.A\((Ad - eye(size(Ad)))*sys.B);
+xs = zeros(size(sys.A, 1), 1);  Yl = zeros(numel(t), 2);
+for k = 2:numel(t), xs = Ad*xs + Bd;  Yl(k,:) = (sys.C*xs)'; end
+check('Nonlinear elastic: tip mass and node set == linear (step force)', ...
+      [y.uz, y.mid]./max(abs(Yl)), Yl./max(abs(Yl)), 1e-3);
+
+% nonlinear elastic: stiff flexible pendulum == rigid pendulum (3 rad swing)
+stiff = fembd.material(210e12, 0.3, 7800);
+[~, yr] = elasticPendulum(beam, stiff, Lb, true).nonlinear(Gravity = [0 0 -g]).simulate([0 0.6]);
+[~, ye] = elasticPendulum(beam, stiff, Lb, false).nonlinear(Gravity = [0 0 -g], Modes = 6).simulate([0 0.6]);
+check(sprintf('Nonlinear elastic: stiff pendulum (%.1f rad) == rigid', max(abs(yr.th))), ye.th, yr.th, 1e-4);
+
+% nonlinear elastic: soft flexible pendulum conserves energy; kinetic energy
+% from the inertia invariants == nodal 1/2 xdot' M xdot
+nl = elasticPendulum(beam, fembd.material(2e9, 0.3, 7800), Lb, false).nonlinear(Gravity = [0 0 -g], Modes = 6);
+[~, ~, x] = nl.simulate([0 0.6], Step = 5e-4, Rho = 1);
+E = nl.energy(x);  B = nl.Bodies(1);  k = size(x.nu, 2);
+U = B.Xl' + reshape(B.Phi*x.e(:,k), 3, []);  w = x.nu(4:6,k);
+xd = x.nu(1:3,k) + x.R(:,:,1,k)*(cross(repmat(w, 1, size(U, 2)), U) + reshape(B.Phi*x.nu(7:end,k), 3, []));
+[~, Mb] = nl.Assembly.Bodies{1}.matrices();
+check(sprintf('Nonlinear elastic: soft pendulum energy (strain %.0e J)', max(E.strain)), ...
+      (E.total - E.total(1))/max(E.kinetic), 0, 1e-5);
+check('Nonlinear elastic: kinetic energy, invariants == nodal', E.kinetic(k), 0.5*full(xd(:)'*Mb*xd(:)), 1e-10);
+end
+
+function a = elasticBeam(file, mat, L, damping)
+% Elastic Tet4 beam along x with couplings at both ends.
+a = fembd.Assembly();
+a.add(fembd.Body(file, mat, Size = 0.01, Order = 1, Name = 'beam', Damping = damping));
+a.couple('beam', @(X) X(:,1) < 1e-9, Name = 'root');
+a.couple('beam', @(X) X(:,1) > L - 1e-9, Name = 'tip');
+end
+
+function a = elasticPendulum(file, mat, L, rigid)
+% Beam pendulum hinged about y at its root, rigid or elastic.
+if rigid
+    a = fembd.Assembly();
+    a.add(fembd.Body(file, mat, Size = 0.01, Order = 1, Name = 'beam', Rigid = true));
+    a.joint('ground', 'beam', 'revolute', Point = [0 0.01 0.01], Axis = [0 1 0], Name = 'hinge');
+else
+    a = elasticBeam(file, mat, L, [0 0]);
+    a.joint('ground', 'root', 'revolute', Point = [0 0.01 0.01], Axis = [0 1 0], Name = 'hinge');
+end
+a.output('th', 'hinge');
 end
 
 function [a, name] = refBeltNL(posed)

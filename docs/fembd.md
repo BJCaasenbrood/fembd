@@ -247,7 +247,7 @@ out with f ≈ 0. Mode shapes are normalised so that `VᵀMV = I`.
 | `sys = a.statespace(Modes=, Damping=, StaticCorrection=, Lumped=, Format=)` | Modal state-space model with the inputs and outputs (Recipes) |
 | `[Bu, Cu, inName, outName, type] = a.ioMatrices()` | Inputs and outputs in the full space |
 | `j = a.qdof(d)` | Positions of global dofs `d` in `q`, so `u(d) = q(j)`. `d` must be independent (not supported, not a tie slave). |
-| `m = a.nonlinear(Gravity=)` | Nonlinear multibody model (`fembd.Model`, §5): `m.simulate(tspan, Step=, Input=, Rates=, Rho=, Tol=)`, `m.animate(t, x, Rate=, Title=)` |
+| `m = a.nonlinear(Gravity=, Modes=)` | Nonlinear multibody model (`fembd.Model`, §5): `m.simulate(tspan, Step=, Input=, Rates=, Rho=, Tol=)`, `m.energy(x)`, `m.animate(t, x, Rate=, Scale=, Title=)` |
 | `[K, M, D] = a.assemble(Lumped=false)` | Full matrices, including elastic interfaces; `D` holds body (Rayleigh), joint and transmission dampers |
 | `[T, I] = a.constraints()` | `u = T*q`, and the independent global dofs `I` |
 | `[K, M, T, D] = a.system(Lumped=false)` | Reduced matrices, `T`, and the reduced damping matrix `D = T'·D·T` |
@@ -389,6 +389,15 @@ plot(t, y.th1);  m.animate(t, x, Rate = 0.5);                         % half spe
 - **Coordinates:** each rigid body has a frame at its centre of mass: position `r` (world) and
   rotation `R`, with velocities `[v (world); ω (body)]`. The mass matrix is constant
   (`diag(m I, J)`), with gyroscopic forces `ω × Jω`.
+- **Elastic bodies** use a floating frame of reference. The frame follows the body's first
+  coupling; the deformation in that frame is described by Craig–Bampton modes (first coupling
+  clamped, the other couplings as interfaces, plus `Modes` fixed-interface modes, default 10):
+  `x = r + R(X₀ + Φη)`. The mass matrix `M(η)`, the centrifugal and Coriolis forces and gravity
+  follow from precomputed inertia invariants `Q_ab = U_aᵀ M U_b`, `U = [X₀, Φ]`, so the cost per
+  step does not depend on the mesh size. Stiffness and Rayleigh damping are the reduced
+  `Vᵀ K V` and `Vᵀ D V`. Couplings move and rotate with the modes, so joints on them deform with
+  the body. Large rotations are exact; the deformation is linear (no stiffening by centrifugal
+  or gravity preload, which matters only for fast-spinning slender parts).
 - **Joints and supports** are exact nonlinear constraints `g(q) = 0` with Lagrange multipliers.
   Locked translations: the components of the joint offset in the frame on A. Locked rotations:
   dot products of frame axes (a revolute joint keeps its axes aligned at any angle). Redundant
@@ -407,17 +416,24 @@ plot(t, y.th1);  m.animate(t, x, Rate = 0.5);                         % half spe
   them. `Rho` (default 0.8) sets the numerical damping of high frequencies (1: none).
 - **Inputs** come from `Input = @(t, y)`, evaluated with the outputs of the previous step: a
   controller sampled at the time step. Initial joint velocities: `Rates = struct('joint', v)`.
-- **Phase 1 limits:** rigid bodies only (elastic bodies, couplings and ties follow, via
-  Craig–Bampton modes in a floating frame); displacement and velocity outputs.
+- **Signals:** joint coordinates, reference points (rigid bodies, couplings) and node sets
+  (average displacement, world axes; forces split over the nodes). `m.energy(x)` gives the
+  kinetic, gravity, strain and spring energies; `m.animate(t, x, Scale = 100)` magnifies the
+  deformation.
+- **Limits:** an elastic body needs at least one coupling (its frame); ties and supports on
+  body nodes are not supported (support a coupling instead); displacement and velocity outputs.
 
 Verified against the Lagrange equations of a double pendulum, the exact (linear) solution of a
 damped belt drive at large angles, a rigid transmission under a constant torque, a heavy top
-(energy, Euler equations) and free fall; all converge at second order in the time step.
+(energy, Euler equations) and free fall; elastic bodies against the linear model (cantilever
+with a tip mass on its second coupling, node-set output), a stiff flexible pendulum against the
+rigid one, energy conservation of a soft flexible pendulum, and the kinetic energy from the
+invariants against the nodal `½ ẋᵀ M ẋ`. All converge at second order in the time step.
 
 ---
 
 ## 6 Limitations
-- Linear elasticity only: small strains, no contact, no geometric stiffness. Large rotations of rigid bodies: see the nonlinear model (§5).
+- Linear elasticity only: small strains, no contact, no geometric stiffness. Large rotations of rigid and elastic bodies: see the nonlinear model (§5).
 - Ties project onto the flat corner triangle of each master face. On curved Tet10 interfaces the error is about the chord height.
 - If curved Tet10 edge nodes invert an element (coarse mesh, small radius), `meshSTL` re-meshes with straight-sided Tet10 and warns. A smaller `Size` keeps the curved geometry.
 - STL surfaces must be closed and watertight for `Remesh = true`. Only ASCII `.msh` files are read.
@@ -426,6 +442,6 @@ damped belt drive at large angles, a rigid transmission under a constant torque,
 - `T` is formed explicitly: memory grows with the number of tie and rigid-body nodes. `craigBampton` forms the dense `V`.
 - Requires MATLAB R2022a or later and Gmsh 4.
 
-Verification: `tests/runTests.m` covers 77 checks, including Euler–Bernoulli, rigid-body
+Verification: `tests/runTests.m` covers 81 checks, including Euler–Bernoulli, rigid-body
 invariance, exact rigid inertia, tie and spring consistency, joints against 1-dof oscillators, a four-bar against velocity analysis, and
 hinged-beam solutions, couplings, posed joints against a double pendulum, mesh-free rigid bodies, Craig–Bampton accuracy, damping, state space, the MSH readers and the nonlinear model (§5).
