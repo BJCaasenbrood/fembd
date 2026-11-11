@@ -40,8 +40,8 @@ classdef Model < handle
 properties (SetAccess = private)
     Assembly                % the source assembly
     Gravity (1,3) double
-    Bodies                  % per body: name, elastic, m, J, c0, Xl, F, cols, ecols, and modal data
-    Anchors                 % body frames and couplings: body, x0, Psi (6 x ne)
+    Bodies                  % per body: name, elastic, m, J, c0, Xl, cols, ecols, and modal data
+    Anchors                 % body frames and couplings: body, frame, x0, Psi (6 x ne)
     Joints                  % name, A, B (anchors, 0 = ground), a, b, QA, QB, free, k, c
     Trans                   % transmissions: terms (kind, idx, dir), coef, k, c, d0
     Locks                   % supported joint coordinates: kind, idx, dir, value
@@ -69,13 +69,13 @@ methods
         % bodies: rigid (frame at the centre of mass) or elastic (frame at
         % the first coupling, Craig-Bampton modes); one anchor per body frame
         nb = numel(a.Bodies);  off = 0;  eoff = 0;
-        m.Anchors = struct('body', {}, 'x0', {}, 'Psi', {});
+        m.Anchors = struct('body', {}, 'frame', {}, 'x0', {}, 'Psi', {});
         for i = 1:nb
             b = a.Bodies{i};
             if b.Rigid
-                [mb, c, J] = massProps(b);
+                [mb, c, J] = b.massProperties();
                 B = struct('name', b.Name, 'elastic', false, 'm', mb, 'J', J, 'c0', c(:), ...
-                           'Xl', b.X - c(:)', 'F', b.F(:, 1:min(3, size(b.F, 2))), 'ne', 0, ...
+                           'Xl', b.X - c(:)', 'ne', 0, ...
                            'Phi', zeros(3*b.nNode, 0), 'Q', [], 's', [], 'CR', [], 'Kc', [], ...
                            'Dc', [], 'Mee', [], 'couplings', {{}}, 'Psi', zeros(6, 0, 0));
             else
@@ -84,7 +84,7 @@ methods
             B.cols = off + (1:6 + B.ne);  B.ecols = eoff + (1:B.ne);
             off = off + 6 + B.ne;  eoff = eoff + B.ne;
             m.Bodies = [m.Bodies, B];
-            m.Anchors(i) = struct('body', i, 'x0', zeros(3, 1), 'Psi', zeros(6, B.ne));
+            m.Anchors(i) = struct('body', i, 'frame', true, 'x0', zeros(3, 1), 'Psi', zeros(6, B.ne));
         end
         m.nDof = off;
         m.q0 = struct('r', reshape([m.Bodies.c0], 3, nb), 'R', repmat(eye(3), 1, 1, nb), ...
@@ -98,9 +98,13 @@ methods
                 m.Refs(k) = struct('anchor', i, 's', x - B.c0, 'x0', x);
             else
                 c = find(strcmp(B.couplings, a.Refs(k).Name));
-                Psi = B.Psi(:,:,c);
-                m.Anchors(end+1) = struct('body', i, 'x0', x - B.c0, 'Psi', Psi);
-                m.Refs(k) = struct('anchor', numel(m.Anchors), 's', zeros(3, 1), 'x0', x);
+                if c == 1                        % the first coupling carries the body frame
+                    m.Refs(k) = struct('anchor', i, 's', zeros(3, 1), 'x0', x);
+                else
+                    m.Anchors(end+1) = struct('body', i, 'frame', false, 'x0', x - B.c0, ...
+                                              'Psi', B.Psi(:,:,c));
+                    m.Refs(k) = struct('anchor', numel(m.Anchors), 's', zeros(3, 1), 'x0', x);
+                end
             end
         end
 
@@ -108,9 +112,8 @@ methods
         m.Joints = struct('name', {}, 'A', {}, 'B', {}, 'a', {}, 'b', {}, 'QA', {}, ...
                           'QB', {}, 'free', {}, 'k', {}, 'c', {});
         for J = a.Joints
-            s = zeros(6, 1);  s(J.free) = J.value;
-            m.addJoint(J.Name, J.A, J.B, J.p(:), J.R, J.p(:) + J.R*s(1:3), J.R*expso3(s(4:6)), ...
-                       J.free, J.k, J.damp);
+            [Rj, tj] = jointMotion(J, J.value);
+            m.addJoint(J.Name, J.A, J.B, J.p(:), J.R, J.p(:) + tj, Rj*J.R, J.free, J.k, J.damp);
         end
 
         % supports: of a reference point -> joint to ground; of a joint -> lock
@@ -307,41 +310,26 @@ methods
             opts.Scale (1,1) double = 1
             opts.Title (1,:) char = ''
         end
-        nb = numel(m.Bodies);  h = gobjects(nb, 1);
-        hold on
-        for i = 1:nb
-            B = m.Bodies(i);
-            if isempty(B.F)                      % point mass: marker at its centre of mass
-                h(i) = plot3(x.r(1,i,1), x.r(2,i,1), x.r(3,i,1), 'ko', 'MarkerFaceColor', 'k');
-            else
-                h(i) = patch('Faces', B.F, 'Vertices', m.vertices(i, x, 1, opts.Scale), ...
-                             'FaceColor', [0.75 0.78 0.85], 'LineStyle', 'none');
-            end
-        end
-        hold off;  axis equal;  view(3);  camlight;  lighting gouraud
+        nb = numel(m.Bodies);  V = @(k) arrayfun(@(i) m.vertices(i, x, k, opts.Scale), 1:nb, 'UniformOutput', false);
+        cla;  h = drawBodies(m.Assembly.Bodies, V(1), num2cell(lines(nb), 2)');
         X = reshape(permute(x.r, [1 3 2]), 3, [])';           % all frame positions
         span = max([arrayfun(@(B) max([vecnorm(B.Xl, 2, 2); 0]), m.Bodies), 1e-3]);
         axis(reshape([min(X, [], 1) - span; max(X, [], 1) + span], 1, []));
-        clock = tic;  k = 1;
-        while k < numel(t) && all(isgraphics(h))
-            k = find(t <= t(1) + opts.Rate*toc(clock), 1, 'last');
-            for i = 1:nb
-                if isempty(m.Bodies(i).F)
-                    set(h(i), 'XData', x.r(1,i,k), 'YData', x.r(2,i,k), 'ZData', x.r(3,i,k));
-                else
-                    set(h(i), 'Vertices', m.vertices(i, x, k, opts.Scale));
-                end
-            end
+        playback(h, (t(end) - t(1))/opts.Rate, @(s) frame(s));
+        function frame(s)
+            k = find(t <= t(1) + opts.Rate*s, 1, 'last');
+            setVertices(h, V(k));
             title(sprintf('%s  t = %.3f s', opts.Title, t(k)));
-            drawnow limitrate
         end
     end
 end
 
 methods (Access = private)
     function V = vertices(m, i, x, k, scale)
-    % Node positions of body i at step k (deformation magnified by scale).
+    % Node positions of body i at step k (deformation magnified by scale);
+    % the centre of mass for a point mass.
         B = m.Bodies(i);  U = B.Xl;
+        if isempty(U), V = x.r(:,i,k)';  return, end
         if B.elastic, U = U + scale*reshape(B.Phi*x.e(B.ecols, k), 3, [])'; end
         V = U*x.R(:,:,i,k)' + x.r(:,i,k)';
     end
@@ -368,7 +356,7 @@ methods (Access = private)
         A = m.Anchors(k);  B = m.Bodies(A.body);  c = B.cols;
         r = q.r(:, A.body);  R = q.R(:,:,A.body);
         Jv(:, c(1:3)) = eye(3);
-        if ~any(A.Psi(:)) && ~any(A.x0)        % body frame (or the coupling carrying it)
+        if A.frame
             ra = r;  Ra = R;  Jw(:, c(4:6)) = eye(3);
             return
         end
@@ -532,30 +520,17 @@ methods (Access = private)
     end
 
     function [specs, names] = signals(m, list)
-    % Input/output selections -> signals (kind, index, direction).
-        a = m.Assembly;
-        specs = struct('kind', {}, 'idx', {}, 'dir', {}, 'type', {});  names = {};
-        for s = list
-            if isempty(s.nodes)
-                [kind, k] = a.lookup(s.id, true);
-                dirs = s.dirs;
-                if isempty(dirs)
-                    dirs = 1:6;  if strcmp(kind, 'joint'), dirs = 1:nnz(a.Joints(k).free); end
-                end
-            else                                 % node set: average motion of the nodes
-                [~, ~, i] = a.body(s.id);  B = m.Bodies(i);  b = a.Bodies{i};
-                d = 3*s.nodes(:)' - [2; 1; 0];  P = zeros(3, B.ne);
-                if B.ne > 0, P = reshape(mean(reshape(B.Phi(d(:), :), 3, numel(s.nodes), B.ne), 2), 3, B.ne); end
-                m.Nodes(end+1) = struct('body', i, 'u0', mean(B.Xl(s.nodes, :), 1)', ...
-                    'Phi', P, 'x0', mean(b.X(s.nodes, :), 1)');
-                kind = 'node';  k = numel(m.Nodes);  dirs = s.dirs;
-            end
-            type = 'displacement';  if isfield(s, 'type'), type = s.type; end
-            for d = dirs(:)'
-                specs(end+1) = struct('kind', kind, 'idx', k, 'dir', d, 'type', type); %#ok<AGROW>
-                names{end+1} = s.Name;                                              %#ok<AGROW>
-                if numel(dirs) > 1, names{end} = sprintf('%s_%d', s.Name, d); end
-            end
+    % Input/output selections -> signals (kind, index, direction); node
+    % sets become average-displacement signals.
+        a = m.Assembly;  sig = a.signals(list);  names = {sig.Name};
+        specs = struct('kind', {sig.kind}, 'idx', {sig.idx}, 'dir', {sig.dir}, 'type', {sig.type});
+        for c = find(strcmp({sig.kind}, 'body'))
+            s = sig(c);  i = s.idx;  B = m.Bodies(i);  nodes = s.nodes(:);
+            d = 3*nodes' - [2; 1; 0];  P = zeros(3, B.ne);
+            if B.ne > 0, P = reshape(mean(reshape(B.Phi(d(:), :), 3, numel(nodes), B.ne), 2), 3, B.ne); end
+            m.Nodes(end+1) = struct('body', i, 'u0', mean(B.Xl(nodes, :), 1)', 'Phi', P, ...
+                                    'x0', mean(a.Bodies{i}.X(nodes, :), 1)');
+            specs(c).kind = 'node';  specs(c).idx = numel(m.Nodes);
         end
     end
 
@@ -627,7 +602,7 @@ Phi = full(U(1:3*nn, :));
 Psi = zeros(6, ne, numel(cpl));
 for c = 1:numel(cpl), Psi(:,:,c) = full(U(ta.dof(names{c}), :)); end
 x0 = a.refPoint(cpl(1));  Xl = b.X - x0(:)';
-[~, Mb] = b.matrices();  Ms = Mb(1:3:end, 1:3:end);
+[~, Mb] = b.matrices(MassOnly = true);  Ms = Mb(1:3:end, 1:3:end);
 Uf = reshape(cat(3, Xl, permute(reshape(Phi, 3, nn, ne), [2 1 3])), nn, []);   % [X0, Phi_1, ...] per node
 MU = Ms*Uf;
 Qf = full(Uf'*MU);                                     % 3(1+ne) x 3(1+ne)
@@ -638,7 +613,7 @@ for aa = 1:1 + ne
     for j = 1:ne, CR(:, aa, j) = cr(Q(:,:,aa,j+1)); end
 end
 B = struct('name', b.Name, 'elastic', true, 'm', full(sum(Ms(:))), 'J', [], 'c0', x0(:), ...
-           'Xl', Xl, 'F', b.F(:, 1:3), 'ne', ne, 'Phi', Phi, 'Q', Q, 's', s, 'CR', CR, ...
+           'Xl', Xl, 'ne', ne, 'Phi', Phi, 'Q', Q, 's', s, 'CR', CR, ...
            'Kc', Kc, 'Dc', (V'*D*V + (V'*D*V)')/2, 'Mee', Mc);
 B.couplings = names;  B.Psi = Psi;
 end
@@ -671,63 +646,4 @@ end
 function v = cr(Q)
 % sum_pq Ms_pq y_p x z_q from Q = sum_pq Ms_pq y_p z_q'.
 v = [Q(2,3) - Q(3,2); Q(3,1) - Q(1,3); Q(1,2) - Q(2,1)];
-end
-
-function [m, c, J] = massProps(b)
-% Mass, centre of mass and inertia (about c) of a rigid body.
-if ~isempty(b.MassProps)
-    p = b.MassProps;  m = p.m;  c = p.c(:)';  J = p.J;  return
-end
-[~, M] = b.matrices();  Ms = M(1:3:end, 1:3:end);
-m = full(sum(Ms(:)));
-c = full(sum(Ms, 1)*b.X)/m;
-Xc = b.X - c;  S = full(Xc'*Ms*Xc);
-J = trace(S)*eye(3) - S;  J = (J + J')/2;
-end
-
-function S = hat(v)
-S = [0 -v(3) v(2); v(3) 0 -v(1); -v(2) v(1) 0];
-end
-
-function R = expso3(p)
-% Rotation matrix exp(hat(p)) (Rodrigues).
-th = norm(p);  P = hat(p);
-if th < 1e-8, R = eye(3) + P + P*P/2; return, end
-R = eye(3) + sin(th)/th*P + (1 - cos(th))/th^2*(P*P);
-end
-
-function p = logso3(R)
-% Rotation vector of R (angle in [0, pi]).
-s = [R(3,2) - R(2,3); R(1,3) - R(3,1); R(2,1) - R(1,2)]/2;
-c = (trace(R) - 1)/2;  sn = norm(s);  th = atan2(sn, c);
-if th < 1e-8
-    p = s;
-elseif pi - th > 1e-6
-    p = th/sn*s;
-else                                         % near pi: axis from R + I
-    B = (R + eye(3))/2;  [~, i] = max(diag(B));
-    n = B(:, i)/sqrt(B(i, i));
-    if n'*s < 0, n = -n; end
-    p = th*n;
-end
-end
-
-function T = dexp(p)
-% Right Jacobian of SO(3): omega = T*dp/dt for R = exp(hat(p)), dR/dt = R*hat(omega).
-th = norm(p);  P = hat(p);
-if th < 1e-6
-    T = eye(3) - P/2 + (P*P)/6;
-else
-    T = eye(3) - (1 - cos(th))/th^2*P + (th - sin(th))/th^3*(P*P);
-end
-end
-
-function Ti = dexpInv(p)
-% Inverse of the right Jacobian of SO(3): dp/dt = Ti*omega.
-th = norm(p);  P = hat(p);
-if th < 1e-6
-    Ti = eye(3) + P/2 + (P*P)/12;
-else
-    Ti = eye(3) + P/2 + (1/th^2 - (1 + cos(th))/(2*th*sin(th)))*(P*P);
-end
 end

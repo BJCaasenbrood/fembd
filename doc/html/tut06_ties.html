@@ -1,0 +1,294 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<META http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      -->
+<title>tut06_ties</title>
+<meta name="generator" content="MATLAB 24.1">
+<link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
+<meta name="DC.date" content="2026-11-10">
+<meta name="DC.source" content="tut06_ties.m">
+<style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; }
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+span.typesection { color:#A0522D }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style>
+</head>
+<body>
+<div class="content">
+<h2>Contents</h2>
+<div>
+<ul>
+<li>
+<a href="#1">Tutorial 6 - Connecting bodies: ties and elastic interfaces</a>
+</li>
+<li>
+<a href="#2">1. Two parts with non-matching meshes</a>
+</li>
+<li>
+<a href="#3">2. Bonded tie</a>
+</li>
+<li>
+<a href="#4">3. Tolerance</a>
+</li>
+<li>
+<a href="#5">4. Partial bonding with Select</a>
+</li>
+<li>
+<a href="#6">5. Elastic interfaces</a>
+</li>
+</ul>
+</div>
+<h2 id="1">Tutorial 6 - Connecting bodies: ties and elastic interfaces</h2>
+<p>Each body is meshed separately, so the meshes do not match at an interface. This tutorial covers:</p>
+<div>
+<ul>
+<li>bonded ties (exact multi-point constraints)</li>
+<li>choosing master and slave, and the <tt>Tol</tt> and <tt>Select</tt> options</li>
+<li>elastic interfaces (distributed springs) with <tt>Stiffness</tt>
+</li>
+</ul>
+</div>
+<pre class="codeinput">addpath(fileparts(fileparts(mfilename(<span class="string">'fullpath'</span>))));
+out = fullfile(tempdir, <span class="string">'femTutorials'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
+steel = fembd.material(210e9, 0.3, 7850);
+clampX0 = @(X) X(:,1) &lt; 1e-9;
+
+<span class="comment">% reference: one-piece cantilever</span>
+fembd.boxSTL(fullfile(out, <span class="string">'beam.stl'</span>), [0 0 0], [1000 50 50]);
+one = fembd.Body(fullfile(out, <span class="string">'beam.stl'</span>), steel, Size = 25, Scale = 1e-3);
+a = fembd.Assembly();  a.add(one);  a.fix(1, clampX0);
+[K, M] = a.system();  [~, fRef] = fembd.modes(K, M, 6);
+</pre>
+<h2 id="2">1. Two parts with non-matching meshes</h2>
+<p>The same beam as two halves, meshed with different element sizes.</p>
+<pre class="codeinput">fembd.boxSTL(fullfile(out, <span class="string">'left.stl'</span>),  [0 0 0],   [500 50 50]);
+fembd.boxSTL(fullfile(out, <span class="string">'right.stl'</span>), [500 0 0], [1000 50 50]);
+left  = fembd.Body(fullfile(out, <span class="string">'left.stl'</span>),  steel, Size = 25, Scale = 1e-3);
+right = fembd.Body(fullfile(out, <span class="string">'right.stl'</span>), steel, Size = 15, Scale = 1e-3);
+</pre>
+<h2 id="3">2. Bonded tie</h2>
+<p>
+<tt>a.tie(master, slave)</tt> takes the slave's surface nodes that lie within Tol of the master surface, and constrains each one to the point of the master face it touches:</p>
+<pre class="language-matlab">u_slave = sum_j N_j(xi) u_master,j
+</pre>
+<p>The constraint is exact (no penalty) and is removed in T. Use the finer mesh as slave, so that every slave node has a master face to follow.</p>
+<pre class="codeinput">a = fembd.Assembly();  a.add(left);  a.add(right);
+ns = a.tie(<span class="string">'left'</span>, <span class="string">'right'</span>);
+a.fix(<span class="string">'left'</span>, clampX0);
+[K, M, T] = a.system();  [V, f] = fembd.modes(K, M, 6);
+fprintf(<span class="string">'%d slave nodes tied\n'</span>, ns);
+disp(table(fRef, f, <span class="string">'VariableNames'</span>, {<span class="string">'one_piece_Hz'</span>, <span class="string">'tied_Hz'</span>}));
+
+<span class="comment">% The tied nodes are stored in a.Links (global node numbers):</span>
+L = a.Links(1);  X = a.X;
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);  a.plot();  hold <span class="string">on</span>
+plot3(X(L.slave,1), X(L.slave,2), X(L.slave,3), <span class="string">'k.'</span>, <span class="string">'MarkerSize'</span>, 12);
+title(<span class="string">'Tied slave nodes'</span>);  hold <span class="string">off</span>
+</pre>
+<pre class="codeoutput">105 slave nodes tied
+    one_piece_Hz    tied_Hz
+    ____________    _______
+
+       41.826       41.825 
+        41.83       41.829 
+       259.16       259.16 
+       259.24        259.2 
+        713.2       712.99 
+       713.58       713.22 
+
+</pre>
+<img vspace="5" hspace="5" src="tut06_ties_01.png" alt=""> <h2 id="4">3. Tolerance</h2>
+<p>By default Tol is 10% of the median face edge of the finer surface (here about 1.5 mm), which absorbs small faceting gaps. Parts that are further apart are not tied: a 5 mm gap gives no tied nodes (with a warning) unless Tol is raised. Set Tol explicitly when it matters.</p>
+<pre class="codeinput">fembd.boxSTL(fullfile(out, <span class="string">'gap.stl'</span>), [505 0 0], [1000 50 50]);
+gap = fembd.Body(fullfile(out, <span class="string">'gap.stl'</span>), steel, Size = 15, Scale = 1e-3);
+b = fembd.Assembly();  b.add(left);  b.add(gap);
+fprintf(<span class="string">'default Tol: %d nodes\n'</span>, b.tie(<span class="string">'left'</span>, <span class="string">'gap'</span>));
+fprintf(<span class="string">'Tol = 6 mm: %d nodes\n'</span>, b.tie(<span class="string">'left'</span>, <span class="string">'gap'</span>, Tol = 6e-3));
+</pre>
+<pre class="codeoutput">Warning: No slave nodes within tolerance 0.00146329. 
+default Tol: 0 nodes
+Tol = 6 mm: 105 nodes
+</pre>
+<h2 id="5">4. Partial bonding with Select</h2>
+<p>Select restricts the slave nodes, e.g. to model an adhesive layer that covers only part of the interface. Gluing only the lower half (z &lt; 25 mm) makes the joint more flexible, mostly for bending in the xz plane.</p>
+<pre class="codeinput">b = fembd.Assembly();  b.add(left);  b.add(right);
+b.tie(<span class="string">'left'</span>, <span class="string">'right'</span>, Select = @(X) X(:,3) &lt; 0.025);
+b.fix(<span class="string">'left'</span>, clampX0);
+[Kb, Mb] = b.system();  [~, fp] = fembd.modes(Kb, Mb, 2);
+fprintf(<span class="string">'half-bonded joint: f1, f2 = %.2f, %.2f Hz (fully bonded %.2f Hz)\n'</span>, fp, f(1));
+</pre>
+<pre class="codeoutput">half-bonded joint: f1, f2 = 40.60, 41.52 Hz (fully bonded 41.82 Hz)
+</pre>
+<h2 id="6">5. Elastic interfaces</h2>
+<p>With Stiffness = [kn kt] (N/m^3, per unit area) the slave nodes are connected by springs instead, normal (kn) and tangential (kt) to the master surface. This models a compliant layer such as glue, a rubber pad, or contact stiffness. A very stiff interface approaches the bonded tie.</p>
+<pre class="codeinput">kn = 10.^(10:2:16);  f1 = zeros(size(kn));
+<span class="keyword">for</span> k = 1:numel(kn)
+    b = fembd.Assembly();  b.add(left);  b.add(right);
+    b.tie(<span class="string">'left'</span>, <span class="string">'right'</span>, Stiffness = kn(k));          <span class="comment">% kt = kn</span>
+    b.fix(<span class="string">'left'</span>, clampX0);
+    [Kb, Mb] = b.system();  [~, f1(k)] = fembd.modes(Kb, Mb, 1);
+<span class="keyword">end</span>
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
+semilogx(kn, f1, <span class="string">'o-'</span>, kn, f(1) + 0*kn, <span class="string">'--'</span>);  grid <span class="string">on</span>
+xlabel(<span class="string">'interface stiffness k_n = k_t (N/m^3)'</span>);  ylabel(<span class="string">'f_1 (Hz)'</span>);
+legend(<span class="string">'elastic interface'</span>, <span class="string">'bonded tie'</span>, <span class="string">'Location'</span>, <span class="string">'southeast'</span>);
+</pre>
+<img vspace="5" hspace="5" src="tut06_ties_02.png" alt=""> <p class="footer">
+<br>
+<a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2024a</a>
+<br>
+</p>
+</div>
+<!--
+##### SOURCE BEGIN #####
+%% Tutorial 6 - Connecting bodies: ties and elastic interfaces
+% Each body is meshed separately, so the meshes do not match at an
+% interface. This tutorial covers:
+%
+% * bonded ties (exact multi-point constraints)
+% * choosing master and slave, and the |Tol| and |Select| options
+% * elastic interfaces (distributed springs) with |Stiffness|
+
+addpath(fileparts(fileparts(mfilename('fullpath'))));
+out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
+steel = fembd.material(210e9, 0.3, 7850);
+clampX0 = @(X) X(:,1) < 1e-9;
+
+% reference: one-piece cantilever
+fembd.boxSTL(fullfile(out, 'beam.stl'), [0 0 0], [1000 50 50]);
+one = fembd.Body(fullfile(out, 'beam.stl'), steel, Size = 25, Scale = 1e-3);
+a = fembd.Assembly();  a.add(one);  a.fix(1, clampX0);
+[K, M] = a.system();  [~, fRef] = fembd.modes(K, M, 6);
+
+%% 1. Two parts with non-matching meshes
+% The same beam as two halves, meshed with different element sizes.
+fembd.boxSTL(fullfile(out, 'left.stl'),  [0 0 0],   [500 50 50]);
+fembd.boxSTL(fullfile(out, 'right.stl'), [500 0 0], [1000 50 50]);
+left  = fembd.Body(fullfile(out, 'left.stl'),  steel, Size = 25, Scale = 1e-3);
+right = fembd.Body(fullfile(out, 'right.stl'), steel, Size = 15, Scale = 1e-3);
+
+%% 2. Bonded tie
+% |a.tie(master, slave)| takes the slave's surface nodes that lie within
+% Tol of the master surface, and constrains each one to the point of the
+% master face it touches:
+%
+%   u_slave = sum_j N_j(xi) u_master,j
+%
+% The constraint is exact (no penalty) and is removed in T. Use the finer
+% mesh as slave, so that every slave node has a master face to follow.
+a = fembd.Assembly();  a.add(left);  a.add(right);
+ns = a.tie('left', 'right');
+a.fix('left', clampX0);
+[K, M, T] = a.system();  [V, f] = fembd.modes(K, M, 6);
+fprintf('%d slave nodes tied\n', ns);
+disp(table(fRef, f, 'VariableNames', {'one_piece_Hz', 'tied_Hz'}));
+
+% The tied nodes are stored in a.Links (global node numbers):
+L = a.Links(1);  X = a.X;
+figure('Color', 'w');  a.plot();  hold on
+plot3(X(L.slave,1), X(L.slave,2), X(L.slave,3), 'k.', 'MarkerSize', 12);
+title('Tied slave nodes');  hold off
+
+%% 3. Tolerance
+% By default Tol is 10% of the median face edge of the finer surface (here
+% about 1.5 mm), which absorbs small faceting gaps. Parts that are further
+% apart are not tied: a 5 mm gap gives no tied nodes (with a warning)
+% unless Tol is raised. Set Tol explicitly when it matters.
+fembd.boxSTL(fullfile(out, 'gap.stl'), [505 0 0], [1000 50 50]);
+gap = fembd.Body(fullfile(out, 'gap.stl'), steel, Size = 15, Scale = 1e-3);
+b = fembd.Assembly();  b.add(left);  b.add(gap);
+fprintf('default Tol: %d nodes\n', b.tie('left', 'gap'));
+fprintf('Tol = 6 mm: %d nodes\n', b.tie('left', 'gap', Tol = 6e-3));
+
+%% 4. Partial bonding with Select
+% Select restricts the slave nodes, e.g. to model an adhesive layer that
+% covers only part of the interface. Gluing only the lower half (z < 25 mm)
+% makes the joint more flexible, mostly for bending in the xz plane.
+b = fembd.Assembly();  b.add(left);  b.add(right);
+b.tie('left', 'right', Select = @(X) X(:,3) < 0.025);
+b.fix('left', clampX0);
+[Kb, Mb] = b.system();  [~, fp] = fembd.modes(Kb, Mb, 2);
+fprintf('half-bonded joint: f1, f2 = %.2f, %.2f Hz (fully bonded %.2f Hz)\n', fp, f(1));
+
+%% 5. Elastic interfaces
+% With Stiffness = [kn kt] (N/m^3, per unit area) the slave nodes are
+% connected by springs instead, normal (kn) and tangential (kt) to the
+% master surface. This models a compliant layer such as glue, a rubber pad,
+% or contact stiffness. A very stiff interface approaches the bonded tie.
+kn = 10.^(10:2:16);  f1 = zeros(size(kn));
+for k = 1:numel(kn)
+    b = fembd.Assembly();  b.add(left);  b.add(right);
+    b.tie('left', 'right', Stiffness = kn(k));          % kt = kn
+    b.fix('left', clampX0);
+    [Kb, Mb] = b.system();  [~, f1(k)] = fembd.modes(Kb, Mb, 1);
+end
+figure('Color', 'w');
+semilogx(kn, f1, 'o-', kn, f(1) + 0*kn, 'REPLACE_WITH_DASH_DASH');  grid on
+xlabel('interface stiffness k_n = k_t (N/m^3)');  ylabel('f_1 (Hz)');
+legend('elastic interface', 'bonded tie', 'Location', 'southeast');
+
+##### SOURCE END #####
+-->
+</body>
+</html>

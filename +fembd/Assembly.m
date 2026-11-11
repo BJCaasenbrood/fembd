@@ -288,27 +288,29 @@ methods
     %   is supported) is a cut joint: its constrained directions give rows
     %   C*q = 0, removed by rank-revealing QR coordinate partitioning, which
     %   also drops redundant rows (e.g. planar loops in 3D).
-        n = a.nDof;  off = a.offsets;
+        n = a.nDof;
         S = zeros(0, 1);  R = sparse(0, n);
         for k = 1:numel(a.Refs)                  % nodes following a reference point
-            [g, X] = a.refNodes(k);  r = a.refDofs(k);
-            nn = numel(g);  d = X - a.refPoint(k);  j = 3*(0:nn-1)';
+            [g, Xn] = a.refNodes(k);  r = a.refDofs(k);
+            nn = numel(g);  d = Xn - a.refPoint(k);  j = 3*(0:nn-1)';
             S = [S; reshape(3*g' - [2; 1; 0], [], 1)];                    %#ok<AGROW>
             R = [R; sparse([j+1; j+2; j+3; j+1; j+1; j+2; j+2; j+3; j+3], ...
                            repelem(r([1 2 3 5 6 4 6 4 5]), nn), ...
                            [ones(3*nn, 1); d(:,3); -d(:,2); -d(:,3); d(:,1); d(:,2); -d(:,1)], ...
                            3*nn, n)];                                     %#ok<AGROW>
         end
-        skew = @(v) [0 -v(3) v(2); v(3) 0 -v(1); -v(2) v(1) 0];
         fixed = a.fixedDofs();  cut = a.cutJoints(fixed);  Cc = sparse(0, n);
         for k = 1:numel(a.Joints)
             J = a.Joints(k);  E = eye(6);  Rh = blkdiag(J.R, J.R);
-            Pinv = [eye(3), skew(J.p - a.refPoint(J.B)); zeros(3), eye(3)];
-            G = sparse(6, n);                    % relative motion at p: P_B q_B - P_A q_A
-            G(:, a.refDofs(J.B)) = inv(Pinv);
-            if J.A > 0
-                G(:, a.refDofs(J.A)) = -[eye(3), -skew(J.p - a.refPoint(J.A)); zeros(3), eye(3)];
+            Pinv = [eye(3), hat(J.p - a.refPoint(J.B)); zeros(3), eye(3)];
+            if J.A > 0                           % relative motion at p: P_B q_B - P_A q_A
+                PA = [eye(3), -hat(J.p - a.refPoint(J.A)); zeros(3), eye(3)];
+                cols = [a.refDofs(J.B); a.refDofs(J.A)];  blk = [inv(Pinv), -PA];
+            else
+                cols = a.refDofs(J.B);  blk = inv(Pinv);
             end
+            [ii, jj] = ndgrid(1:6, 1:numel(cols));
+            G = sparse(ii, cols(jj), blk, 6, n);
             if ~cut(k)                           % q_B = P_B^-1 (P_A q_A + R E s)
                 Rk = -Pinv*G;  Rk(:, a.refDofs(J.B)) = 0;
                 Rk(:, a.jointDofs(k)) = Pinv*Rh*E(:, J.free);
@@ -539,11 +541,11 @@ methods
         if opts.StaticCorrection && size(V, 2) < n && ~isempty(B)
             lam = (2*pi*f).^2;                   % quasi-static shapes; shifted if K is singular
             sigma = 0;  if lam(1) < 1e-8*lam(end), sigma = -1e-6*lam(end); end
-            X = (K - sigma*M)\full(B);
-            X = X - V*(V'*(M*X));                % keep only the part the modes miss
-            [P, S] = eig((X'*M*X + (X'*M*X)')/2, 'vector');
+            Xs = (K - sigma*M)\full(B);
+            Xs = Xs - V*(V'*(M*Xs));             % keep only the part the modes miss
+            [P, S] = eig((Xs'*M*Xs + (Xs'*M*Xs)')/2, 'vector');
             keep = S > 1e-12*max([S; eps]);
-            W = [V, X*P(:,keep)./sqrt(S(keep))'];
+            W = [V, Xs*P(:,keep)./sqrt(S(keep))'];
         end
         Kr = full(W'*K*W);  Mr = full(W'*M*W);
         [P, lam] = eig((Kr + Kr')/2, (Mr + Mr')/2, 'vector');
@@ -599,31 +601,12 @@ methods
     %   or a marker for a point mass. See also animate.
         if nargin < 2 || isempty(u), u = zeros(a.nDof, 1); end
         if nargin < 3, scale = 1; end
-        off = a.offsets;  U = reshape(u(1:3*off(end)), 3, [])';  c = lines(numel(a.Bodies));
-        h = gobjects(1, numel(a.Bodies));
-        held = ishold;  hold on
-        for i = 1:numel(a.Bodies)
-            b = a.Bodies{i};  Ui = U(off(i)+1:off(i+1), :);  F = b.F;
-            if isempty(F)                                 % point mass: marker
-                [~, k] = a.lookup(b, true);  x = b.Ref;  d = a.refDofs(k);
-                if any(u), x = x + scale*u(d(1:3))'; end
-                h(i) = plot3(x(1), x(2), x(3), 'ko', 'MarkerFaceColor', c(i,:), 'MarkerSize', 8);
-                continue
-            end
-            if size(F, 2) == 6
-                F = [F(:,[1 4 6]); F(:,[4 2 5]); F(:,[6 5 3]); F(:,[4 5 6])];
-            end
-            if any(u)                                     % colour by |u|
-                C = vecnorm(Ui, 2, 2);
-            else                                          % one colour per body
-                C = repmat(c(i,:), b.nNode, 1);
-            end
-            h(i) = patch('Faces', F, 'Vertices', b.X + scale*Ui, 'FaceVertexCData', C, ...
-                         'FaceColor', 'interp', 'LineStyle', 'none');
+        [X0, U] = a.bodyMotion(u);  c = lines(numel(a.Bodies));  C = num2cell(c, 2)';
+        if any(u)                                         % colour by |u|
+            has = ~cellfun(@(b) isempty(b.F), a.Bodies);
+            C(has) = cellfun(@(d) vecnorm(d, 2, 2), U(has), 'UniformOutput', false);
         end
-        if ~held, hold off, end
-        axis equal;  view(3);  shading interp
-        if isempty(findobj(gca, 'Type', 'light')), camlight, end
+        h = drawBodies(a.Bodies, cellfun(@(x, d) x + scale*d, X0, U, 'UniformOutput', false), C);
         if nargout == 0, clear h, end
     end
 
@@ -657,9 +640,8 @@ methods
             opts.Title = []
         end
         assert(numel(u) == a.nDof, 'fembd:animate', 'u must have a.nDof = %d entries.', a.nDof);
-        off = a.offsets;  nU = 3*off(end);
-        umax = max(abs(u(1:nU)));
-        sc = opts.Amplitude/max(umax, eps);
+        off = a.offsets;
+        sc = opts.Amplitude/max(max(abs(u(1:3*off(end)))), eps);
         cla;  h = a.plot(u, sc);  axis manual
         ttl = char(opts.Title);                   % e.g. 'Mode 4', completed with the frequency
         if ~isempty(opts.Frequency)
@@ -671,31 +653,9 @@ methods
             if isempty(ttl), ttl = ft; else, ttl = [ttl ': ' ft]; end
         end
         if ~isempty(ttl), title(ttl); end
-
-        U = reshape(u(1:nU), 3, [])';
-        pos = cell(1, numel(a.Bodies));  shape = pos;   % rest positions and mode shapes
-        for i = 1:numel(a.Bodies)
-            b = a.Bodies{i};
-            if isempty(b.F)                               % point mass: its reference point
-                [~, k] = a.lookup(b, true);  d = a.refDofs(k);
-                pos{i} = b.Ref;  shape{i} = u(d(1:3))';
-            else
-                pos{i} = b.X;    shape{i} = U(off(i)+1:off(i+1), :);
-            end
-        end
-        t0 = tic;
-        while toc(t0) < opts.Duration && all(isvalid(h))
-            s = sc*sin(2*pi*opts.Rate*toc(t0));
-            for i = 1:numel(h)
-                x = pos{i} + s*shape{i};
-                if isa(h(i), 'matlab.graphics.primitive.Patch')
-                    set(h(i), 'Vertices', x);
-                else
-                    set(h(i), 'XData', x(1), 'YData', x(2), 'ZData', x(3));
-                end
-            end
-            drawnow;
-        end
+        [X0, U] = a.bodyMotion(u);
+        playback(h, opts.Duration, @(s) setVertices(h, cellfun(@(x, d) x + sc*sin(2*pi*opts.Rate*s)*d, ...
+                                                       X0, U, 'UniformOutput', false)));
     end
 end
 
@@ -716,24 +676,55 @@ methods (Access = {?fembd.Model})          % private, shared with the nonlinear 
         spec = struct('Name', name, 'id', {id}, 'nodes', nodes, 'dirs', dirs);
     end
 
+    function sig = signals(a, specs)
+    % Expand input/output selections into one signal per direction: Name
+    % (name, or name_dir if there are several), kind ('joint', 'ref' or
+    % 'body'), index, dir, nodes (node sets) and type.
+        sig = struct('Name', {}, 'kind', {}, 'idx', {}, 'dir', {}, 'nodes', {}, 'type', {});
+        for s = specs
+            [kind, k] = a.lookup(s.id, isempty(s.nodes));
+            dirs = s.dirs;
+            if isempty(dirs) && strcmp(kind, 'joint'), dirs = 1:nnz(a.Joints(k).free); end
+            if isempty(dirs), dirs = 1:6; end
+            type = 'displacement';  if isfield(s, 'type'), type = s.type; end
+            for d = dirs(:)'
+                name = s.Name;  if numel(dirs) > 1, name = sprintf('%s_%d', s.Name, d); end
+                sig(end+1) = struct('Name', name, 'kind', kind, 'idx', k, 'dir', d, ...
+                                    'nodes', s.nodes, 'type', type);                 %#ok<AGROW>
+            end
+        end
+    end
+
     function [W, names, type] = ioColumns(a, specs)
     % One column per signal: unit weights on the selected dofs (node sets:
     % split equally over the nodes).
-        W = sparse(a.nDof, 0);  names = {};  type = {};
-        for s = specs
-            if isempty(s.nodes)
-                d = a.dof(s.id, [], s.dirs);  cols = num2cell(d');
-                dirs = s.dirs;  if isempty(dirs), dirs = 1:numel(d); end
-            else
-                dirs = s.dirs;
-                cols = arrayfun(@(k) a.dof(s.id, s.nodes, k), dirs, 'UniformOutput', false);
+        sig = a.signals(specs);  d = cell(1, numel(sig));
+        for c = 1:numel(sig)
+            s = sig(c);
+            switch s.kind
+                case 'joint', dk = a.jointDofs(s.idx);  d{c} = dk(s.dir);
+                case 'ref',   dk = a.refDofs(s.idx);    d{c} = dk(s.dir);
+                otherwise,    d{c} = a.dof(s.idx, s.nodes, s.dir);
             end
-            for c = 1:numel(cols)
-                d = cols{c};
-                W(:, end+1) = sparse(d, 1, 1/numel(d), a.nDof, 1);       %#ok<AGROW>
-                names{end+1} = s.Name;                                     %#ok<AGROW>
-                if numel(cols) > 1, names{end} = sprintf('%s_%d', s.Name, dirs(c)); end
-                if isfield(s, 'type'), type{end+1} = s.type; end           %#ok<AGROW>
+        end
+        nd = cellfun(@numel, d);
+        W = sparse(vertcat(zeros(0, 1), d{:}), repelem(1:numel(sig), nd)', repelem(1./nd, nd)', ...
+                   a.nDof, numel(sig));
+        names = {sig.Name};  type = {sig.type};
+    end
+
+    function [X0, U] = bodyMotion(a, u)
+    % Rest positions X0{i} and displacements U{i} (from u) of the nodes of
+    % each body; a point mass is represented by its reference point.
+        off = a.offsets;  n = numel(a.Bodies);  X0 = cell(1, n);  U = X0;
+        Uall = reshape(u(1:3*off(end)), 3, [])';
+        for i = 1:n
+            b = a.Bodies{i};
+            if isempty(b.F)
+                [~, k] = a.lookup(b, true);  d = a.refDofs(k);
+                X0{i} = b.Ref;  U{i} = u(d(1:3))';
+            else
+                X0{i} = b.X;  U{i} = Uall(off(i)+1:off(i+1), :);
             end
         end
     end
@@ -832,12 +823,12 @@ methods (Access = {?fembd.Model})          % private, shared with the nonlinear 
             'Joint ends must be rigid bodies, couplings (a.couple) or ''ground''.');
     end
 
-    function [g, X] = refNodes(a, k)
+    function [g, Xn] = refNodes(a, k)
     % Global indices and coordinates of the nodes following reference k.
-        r = a.Refs(k);  i = find(cellfun(@(b) b == r.body, a.Bodies));  off = a.offsets;
+        r = a.Refs(k);  off = a.offsets;
         nodes = r.nodes;
         if isempty(nodes), nodes = (1:r.body.nNode)'; end
-        g = off(i) + nodes;  X = r.body.X(nodes,:);
+        g = off(a.refBody(k)) + nodes;  Xn = r.body.X(nodes,:);
     end
 
     function x = refPoint(a, k)
@@ -884,13 +875,6 @@ methods (Access = {?fembd.Model})          % private, shared with the nonlinear 
         G = sparse(rows(:), cols(:), vals(:), 3*numel(L.slave), a.nDof);
     end
 end
-end
-
-function [R, t] = jointMotion(J, v)
-% Finite rigid motion of a joint about its point: x -> R*(x - p) + p + t.
-s = zeros(6, 1);  s(J.free) = v;
-t = J.R*s(1:3);  w = J.R*s(4:6);
-R = expm([0 -w(3) w(2); w(3) 0 -w(1); -w(2) w(1) 0]);
 end
 
 function [T2, keep] = partition(C, order)

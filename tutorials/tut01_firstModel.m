@@ -1,74 +1,91 @@
-%% Tutorial 1 - Your first model: a cantilever beam
+%% Tutorial 1 - Your first model: a two-link arm with an elastic forearm
 % This tutorial goes through the basic workflow:
 %
-% # geometry (STL) -> |fembd.Body| (mesh + material)
-% # bodies -> |fembd.Assembly| (supports, connections)
-% # |a.system()| -> stiffness K and mass M -> |fembd.modes|
+% # geometry (STL) -> |fembd.Body|: rigid, or elastic (Gmsh mesh + material)
+% # bodies -> |fembd.Assembly|: joints, couplings, inputs and outputs
+% # |a.nonlinear()| -> |simulate|: large motion with a controller in the loop
+% # |a.system()|, |a.statespace()|: linear analysis about a pose
 %
-% The result is checked against Euler-Bernoulli beam theory.
+% The arm moves in the horizontal plane (a SCARA arm): a rigid upper arm on
+% a shoulder joint, and an elastic aluminium forearm on an elbow joint, both
+% driven by a motor torque under PD control. Gravity bends the forearm.
 % Run it section by section (Ctrl+Enter), or render it with
 % |publish('tut01_firstModel')|.
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));     % toolbox root
-out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
+tmp = tempname;  mkdir(tmp);
 
-%% 1. Geometry
-% Any closed (watertight) STL works, for example a CAD export. Here we write
-% a 1000 x 50 x 50 mm steel beam. STL files have no units: we model in
-% millimetres and convert to metres when the body is created.
-file = fullfile(out, 'beam.stl');
-fembd.boxSTL(file, [0 0 0], [1000 50 50]);
+%% 1. Geometry and bodies
+% Two boxes as STL files (in m). The upper arm is rigid: its mesh only gives
+% its mass, inertia and surface. The forearm is elastic: Gmsh meshes it with
+% quadratic Tet10 elements.
+fembd.boxSTL(fullfile(tmp, 'upper.stl'),   [0 -0.02 -0.01],     [0.3 0.02 0.01]);
+fembd.boxSTL(fullfile(tmp, 'forearm.stl'), [0.3 -0.015 -0.005], [0.6 0.015 0.005]);
+steel = fembd.material(210e9, 0.30, 7850);
+alu   = fembd.material(70e9,  0.33, 2700);
 
-%% 2. Material and body
-% |fembd.material(E, nu, rho)| gives an isotropic linear-elastic material, in
-% SI units. |fembd.Body| meshes the STL with Gmsh:
-%
-% * |Size|  - maximum element size, in STL units (mm here)
-% * |Order| - 2 = quadratic Tet10 elements (default), 1 = linear Tet4
-% * |Scale| - coordinate factor applied after meshing (mm -> m)
-steel = fembd.material(210e9, 0.3, 7850);
-beam  = fembd.Body(file, steel, Size = 25, Scale = 1e-3);
-fprintf('%s: %d nodes, %d Tet%d elements\n', beam.Name, beam.nNode, ...
-        size(beam.T, 1), size(beam.T, 2));
+upper   = fembd.Body(fullfile(tmp, 'upper.stl'),   steel, Size = 0.02, Rigid = true, Name = 'upper');
+forearm = fembd.Body(fullfile(tmp, 'forearm.stl'), alu,   Size = 0.006, Name = 'forearm');
+fprintf('upper arm: %.2f kg (rigid); forearm: %.3f kg, %d nodes\n', ...
+        upper.massProperties(), forearm.massProperties(), forearm.nNode);
 
-%% 3. Assembly and supports
-% An assembly holds the bodies and everything that connects or supports
-% them. Here there is one body, clamped at x = 0. Nodes are selected with a
-% function of their coordinates X (n x 3, in metres after scaling).
+%% 2. Assembly: joints, couplings, inputs and outputs
+% Joints connect reference points: a rigid body, or a patch of an elastic
+% body made rigid by a coupling. The forearm gets couplings at its root
+% (the elbow) and at its tip (the payload point).
 a = fembd.Assembly();
-a.add(beam);
-a.fix('beam', @(X) X(:,1) < 1e-9);       % all 3 directions of the x = 0 face
+a.add(upper);  a.add(forearm);
+a.couple('forearm', @(X) X(:,1) < 0.3 + 1e-6, Name = 'root', Point = [0.3 0 0]);
+a.couple('forearm', @(X) X(:,1) > 0.6 - 1e-6, Name = 'tip');
+a.joint('ground', 'upper', 'revolute', Point = [0 0 0],   Name = 'shoulder');   % about z
+a.joint('upper',  'root',  'revolute', Point = [0.3 0 0], Name = 'elbow');
 
-figure('Color', 'w');  a.plot();  title('Mesh');
+% motor torques on the joints, and sensors: joint angles and rates, and the
+% vertical tip motion (the forearm's bending)
+a.input('tau1', 'shoulder');  a.input('tau2', 'elbow');
+a.output('th1', 'shoulder');  a.output('w1', 'shoulder', Type = 'velocity');
+a.output('th2', 'elbow');     a.output('w2', 'elbow',    Type = 'velocity');
+a.output('tipz', 'tip', [], 3);
 
-%% 4. System matrices
-% |a.system()| assembles K and M and removes all constraints. The full
-% displacement vector u (3 dofs per node, [ux1 uy1 uz1 ux2 ...]) is related
-% to the independent dofs q by u = T*q. K and M are already reduced:
-% K = T'*Kfull*T and M = T'*Mfull*T.
+%% 3. Nonlinear simulation with a controller in the loop
+% |a.nonlinear| builds the nonlinear model: exact joint kinematics for large
+% angles, and the forearm's deformation by a few Craig-Bampton modes in a
+% frame that moves with it. |simulate| integrates in time; the controller
+% |Input = @(t, y)| gets the outputs of the previous step.
+m = a.nonlinear(Gravity = [0 0 -9.81], Modes = 6);
+
+ref = [1.0; -1.5];                                     % target angles (rad)
+kp  = [16; 1.5];  kd = [1.8; 0.15];                    % PD gains (about 2 Hz bandwidth)
+pd  = @(t, y) kp.*(ref - [y.th1; y.th2]) - kd.*[y.w1; y.w2];
+[t, y, x] = m.simulate([0 1.5], Step = 5e-4, Input = pd);
+
+figure('Color', 'w');
+subplot(2, 1, 1);  plot(t, [y.th1 y.th2], 'LineWidth', 1.5);  grid on
+ylabel('angle (rad)');  legend('shoulder', 'elbow', 'Location', 'east');
+subplot(2, 1, 2);  plot(t, 1e6*y.tipz, 'LineWidth', 1.5);  grid on
+xlabel('time (s)');  ylabel('tip z (\mum)');  title('forearm bending: gravity sag and vibration');
+fprintf('final angles %.3f, %.3f rad (targets %.1f, %.1f)\n', y.th1(end), y.th2(end), ref);
+
+%% 4. Energy and animation
+% |energy| splits the energy into kinetic, gravity, strain and spring
+% parts. |animate| plays the motion in real time (|Rate|); |Scale|
+% magnifies the deformation.
+E = m.energy(x);
+fprintf('largest strain energy in the forearm: %.2e J\n', max(E.strain));
+figure('Color', 'w');
+m.animate(t, x, Rate = 1, Scale = 200, Title = 'SCARA arm');
+
+%% 5. Linear analysis about a pose
+% The same assembly gives the linear finite-element model about its current
+% pose: all constraints are eliminated with u = T*q, and K and M are the
+% stiffness and mass in the independent dofs q. The two joint angles are
+% free, so the first two modes are rigid-body (mechanism) modes at 0 Hz.
 [K, M, T] = a.system();
-fprintf('full dofs: %d, independent dofs: %d\n', a.nDof, size(K, 1));
-
-%% 5. Natural frequencies
-% |fembd.modes| returns the lowest frequencies (Hz) and mass-normalised mode
-% shapes (V'*M*V = I).
 [V, f] = fembd.modes(K, M, 6);
 disp(table((1:6)', f, 'VariableNames', {'mode', 'f_Hz'}));
 
-%% 6. Check against beam theory
-% For a clamped-free beam: f_n = lambda_n^2/(2 pi) sqrt(E I/(rho A L^4)),
-% with lambda_1 = 1.8751 and lambda_2 = 4.6941. The square section gives
-% pairs of equal bending frequencies in y and z.
-L = 1;  h = 0.05;  I = h^4/12;  A = h^2;
-fEB = [1.875104 4.694091].^2/(2*pi)*sqrt(steel.E*I/(steel.rho*A*L^4));
-fprintf('1st bending: FE %.2f Hz, Euler-Bernoulli %.2f Hz\n', f(1), fEB(1));
-fprintf('2nd bending: FE %.2f Hz, Euler-Bernoulli %.2f Hz\n', f(3), fEB(2));
-% The second mode is slightly lower in FE because Euler-Bernoulli ignores
-% shear deformation and rotary inertia.
-
-%% 7. Plot a mode
-% Map q back to the full vector u = T*q and plot it. The second argument
-% scales the deformation (here: largest displacement = 0.1 m).
-u = T*V(:,1);
-figure('Color', 'w');
-a.plot(u, 0.1/max(abs(u)));  title(sprintf('Mode 1: %.1f Hz', f(1)));
+% the state-space model from the motor torques to the sensors (for control
+% design, see Tutorial 9 and the manual)
+sys = a.statespace(Modes = 10, Damping = 0.01);
+fprintf('state-space model: %d states, inputs %s, outputs %s\n', size(sys.A, 1), ...
+        strjoin(sys.InputName, ', '), strjoin(sys.OutputName, ', '));

@@ -1,46 +1,124 @@
 # fembd — reference manual
 
-`fembd` builds linear-elastic finite-element models of STL assemblies in MATLAB. Each part is
-meshed separately with Gmsh, as Tet4 or Tet10 elements. Parts can be elastic or rigid and are
-connected by bonded ties or elastic joints. The output is the sparse stiffness K and mass M,
-for modal, harmonic, transient or reduced-order analysis.
+`fembd` models assemblies of STL parts as multibody systems with rigid and elastic bodies. Each
+elastic part is meshed with Gmsh (Tet4 or Tet10) and reduced to a few modes in a moving frame;
+parts are connected by joints, couplings, ties, springs, dampers and transmissions. The same
+model gives two analyses:
+
+- **Nonlinear simulation** (`a.nonlinear`): large motions with exact joint kinematics, gravity,
+  controllers in the loop and elastic deformation (§2).
+- **Linear analysis about a pose** (`a.system`, `a.statespace`): the full finite-element model
+  for modes, frequency responses, statics, state-space models for control and Craig–Bampton
+  reduction (§3–§5).
 
 New to the toolbox? Start with the tutorials in [`../tutorials`](../tutorials/README.md).
 
-Contents: [1 Workflow](#1-workflow) · [2 Formulation](#2-formulation) ·
-[3 API](#3-api) · [4 Recipes](#4-recipes) · [5 Nonlinear model](#5-nonlinear-model-large-rotations) · [6 Limitations](#6-limitations)
+Contents: [1 Workflow](#1-workflow) · [2 Nonlinear model](#2-nonlinear-model-large-rotations) ·
+[3 Formulation](#3-formulation) · [4 API](#4-api) · [5 Linear analysis](#5-linear-analysis) ·
+[6 Limitations](#6-limitations)
 
 ---
 
 ## 1 Workflow
 
 ```matlab
-steel = fembd.material(210e9, 0.30, 7850);                     % E, nu, rho (SI)
-base  = fembd.Body('base.stl',  steel, Size = 8, Scale = 1e-3); % mesh in mm, model in m
-arm   = fembd.Body('arm.stl',   steel, Size = 4, Scale = 1e-3);
-tool  = fembd.Body('tool.stl',  struct('rho', 2700), Scale = 1e-3, Rigid = true);
+steel = fembd.material(210e9, 0.30, 7850);                          % E, nu, rho (SI)
+base  = fembd.Body.rigidSurface('base.stl', 7850, Scale = 1e-3);   % rigid, from its STL surface
+link  = fembd.Body.rigidSurface('link.stl', 7850, Scale = 1e-3);
+tool  = fembd.Body('tool.stl', steel, Size = 4, Scale = 1e-3);      % elastic, meshed with Gmsh
 
 a = fembd.Assembly();
-a.add(base);  a.add(arm);  a.add(tool);
-a.tie('base', 'arm');                         % bonded interface
-a.tie('arm', 'tool', Stiffness = 1e13);       % elastic joint (N/m^3)
-a.fix('base', @(X) X(:,3) < 1e-9);            % clamp the bottom face
+a.add(base);  a.add(link);  a.add(tool);
+a.fix('base', [], 1:6);
+a.joint('base', 'link', 'revolute', Point = [0 0 0], Name = 'shoulder');
+h = a.couple('tool', @(X) X(:,1) < 0.201);                  % rigid patch at the flange
+a.joint('link', h, 'fixed');
+a.input('tau', 'shoulder');
+a.output('th', 'shoulder');  a.output('w', 'shoulder', Type = 'velocity');
 
+% nonlinear simulation: large motion, PD controller in the loop
+m = a.nonlinear(Gravity = [0 0 -9.81]);
+[t, y, x] = m.simulate([0 1], Input = @(t, y) 80*(1 - y.th) - 8*y.w);
+m.animate(t, x);
+
+% linear analysis about the current pose
 [K, M, T] = a.system();                       % reduced system, u = T*q
-[V, f] = fembd.modes(K, M, 10);                 % f in Hz
-a.plot(T*V(:,1), 0.01);                       % deformed shape of mode 1
+[V, f] = fembd.modes(K, M, 10);               % f in Hz
+sys = a.statespace(Modes = 20);               % inputs -> outputs, for control design
 ```
 
 A model goes through three stages:
-1. **Bodies:** mesh plus material, each with its own local K and M.
-2. **Assembly:** the bodies with their connections and supports. The *full* dof vector `u` stacks every node dof of every body.
-3. **System:** constraints are eliminated with `u = T*q`, leaving independent dofs `q` and `K_q = T'*K*T`, `M_q = T'*M*T`.
+1. **Bodies:** mesh plus material (elastic), or mass properties (rigid).
+2. **Assembly:** the bodies with their connections, supports, inputs and outputs.
+3. **Analysis:** `a.nonlinear()` for large motions (§2), or the linear system about the current
+   pose (§3–§5): constraints are eliminated with `u = T*q`, leaving independent dofs `q` and
+   `K_q = T'*K*T`, `M_q = T'*M*T`.
 
 ---
 
-## 2 Formulation
+## 2 Nonlinear model (large rotations)
 
-### 2.1 Elements
+`m = a.nonlinear(Gravity = [0 0 -9.81])` turns the same assembly into a nonlinear multibody model
+(`fembd.Model`) for large rotations, e.g. a robot arm moving through its workspace. The linear
+model (`a.statespace`) stays the tool for frequency-domain analysis about one pose.
+```matlab
+m = a.nonlinear(Gravity = [0 0 -9.81]);
+[t, y, x] = m.simulate([0 2], Step = 1e-3, ...
+    Input = @(t, y) [KP1*(r1(t) - y.enc1); KP2*(r2(t) - y.enc2)]);   % controller in the loop
+plot(t, y.th1);  m.animate(t, x, Rate = 0.5);                         % half speed
+```
+- **Coordinates:** each rigid body has a frame at its centre of mass: position `r` (world) and
+  rotation `R`, with velocities `[v (world); ω (body)]`. The mass matrix is constant
+  (`diag(m I, J)`), with gyroscopic forces `ω × Jω`.
+- **Elastic bodies** use a floating frame of reference. The frame follows the body's first
+  coupling; the deformation in that frame is described by Craig–Bampton modes (first coupling
+  clamped, the other couplings as interfaces, plus `Modes` fixed-interface modes, default 10):
+  `x = r + R(X₀ + Φη)`. The mass matrix `M(η)`, the centrifugal and Coriolis forces and gravity
+  follow from precomputed inertia invariants `Q_ab = U_aᵀ M U_b`, `U = [X₀, Φ]`, so the cost per
+  step does not depend on the mesh size. Stiffness and Rayleigh damping are the reduced
+  `Vᵀ K V` and `Vᵀ D V`. Couplings move and rotate with the modes, so joints on them deform with
+  the body. Large rotations are exact; the deformation is linear (no stiffening by centrifugal
+  or gravity preload, which matters only for fast-spinning slender parts).
+- **Joints and supports** are exact nonlinear constraints `g(q) = 0` with Lagrange multipliers.
+  Locked translations: the components of the joint offset in the frame on A. Locked rotations:
+  dot products of frame axes (a revolute joint keeps its axes aligned at any angle). Redundant
+  constraints (e.g. a fixed body that also has a joint to ground) are detected at the start
+  (rank-revealing QR) and dropped.
+- **Forces:** gravity, joint springs and dampers, elastic transmissions, and the inputs (joint
+  forces/torques; forces and moments on rigid bodies, world axes). Rigid transmissions and
+  supported joints are constraints.
+- **Coordinates of joints** are measured from the configuration in which the joint was created
+  (as in `pose`): translations in the joint frame, rotations as the rotation vector of B relative
+  to A (for a revolute joint: the angle). Joint springs are relaxed there. Transmissions are
+  relaxed (elastic) or held (rigid) at the initial configuration. Reference-point outputs are the
+  displacement of the point and the rotation vector of the body, from the initial configuration.
+- **Time integration:** generalised-α on the Lie group R³ × SO(3) of each body, with Newton
+  iterations. Positions satisfy the constraints at every step; velocities are projected onto
+  them. `Rho` (default 0.8) sets the numerical damping of high frequencies (1: none).
+- **Inputs** come from `Input = @(t, y)`, evaluated with the outputs of the previous step: a
+  controller sampled at the time step. Initial joint velocities: `Rates = struct('joint', v)`.
+- **Signals:** joint coordinates, reference points (rigid bodies, couplings) and node sets
+  (average displacement, world axes; forces split over the nodes). `m.energy(x)` gives the
+  kinetic, gravity, strain and spring energies; `m.animate(t, x, Scale = 100)` magnifies the
+  deformation.
+- **Limits:** an elastic body needs at least one coupling (its frame); ties and supports on
+  body nodes are not supported (support a coupling instead); displacement and velocity outputs.
+
+Verified against the Lagrange equations of a double pendulum, the exact (linear) solution of a
+damped belt drive at large angles, a rigid transmission under a constant torque, a heavy top
+(energy, Euler equations) and free fall; elastic bodies against the linear model (cantilever
+with a tip mass on its second coupling, node-set output), a stiff flexible pendulum against the
+rigid one, energy conservation of a soft flexible pendulum, and the kinetic energy from the
+invariants against the nodal `½ ẋᵀ M ẋ`. All converge at second order in the time step.
+
+---
+
+## 3 Formulation
+
+The elements, connections and constraint elimination of the linear system. The nonlinear model
+(§2) uses the same elements and connections, with each elastic body reduced to its modes.
+
+### 3.1 Elements
 Bodies are discretised with isoparametric Tet4 or Tet10 elements, using Gmsh node ordering.
 Small-strain elasticity, with Voigt strain `ε = [εxx εyy εzz γyz γxz γxy]` (engineering shear)
 and `σ = D ε`:
@@ -64,7 +142,7 @@ quadrature point.
 is scaled so the element's total mass is preserved. Plain row-sum lumping is not used because it
 gives negative corner masses for Tet10.
 
-### 2.2 Bonded ties (multi-point constraints)
+### 3.2 Bonded ties (multi-point constraints)
 `tie(master, slave)` finds the slave surface nodes that lie within `Tol` of the master surface.
 Each such node *s* is projected onto its closest master face, at barycentric point ξ, and
 constrained to follow the face:
@@ -76,7 +154,7 @@ no penalty parameter, and lets bodies with non-matching meshes be joined. Make t
 slave. When a node is a slave in one tie and a master in another, the chain is resolved
 automatically.
 
-### 2.3 Elastic interfaces
+### 3.3 Elastic interfaces
 `tie(..., Stiffness = [kn kt])` uses the same projection to define the gap `g = G u`, i.e.
 `u_s − Σ N_j u_m,j`, and adds a distributed spring layer to K:
 
@@ -87,7 +165,7 @@ $$K \mathrel{+}= G^\top D_s G, \qquad
 - `A_i` is the slave nodal area, using HRZ weights for Tri6 faces.
 - A scalar `Stiffness` sets `kn = kt`.
 
-### 2.4 Rigid bodies
+### 3.4 Rigid bodies
 A rigid body has 6 reference dofs, `[ux uy uz rx ry rz]`, at its reference point `x_r`. Every one
 of its nodes follows that motion (small rotations):
 
@@ -111,7 +189,7 @@ of an *elastic* body, such as a bore or an end face. This gives the set a 6-dof 
 its centroid, or at `Point`. The coupled patch moves rigidly; the rest of the body stays elastic.
 Rigid bodies and couplings are both called *reference points*.
 
-### 2.5 Joints
+### 3.5 Joints
 A joint connects reference point B to reference point A, or to ground, at point `p` with frame
 `R = [e_x e_y e_z]`. The motion of a reference point at `p` is
 `w(p) = P q`, with `P = [I −[p − x_r]×; 0 I]`. The joint requires
@@ -125,7 +203,7 @@ joint coordinates.
 - A `Stiffness` on the released directions adds `diag(k)` on `s`: a torsion spring for a revolute joint, an axial spring for a prismatic one, or a 6-dof bushing for `'free'`.
 - A `Damping` on the released directions adds `diag(c)` to the damping matrix `D`: viscous bearing or motor friction, or a damped bushing.
 - A released joint without stiffness is a mechanism: `fembd.modes` returns it with f = 0.
-- **Closed loops** (e.g. four-bar linkages) are allowed in the linear model. Joints are processed in the order they were created. A joint becomes a *cut joint* if its two ends are already connected through earlier joints, if its B side already follows another joint, or if its B side is supported. Its released coordinates follow from the relative motion, `s = (R̂E)ᵀ(P_B q_B − P_A q_A)`, and its constrained directions give rows `C q = 0` (§2.6). Define driving joints first: earlier joints keep their coordinates independent where possible.
+- **Closed loops** (e.g. four-bar linkages) are allowed in the linear model. Joints are processed in the order they were created. A joint becomes a *cut joint* if its two ends are already connected through earlier joints, if its B side already follows another joint, or if its B side is supported. Its released coordinates follow from the relative motion, `s = (R̂E)ᵀ(P_B q_B − P_A q_A)`, and its constrained directions give rows `C q = 0` (§3.6). Define driving joints first: earlier joints keep their coordinates independent where possible.
 - **Posing.** `a.pose(joint, value)` sets the joint to a finite position: an angle in rad or an offset in m, relative to the pose the joint was created in. Everything on its B side moves rigidly: bodies, couplings, downstream joints and tied bodies. The next `a.system()` then linearises about the new pose. Sweeping a pose shows how the dynamics depend on the configuration. If the moving side is attached elsewhere too (a closed loop or a support), `pose` gives an error: posing closed loops would need a loop-closure solve, which is not implemented yet.
 
 | Type | Free in joint frame |
@@ -138,11 +216,11 @@ joint coordinates.
 | `planar` | `ux uy rz` |
 | `free` | all six (use `Stiffness`) |
 
-### 2.5b Transmissions
+### 3.5b Transmissions
 `a.transmission(joints, c)` relates coordinates of different joints: a belt, gear, cable or rack. Their
 "stretch" is `δ = Σ cᵢ sᵢ`.
 - **Elastic** (`Stiffness = k`): a spring on `δ`, adding `K += k g gᵀ` with `g` the row of coefficients. `Damping = c` adds a damper on `δ`: `D += c g gᵀ`.
-- **Rigid** (no stiffness): the exact constraint `δ = 0`, removed by the coordinate partitioning of §2.6. The first joint listed (the driver) keeps its coordinate.
+- **Rigid** (no stiffness): the exact constraint `δ = 0`, removed by the coordinate partitioning of §3.6. The first joint listed (the driver) keeps its coordinate.
 
 Each entry is a joint (`Dirs`: its joint coordinate) or a reference point, i.e. a rigid body or
 coupling (`Dirs`: 1:6 = `[ux uy uz rx ry rz]`, absolute). For example, a motor (revolute) driving the
@@ -155,7 +233,7 @@ a.transmission({'motor', 'lower'},    [1/N -1], Stiffness = k, Dirs = {1, 6});
 The belt torque `k δ` acts on each joint in proportion to its coefficient, and the motor inertia is seen as
 `N² J_m` at the joint. Shaft loads from belt tension are not modelled.
 
-### 2.6 Constraint elimination
+### 3.6 Constraint elimination
 All dependent dofs `S` (tie slaves, the nodes of rigid bodies and couplings, and the B sides of
 joints) and the supported dofs `F` are eliminated. The independent dofs are `I = all \ (S ∪ F)` and
 
@@ -173,7 +251,7 @@ are removed by *coordinate partitioning*:
 This gives `q = T₂ q'` and `T = T_tree T₂`. The result stays sparse and exact, and K and M stay
 symmetric positive (semi)definite, so all downstream tools work unchanged.
 
-### 2.7 Craig–Bampton reduction
+### 3.7 Craig–Bampton reduction
 Partition the dofs of `K_q, M_q` into boundary dofs `b` and interior dofs `i`:
 
 $$q \approx V \begin{bmatrix} u_b \\ \eta \end{bmatrix},\qquad
@@ -186,14 +264,14 @@ $$q \approx V \begin{bmatrix} u_b \\ \eta \end{bmatrix},\qquad
 - `n = 0` gives Guyan reduction.
 - `K_ii` must be non-singular: `b`, together with the supports, must prevent rigid motion.
 
-### 2.8 Eigenvalues
+### 3.8 Eigenvalues
 `fembd.modes` uses shift-invert Lanczos (`eigs`) with a small negative shift, scaled to the softest
 dofs. This also works for free or partly free systems, where K is singular: rigid-body modes come
 out with f ≈ 0. Mode shapes are normalised so that `VᵀMV = I`.
 
 ---
 
-## 3 API
+## 4 API
 
 ### Package functions
 | Function | Description |
@@ -215,7 +293,7 @@ out with f ≈ 0. Mode shapes are normalised so that `VᵀMV = I`.
 | `Name` | file name | Name used to refer to the body in an assembly |
 | `Scale` | 1 | Coordinate factor, applied after meshing (e.g. `1e-3`: mm → m) |
 | `Size`, `Order`, `Remesh`, `FeatureAngle` | | Passed to `fembd.meshSTL` |
-| `Rigid` | false | Make the body rigid (§2.4) |
+| `Rigid` | false | Make the body rigid (§3.4) |
 | `RefPoint` | centroid | Reference point of a rigid body (after `Scale`) |
 | `Damping` | `[0 0]` | Rayleigh damping `[α β]` of an elastic body: `D = αM + βK`. `β = 2ζ/ω` gives ratio ζ at ω (rising with frequency); `α` also damps the body's rigid motion |
 
@@ -237,9 +315,9 @@ out with f ≈ 0. Mode shapes are normalised so that `VᵀMV = I`.
 | `a.add(body)` | Append a body |
 | `ns = a.tie(master, slave, Tol=, Stiffness=, Select=)` | Bonded tie, or elastic interface if `Stiffness` is given. `Tol` defaults to 0.1 × the median face edge of the finer surface. `Select`: selector restricting the slave nodes. Returns the number of tied nodes. |
 | `r = a.couple(body, sel, Name=, Point=)` | Rigid coupling (RBE2) of selected nodes of an elastic body to a new reference point; returns its name |
-| `j = a.joint(A, B, type, Point=, Axis=, Frame=, Free=, Stiffness=, Damping=, Name=)` | Joint between reference points (rigid bodies, couplings, or `'ground'` for A); returns its name (§2.5). `Point` defaults to B's reference point, `Axis` to `[0 0 1]`. |
-| `t = a.transmission(ids, c, Stiffness=, Dirs=, Name=)` | Elastic or rigid ratio between joint coordinates or reference-point dofs, `δ = Σ cᵢ sᵢ` (§2.5b) |
-| `a.pose(joint, value)` | Move a joint to a finite angle/offset (relative to its creation pose); B side moves rigidly (§2.5) |
+| `j = a.joint(A, B, type, Point=, Axis=, Frame=, Free=, Stiffness=, Damping=, Name=)` | Joint between reference points (rigid bodies, couplings, or `'ground'` for A); returns its name (§3.5). `Point` defaults to B's reference point, `Axis` to `[0 0 1]`. |
+| `t = a.transmission(ids, c, Stiffness=, Dirs=, Name=)` | Elastic or rigid ratio between joint coordinates or reference-point dofs, `δ = Σ cᵢ sᵢ` (§3.5b) |
+| `a.pose(joint, value)` | Move a joint to a finite angle/offset (relative to its creation pose); B side moves rigidly (§3.5) |
 | `a.fix(id, sel, dirs)` | Support selected body nodes in `dirs ⊂ 1:3`, or a reference point (`dirs ⊂ 1:6`) or joint coordinates with `a.fix(id, [], dirs)`. |
 | `d = a.dof(id, sel, dirs)` | Global dof indices of body nodes, of a reference point `[ux uy uz rx ry rz]`, or of a joint's coordinates. |
 | `a.input(name, id, sel, dirs)` | Named input (joint torque/force, force/moment on a reference point, or total force on a node set) |
@@ -247,7 +325,7 @@ out with f ≈ 0. Mode shapes are normalised so that `VᵀMV = I`.
 | `sys = a.statespace(Modes=, Damping=, StaticCorrection=, Lumped=, Format=)` | Modal state-space model with the inputs and outputs (Recipes) |
 | `[Bu, Cu, inName, outName, type] = a.ioMatrices()` | Inputs and outputs in the full space |
 | `j = a.qdof(d)` | Positions of global dofs `d` in `q`, so `u(d) = q(j)`. `d` must be independent (not supported, not a tie slave). |
-| `m = a.nonlinear(Gravity=, Modes=)` | Nonlinear multibody model (`fembd.Model`, §5): `m.simulate(tspan, Step=, Input=, Rates=, Rho=, Tol=)`, `m.energy(x)`, `m.animate(t, x, Rate=, Scale=, Title=)` |
+| `m = a.nonlinear(Gravity=, Modes=)` | Nonlinear multibody model (`fembd.Model`, §2): `m.simulate(tspan, Step=, Input=, Rates=, Rho=, Tol=)`, `m.energy(x)`, `m.animate(t, x, Rate=, Scale=, Title=)` |
 | `[K, M, D] = a.assemble(Lumped=false)` | Full matrices, including elastic interfaces; `D` holds body (Rayleigh), joint and transmission dampers |
 | `[T, I] = a.constraints()` | `u = T*q`, and the independent global dofs `I` |
 | `[K, M, T, D] = a.system(Lumped=false)` | Reduced matrices, `T`, and the reduced damping matrix `D = T'·D·T` |
@@ -266,7 +344,10 @@ a function `@(X) logical` on node coordinates (n×3), or node indices.
 
 ---
 
-## 4 Recipes
+## 5 Linear analysis
+
+Recipes for analysis about the current pose (`a.pose` sets it; the nonlinear model starts from it
+too).
 
 **Inputs, outputs and a state-space model** (recommended for control):
 ```matlab
@@ -375,65 +456,8 @@ spread slave mass onto master nodes; elastic joints keep it diagonal.
 
 ---
 
-## 5 Nonlinear model (large rotations)
-
-`m = a.nonlinear(Gravity = [0 0 -9.81])` turns the same assembly into a nonlinear multibody model
-(`fembd.Model`) for large rotations, e.g. a robot arm moving through its workspace. The linear
-model (`a.statespace`) stays the tool for frequency-domain analysis about one pose.
-```matlab
-m = a.nonlinear(Gravity = [0 0 -9.81]);
-[t, y, x] = m.simulate([0 2], Step = 1e-3, ...
-    Input = @(t, y) [KP1*(r1(t) - y.enc1); KP2*(r2(t) - y.enc2)]);   % controller in the loop
-plot(t, y.th1);  m.animate(t, x, Rate = 0.5);                         % half speed
-```
-- **Coordinates:** each rigid body has a frame at its centre of mass: position `r` (world) and
-  rotation `R`, with velocities `[v (world); ω (body)]`. The mass matrix is constant
-  (`diag(m I, J)`), with gyroscopic forces `ω × Jω`.
-- **Elastic bodies** use a floating frame of reference. The frame follows the body's first
-  coupling; the deformation in that frame is described by Craig–Bampton modes (first coupling
-  clamped, the other couplings as interfaces, plus `Modes` fixed-interface modes, default 10):
-  `x = r + R(X₀ + Φη)`. The mass matrix `M(η)`, the centrifugal and Coriolis forces and gravity
-  follow from precomputed inertia invariants `Q_ab = U_aᵀ M U_b`, `U = [X₀, Φ]`, so the cost per
-  step does not depend on the mesh size. Stiffness and Rayleigh damping are the reduced
-  `Vᵀ K V` and `Vᵀ D V`. Couplings move and rotate with the modes, so joints on them deform with
-  the body. Large rotations are exact; the deformation is linear (no stiffening by centrifugal
-  or gravity preload, which matters only for fast-spinning slender parts).
-- **Joints and supports** are exact nonlinear constraints `g(q) = 0` with Lagrange multipliers.
-  Locked translations: the components of the joint offset in the frame on A. Locked rotations:
-  dot products of frame axes (a revolute joint keeps its axes aligned at any angle). Redundant
-  constraints (e.g. a fixed body that also has a joint to ground) are detected at the start
-  (rank-revealing QR) and dropped.
-- **Forces:** gravity, joint springs and dampers, elastic transmissions, and the inputs (joint
-  forces/torques; forces and moments on rigid bodies, world axes). Rigid transmissions and
-  supported joints are constraints.
-- **Coordinates of joints** are measured from the configuration in which the joint was created
-  (as in `pose`): translations in the joint frame, rotations as the rotation vector of B relative
-  to A (for a revolute joint: the angle). Joint springs are relaxed there. Transmissions are
-  relaxed (elastic) or held (rigid) at the initial configuration. Reference-point outputs are the
-  displacement of the point and the rotation vector of the body, from the initial configuration.
-- **Time integration:** generalised-α on the Lie group R³ × SO(3) of each body, with Newton
-  iterations. Positions satisfy the constraints at every step; velocities are projected onto
-  them. `Rho` (default 0.8) sets the numerical damping of high frequencies (1: none).
-- **Inputs** come from `Input = @(t, y)`, evaluated with the outputs of the previous step: a
-  controller sampled at the time step. Initial joint velocities: `Rates = struct('joint', v)`.
-- **Signals:** joint coordinates, reference points (rigid bodies, couplings) and node sets
-  (average displacement, world axes; forces split over the nodes). `m.energy(x)` gives the
-  kinetic, gravity, strain and spring energies; `m.animate(t, x, Scale = 100)` magnifies the
-  deformation.
-- **Limits:** an elastic body needs at least one coupling (its frame); ties and supports on
-  body nodes are not supported (support a coupling instead); displacement and velocity outputs.
-
-Verified against the Lagrange equations of a double pendulum, the exact (linear) solution of a
-damped belt drive at large angles, a rigid transmission under a constant torque, a heavy top
-(energy, Euler equations) and free fall; elastic bodies against the linear model (cantilever
-with a tip mass on its second coupling, node-set output), a stiff flexible pendulum against the
-rigid one, energy conservation of a soft flexible pendulum, and the kinetic energy from the
-invariants against the nodal `½ ẋᵀ M ẋ`. All converge at second order in the time step.
-
----
-
 ## 6 Limitations
-- Linear elasticity only: small strains, no contact, no geometric stiffness. Large rotations of rigid and elastic bodies: see the nonlinear model (§5).
+- Linear elasticity only: small strains, no contact, no geometric stiffness. Large rotations of rigid and elastic bodies: see the nonlinear model (§2).
 - Ties project onto the flat corner triangle of each master face. On curved Tet10 interfaces the error is about the chord height.
 - If curved Tet10 edge nodes invert an element (coarse mesh, small radius), `meshSTL` re-meshes with straight-sided Tet10 and warns. A smaller `Size` keeps the curved geometry.
 - STL surfaces must be closed and watertight for `Remesh = true`. Only ASCII `.msh` files are read.
@@ -444,4 +468,4 @@ invariants against the nodal `½ ẋᵀ M ẋ`. All converge at second order in 
 
 Verification: `tests/runTests.m` covers 81 checks, including Euler–Bernoulli, rigid-body
 invariance, exact rigid inertia, tie and spring consistency, joints against 1-dof oscillators, a four-bar against velocity analysis, and
-hinged-beam solutions, couplings, posed joints against a double pendulum, mesh-free rigid bodies, Craig–Bampton accuracy, damping, state space, the MSH readers and the nonlinear model (§5).
+hinged-beam solutions, couplings, posed joints against a double pendulum, mesh-free rigid bodies, Craig–Bampton accuracy, damping, state space, the MSH readers and the nonlinear model (§2).

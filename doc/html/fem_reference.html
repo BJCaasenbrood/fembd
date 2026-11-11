@@ -109,6 +109,8 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <li>
 <a href="matlab:doc('fembd.Body/setMass')">setMass</a> - set a rigid body's mass properties (e.g. from CAD)</li>
 <li>
+<a href="matlab:doc('fembd.Body/massProperties')">massProperties</a> - mass, centre of mass and inertia of a body</li>
+<li>
 <a href="matlab:doc('fembd.Assembly')">fembd.Assembly</a> - bodies, connections, supports; reduced K, M and u = T*q</li>
 <li>
 <a href="matlab:doc('fembd.Model')">fembd.Model</a> - nonlinear multibody model (large rotations)</li>
@@ -161,6 +163,8 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <a href="matlab:doc('fembd.Model/simulate')">Model.simulate</a> - time integration (generalised-alpha)</li>
 <li>
 <a href="matlab:doc('fembd.Model/animate')">Model.animate</a> - animation of a simulation</li>
+<li>
+<a href="matlab:doc('fembd.Model/energy')">Model.energy</a> - kinetic, gravity, strain and spring energies</li>
 </ul>
 </div>
 <h2 id="3">Analysis</h2>
@@ -203,6 +207,7 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 % * <matlab:doc('fembd.Body.rigidSurface') fembd.Body.rigidSurface> - rigid body from an STL surface (no meshing)
 % * <matlab:doc('fembd.Body.pointMass') fembd.Body.pointMass> - rigid body from mass properties only
 % * <matlab:doc('fembd.Body/setMass') setMass> - set a rigid body's mass properties (e.g. from CAD)
+% * <matlab:doc('fembd.Body/massProperties') massProperties> - mass, centre of mass and inertia of a body
 % * <matlab:doc('fembd.Assembly') fembd.Assembly> - bodies, connections, supports; reduced K, M and u = T*q
 % * <matlab:doc('fembd.Model') fembd.Model> - nonlinear multibody model (large rotations)
 % * <matlab:doc('fembd.material') fembd.material> - isotropic linear-elastic material
@@ -230,6 +235,7 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 % * <matlab:doc('fembd.Assembly/nonlinear') nonlinear> - nonlinear model of the assembly
 % * <matlab:doc('fembd.Model/simulate') Model.simulate> - time integration (generalised-alpha)
 % * <matlab:doc('fembd.Model/animate') Model.animate> - animation of a simulation
+% * <matlab:doc('fembd.Model/energy') Model.energy> - kinetic, gravity, strain and spring energies
 %
 %% Analysis
 %

@@ -126,10 +126,7 @@ methods
             opts.LengthScale (1,1) double {mustBePositive} = 1
         end
         assert(b.Rigid, 'fembd:setMass', '%s: setMass is for rigid bodies only.', b.Name);
-        p = b.MassProps;
-        if isempty(p)                            % meshed rigid body: from its surface
-            [p.m, p.c, p.J] = surfaceMass(b.X, b.F(:, 1:3), b.Mat.rho);
-        end
+        p = struct();  [p.m, p.c, p.J] = b.massProperties();
         s = opts.LengthScale;  c = p.c;
         if ~isempty(opts.CenterOfMass), c = s*opts.CenterOfMass(:)'; end
         if isempty(opts.Inertia)
@@ -153,12 +150,24 @@ methods
         b.MassProps = struct('m', m, 'c', c, 'J', J);
     end
 
+    function [m, c, J] = massProperties(b)
+    %MASSPROPERTIES Mass m, centre of mass c (1x3) and inertia J (3x3, about
+    %   c) of the body: from setMass (or a mesh-free rigid body), otherwise
+    %   from the consistent mass matrix of the mesh (exact for the mesh).
+        if ~isempty(b.MassProps)
+            p = b.MassProps;  m = p.m;  c = p.c(:)';  J = p.J;  return
+        end
+        [~, M] = b.matrices(MassOnly = true);  Ms = M(1:3:end, 1:3:end);
+        m = full(sum(Ms(:)));  c = full(sum(Ms, 1)*b.X)/m;
+        Xc = b.X - c;  S = full(Xc'*Ms*Xc);
+        J = trace(S)*eye(3) - S;  J = (J + J')/2;
+    end
+
     function M6 = rigidMass(b)
-    %RIGIDMASS 6x6 mass matrix of a mesh-free rigid body about its reference
-    %   point, for the dofs [ux uy uz rx ry rz].
-        p = b.MassProps;  d = p.c - b.Ref;
-        S = [0 -d(3) d(2); d(3) 0 -d(1); -d(2) d(1) 0];
-        M6 = [p.m*eye(3), -p.m*S; p.m*S, p.J - p.m*S*S];
+    %RIGIDMASS 6x6 mass matrix of a rigid body about its reference point,
+    %   for the dofs [ux uy uz rx ry rz].
+        [m, c, J] = b.massProperties();  S = hat(c - b.Ref);
+        M6 = [m*eye(3), -m*S; m*S, J - m*S*S];
     end
 
     function idx = nodes(b, sel)
@@ -169,7 +178,7 @@ methods
 
     function [K, M] = matrices(b, opts)
     %MATRICES Body stiffness K and mass M (sparse, nDof x nDof); K = 0 for
-    %   a rigid body.
+    %   a rigid body (and with MassOnly = true).
     %   M is consistent, or diagonal with Lumped = true (HRZ: element mass
     %   diagonals scaled to preserve the element mass; row-sum lumping
     %   would give negative Tet10 corner masses).
@@ -177,6 +186,7 @@ methods
             b
             opts.Lumped (1,1) logical = false
             opts.Chunk (1,1) double = 2e4     % elements per vectorised block
+            opts.MassOnly (1,1) logical = false
         end
         chunk = opts.Chunk;
         [ne, nn] = size(b.T);  nd = 3*nn;  p = 1 + (nn == 10);
@@ -189,7 +199,7 @@ methods
             Te = b.T(e0:min(e0 + chunk - 1, ne), :)';  nc = size(Te, 2);
             Xe = permute(reshape(b.X(Te, :), nn, nc, 3), [1 3 2]);
             Ke = zeros(nd, nd, nc);  Me = zeros(nn, nn, nc);
-            for g = 1:numel(wk)*~b.Rigid
+            for g = 1:numel(wk)*~(b.Rigid || opts.MassOnly)
                 [G, dJ] = gradients(dNk(:,:,g), Xe);
                 B = zeros(6, nd, nc);
                 B(1, 1:3:end, :) = G(1,:,:);  B(2, 2:3:end, :) = G(2,:,:);

@@ -1,0 +1,285 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<META http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      -->
+<title>tut07_modes</title>
+<meta name="generator" content="MATLAB 24.1">
+<link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
+<meta name="DC.date" content="2026-11-10">
+<meta name="DC.source" content="tut07_modes.m">
+<style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; }
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+span.typesection { color:#A0522D }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style>
+</head>
+<body>
+<div class="content">
+<h2>Contents</h2>
+<div>
+<ul>
+<li>
+<a href="#1">Tutorial 7 - Linear analysis: modes of a cantilever beam</a>
+</li>
+<li>
+<a href="#2">1. Geometry</a>
+</li>
+<li>
+<a href="#3">2. Material and body</a>
+</li>
+<li>
+<a href="#4">3. Assembly and supports</a>
+</li>
+<li>
+<a href="#5">4. System matrices</a>
+</li>
+<li>
+<a href="#6">5. Natural frequencies</a>
+</li>
+<li>
+<a href="#7">6. Check against beam theory</a>
+</li>
+<li>
+<a href="#8">7. Plot a mode</a>
+</li>
+</ul>
+</div>
+<h2 id="1">Tutorial 7 - Linear analysis: modes of a cantilever beam</h2>
+<p>The linear workflow (the nonlinear one is Tutorial 1):</p>
+<div>
+<ol>
+<li>geometry (STL) -&gt; <tt>fembd.Body</tt> (mesh + material)</li>
+<li>bodies -&gt; <tt>fembd.Assembly</tt> (supports, connections)</li>
+<li>
+<tt>a.system()</tt> -&gt; stiffness K and mass M -&gt; <tt>fembd.modes</tt>
+</li>
+</ol>
+</div>
+<p>The result is checked against Euler-Bernoulli beam theory. Run it section by section (Ctrl+Enter), or render it with <tt>publish('tut07_modes')</tt>.</p>
+<pre class="codeinput">addpath(fileparts(fileparts(mfilename(<span class="string">'fullpath'</span>))));     <span class="comment">% toolbox root</span>
+out = fullfile(tempdir, <span class="string">'femTutorials'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
+</pre>
+<h2 id="2">1. Geometry</h2>
+<p>Any closed (watertight) STL works, for example a CAD export. Here we write a 1000 x 50 x 50 mm steel beam. STL files have no units: we model in millimetres and convert to metres when the body is created.</p>
+<pre class="codeinput">file = fullfile(out, <span class="string">'beam.stl'</span>);
+fembd.boxSTL(file, [0 0 0], [1000 50 50]);
+</pre>
+<h2 id="3">2. Material and body</h2>
+<p>
+<tt>fembd.material(E, nu, rho)</tt> gives an isotropic linear-elastic material, in SI units. <tt>fembd.Body</tt> meshes the STL with Gmsh:</p>
+<div>
+<ul>
+<li>
+<tt>Size</tt> - maximum element size, in STL units (mm here)</li>
+<li>
+<tt>Order</tt> - 2 = quadratic Tet10 elements (default), 1 = linear Tet4</li>
+<li>
+<tt>Scale</tt> - coordinate factor applied after meshing (mm -&gt; m)</li>
+</ul>
+</div>
+<pre class="codeinput">steel = fembd.material(210e9, 0.3, 7850);
+beam  = fembd.Body(file, steel, Size = 25, Scale = 1e-3);
+fprintf(<span class="string">'%s: %d nodes, %d Tet%d elements\n'</span>, beam.Name, beam.nNode, <span class="keyword">...</span>
+        size(beam.T, 1), size(beam.T, 2));
+</pre>
+<pre class="codeoutput">beam: 2330 nodes, 1069 Tet10 elements
+</pre>
+<h2 id="4">3. Assembly and supports</h2>
+<p>An assembly holds the bodies and everything that connects or supports them. Here there is one body, clamped at x = 0. Nodes are selected with a function of their coordinates X (n x 3, in metres after scaling).</p>
+<pre class="codeinput">a = fembd.Assembly();
+a.add(beam);
+a.fix(<span class="string">'beam'</span>, @(X) X(:,1) &lt; 1e-9);       <span class="comment">% all 3 directions of the x = 0 face</span>
+
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);  a.plot();  title(<span class="string">'Mesh'</span>);
+</pre>
+<img vspace="5" hspace="5" src="tut07_modes_01.png" alt=""> <h2 id="5">4. System matrices</h2>
+<p>
+<tt>a.system()</tt> assembles K and M and removes all constraints. The full displacement vector u (3 dofs per node, [ux1 uy1 uz1 ux2 ...]) is related to the independent dofs q by u = T*q. K and M are already reduced: K = T'*Kfull*T and M = T'*Mfull*T.</p>
+<pre class="codeinput">[K, M, T] = a.system();
+fprintf(<span class="string">'full dofs: %d, independent dofs: %d\n'</span>, a.nDof, size(K, 1));
+</pre>
+<pre class="codeoutput">full dofs: 6990, independent dofs: 6879
+</pre>
+<h2 id="6">5. Natural frequencies</h2>
+<p>
+<tt>fembd.modes</tt> returns the lowest frequencies (Hz) and mass-normalised mode shapes (V'*M*V = I).</p>
+<pre class="codeinput">[V, f] = fembd.modes(K, M, 6);
+disp(table((1:6)', f, <span class="string">'VariableNames'</span>, {<span class="string">'mode'</span>, <span class="string">'f_Hz'</span>}));
+</pre>
+<pre class="codeoutput">    mode     f_Hz 
+    ____    ______
+
+     1      41.826
+     2       41.83
+     3      259.16
+     4      259.24
+     5       713.2
+     6      713.58
+
+</pre>
+<h2 id="7">6. Check against beam theory</h2>
+<p>For a clamped-free beam: f_n = lambda_n^2/(2 pi) sqrt(E I/(rho A L^4)), with lambda_1 = 1.8751 and lambda_2 = 4.6941. The square section gives pairs of equal bending frequencies in y and z.</p>
+<pre class="codeinput">L = 1;  h = 0.05;  I = h^4/12;  A = h^2;
+fEB = [1.875104 4.694091].^2/(2*pi)*sqrt(steel.E*I/(steel.rho*A*L^4));
+fprintf(<span class="string">'1st bending: FE %.2f Hz, Euler-Bernoulli %.2f Hz\n'</span>, f(1), fEB(1));
+fprintf(<span class="string">'2nd bending: FE %.2f Hz, Euler-Bernoulli %.2f Hz\n'</span>, f(3), fEB(2));
+<span class="comment">% The second mode is slightly lower in FE because Euler-Bernoulli ignores</span>
+<span class="comment">% shear deformation and rotary inertia.</span>
+</pre>
+<pre class="codeoutput">1st bending: FE 41.83 Hz, Euler-Bernoulli 41.78 Hz
+2nd bending: FE 259.16 Hz, Euler-Bernoulli 261.80 Hz
+</pre>
+<h2 id="8">7. Plot a mode</h2>
+<p>Map q back to the full vector u = T*q and plot it. The second argument scales the deformation (here: largest displacement = 0.1 m).</p>
+<pre class="codeinput">u = T*V(:,1);
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
+a.plot(u, 0.1/max(abs(u)));  title(sprintf(<span class="string">'Mode 1: %.1f Hz'</span>, f(1)));
+</pre>
+<img vspace="5" hspace="5" src="tut07_modes_02.png" alt=""> <p class="footer">
+<br>
+<a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2024a</a>
+<br>
+</p>
+</div>
+<!--
+##### SOURCE BEGIN #####
+%% Tutorial 7 - Linear analysis: modes of a cantilever beam
+% The linear workflow (the nonlinear one is Tutorial 1):
+%
+% # geometry (STL) -> |fembd.Body| (mesh + material)
+% # bodies -> |fembd.Assembly| (supports, connections)
+% # |a.system()| -> stiffness K and mass M -> |fembd.modes|
+%
+% The result is checked against Euler-Bernoulli beam theory.
+% Run it section by section (Ctrl+Enter), or render it with
+% |publish('tut07_modes')|.
+
+addpath(fileparts(fileparts(mfilename('fullpath'))));     % toolbox root
+out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
+
+%% 1. Geometry
+% Any closed (watertight) STL works, for example a CAD export. Here we write
+% a 1000 x 50 x 50 mm steel beam. STL files have no units: we model in
+% millimetres and convert to metres when the body is created.
+file = fullfile(out, 'beam.stl');
+fembd.boxSTL(file, [0 0 0], [1000 50 50]);
+
+%% 2. Material and body
+% |fembd.material(E, nu, rho)| gives an isotropic linear-elastic material, in
+% SI units. |fembd.Body| meshes the STL with Gmsh:
+%
+% * |Size|  - maximum element size, in STL units (mm here)
+% * |Order| - 2 = quadratic Tet10 elements (default), 1 = linear Tet4
+% * |Scale| - coordinate factor applied after meshing (mm -> m)
+steel = fembd.material(210e9, 0.3, 7850);
+beam  = fembd.Body(file, steel, Size = 25, Scale = 1e-3);
+fprintf('%s: %d nodes, %d Tet%d elements\n', beam.Name, beam.nNode, ...
+        size(beam.T, 1), size(beam.T, 2));
+
+%% 3. Assembly and supports
+% An assembly holds the bodies and everything that connects or supports
+% them. Here there is one body, clamped at x = 0. Nodes are selected with a
+% function of their coordinates X (n x 3, in metres after scaling).
+a = fembd.Assembly();
+a.add(beam);
+a.fix('beam', @(X) X(:,1) < 1e-9);       % all 3 directions of the x = 0 face
+
+figure('Color', 'w');  a.plot();  title('Mesh');
+
+%% 4. System matrices
+% |a.system()| assembles K and M and removes all constraints. The full
+% displacement vector u (3 dofs per node, [ux1 uy1 uz1 ux2 ...]) is related
+% to the independent dofs q by u = T*q. K and M are already reduced:
+% K = T'*Kfull*T and M = T'*Mfull*T.
+[K, M, T] = a.system();
+fprintf('full dofs: %d, independent dofs: %d\n', a.nDof, size(K, 1));
+
+%% 5. Natural frequencies
+% |fembd.modes| returns the lowest frequencies (Hz) and mass-normalised mode
+% shapes (V'*M*V = I).
+[V, f] = fembd.modes(K, M, 6);
+disp(table((1:6)', f, 'VariableNames', {'mode', 'f_Hz'}));
+
+%% 6. Check against beam theory
+% For a clamped-free beam: f_n = lambda_n^2/(2 pi) sqrt(E I/(rho A L^4)),
+% with lambda_1 = 1.8751 and lambda_2 = 4.6941. The square section gives
+% pairs of equal bending frequencies in y and z.
+L = 1;  h = 0.05;  I = h^4/12;  A = h^2;
+fEB = [1.875104 4.694091].^2/(2*pi)*sqrt(steel.E*I/(steel.rho*A*L^4));
+fprintf('1st bending: FE %.2f Hz, Euler-Bernoulli %.2f Hz\n', f(1), fEB(1));
+fprintf('2nd bending: FE %.2f Hz, Euler-Bernoulli %.2f Hz\n', f(3), fEB(2));
+% The second mode is slightly lower in FE because Euler-Bernoulli ignores
+% shear deformation and rotary inertia.
+
+%% 7. Plot a mode
+% Map q back to the full vector u = T*q and plot it. The second argument
+% scales the deformation (here: largest displacement = 0.1 m).
+u = T*V(:,1);
+figure('Color', 'w');
+a.plot(u, 0.1/max(abs(u)));  title(sprintf('Mode 1: %.1f Hz', f(1)));
+
+##### SOURCE END #####
+-->
+</body>
+</html>

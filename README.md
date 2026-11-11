@@ -1,30 +1,38 @@
 # fembd — finite elements and multibody dynamics in MATLAB
 
-A compact research alternative to the PDE Toolbox for linear elasticity. It loads STL parts,
-meshes them with Gmsh, assigns linear materials, connects the bodies, and returns the stiffness
-and mass matrices for dynamic analysis. The same assembly also gives a state-space model for
-control, and a nonlinear multibody model for large rotations (`a.nonlinear`).
+Rigid and elastic multibody systems from STL assemblies. Parts are meshed with Gmsh, given
+linear materials or mass properties, and connected by joints, couplings, ties, springs, dampers
+and transmissions. One model gives two analyses:
+
+- **Nonlinear simulation** (`a.nonlinear`): large motions with exact joint kinematics, gravity,
+  controllers in the loop, and elastic bodies in a floating frame (Craig–Bampton modes).
+- **Linear analysis about a pose** (`a.system`, `a.statespace`): the full finite-element model
+  for modes, frequency responses, statics, state space for control, and model reduction.
 
 ```matlab
 addpath('path/to/PDEToolbox');
 setenv('GMSH', '/path/to/gmsh');                 % if gmsh is not on the PATH
 
-steel = fembd.material(210e9, 0.30, 7850);
-alu   = fembd.material(70e9,  0.33, 2700);
-base   = fembd.Body('base.stl',   steel, Size = 8, Scale = 1e-3);   % STL in mm
-pillar = fembd.Body('pillar.stl', alu,   Size = 3, Scale = 1e-3);
+alu  = fembd.material(70e9, 0.33, 2700);
+link = fembd.Body.rigidSurface('link.stl', 7850, Scale = 1e-3);    % rigid, STL in mm
+tool = fembd.Body('tool.stl', alu, Size = 3, Scale = 1e-3);        % elastic, Gmsh mesh
 
 a = fembd.Assembly();
-a.add(base);  a.add(pillar);
-a.tie('base', 'pillar');                         % bonded interface (master, slave)
-a.fix('base', @(X) X(:,3) < 1e-9);               % clamp nodes selected by position
+a.add(link);  a.add(tool);
+a.joint('ground', 'link', 'revolute', Point = [0 0 0], Name = 'shoulder');
+a.joint('link', a.couple('tool', @(X) X(:,1) < 0.201), 'fixed');  % bolt the tool's flange
+a.input('tau', 'shoulder');
+a.output('th', 'shoulder');  a.output('w', 'shoulder', Type = 'velocity');
 
+% nonlinear: a PD-controlled move under gravity
+m = a.nonlinear(Gravity = [0 0 -9.81]);
+[t, y, x] = m.simulate([0 1], Input = @(t, y) 80*(1 - y.th) - 8*y.w);
+m.animate(t, x, Scale = 100);                    % deformation magnified
+
+% linear: modes and a state-space model about the current pose
 [K, M, T] = a.system();                          % reduced matrices, u = T*q
-[V, f] = fembd.modes(K, M, 10);                    % Hz, mass-normalised
-a.plot(T*V(:,1), 0.01);
-
-ib = a.qdof(a.dof('pillar', @(X) X(:,3) > 0.109));   % boundary dofs, indices into q
-[Kc, Mc, Vc] = fembd.craigBampton(K, M, ib, 20);       % u = T*Vc*[u_b; eta]
+[V, f] = fembd.modes(K, M, 10);                  % Hz, mass-normalised
+sys = a.statespace(Modes = 20, Format = "ss");   % tau -> th, w (Control System Toolbox)
 ```
 
 ## Installing Gmsh
@@ -40,11 +48,10 @@ Put the `setenv` line in `startup.m` to keep it across sessions. Run `fembd.gmsh
 check the setup.
 
 ## Documentation
-- **In the MATLAB Help browser:** once the toolbox folder is on the path, the documentation appears under *Supplemental Software*. Open a function's reference page with `doc fembd.Assembly`, `doc fembd.Body`, etc. The pages are prebuilt in `doc/html`; after editing `doc/src`, the tutorials or the examples, rebuild them with `cd doc; buildDocs`, which runs the tutorials and needs Gmsh.
-- **Tutorials:** [`tutorials/`](tutorials/README.md), nine runnable scripts from a first model to joints, dynamics and Craig–Bampton reduction.
-- **Manual:** [`docs/fembd.md`](docs/fembd.md) covers the workflow, formulation (elements, ties, elastic joints, rigid bodies, constraint elimination, Craig–Bampton), the API, recipes (loads, gravity, FRF, state space) and limitations.
-- **In MATLAB:** `help fembd`, `help fembd.Assembly/tie`, etc.
-- **Examples:** `examples/demoAssembly.m` (elastic parts plus a rigid payload: modes, Craig–Bampton, state space) `examples/demoParallelFlexure.m` (parallel leaf-spring guide between rigid bodies: 6×6 shuttle stiffness and modes, checked against beam theory) and `examples/demoSerialArm.m` (two-link arm: couplings and revolute joints with springs, reduced to joint coordinates).
+- **Tutorials:** [`tutorials/`](tutorials/README.md), ten runnable scripts: a first nonlinear model, then meshing, materials, rigid bodies, joints and ties, then linear analysis (modes, statics, dynamics, reduction).
+- **Manual:** [`docs/fembd.md`](docs/fembd.md): workflow, the nonlinear model, the formulation, the API, linear-analysis recipes and limitations.
+- **In MATLAB:** `doc fembd.Assembly`, `doc fembd.Model`, `help fembd`. The tutorials, examples and function reference also appear in the Help browser under *Supplemental Software* (prebuilt in `doc/html`; rebuild with `cd doc; buildDocs`, which runs the tutorials and needs Gmsh).
+- **Examples:** [`examples/`](examples): an STL assembly with a rigid payload, a two-link arm on joints, and a parallel leaf-spring guide.
 - **Verification:** `tests/runTests.m`.
 
 Requires MATLAB R2022a or later and Gmsh 4.

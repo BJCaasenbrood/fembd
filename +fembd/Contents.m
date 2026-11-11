@@ -1,5 +1,5 @@
 % FEMBD  Finite elements and multibody dynamics for STL assemblies
-%   Documentation: Help browser, Supplemental Software    Manual: docs/fembd.md
+%   Manual: docs/fembd.md    Tutorials: tutorials/README.md
 %
 % Model
 %   Body          - Elastic or rigid body: Gmsh Tet4/Tet10 mesh, material, K and M
