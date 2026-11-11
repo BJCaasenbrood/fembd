@@ -21,7 +21,7 @@ classdef System < handle
 %     add, couple, tie, joint, transmission, fix, input, output
 %   Analysis:
 %     simulate, equilibrium, linearize, statespace, modes, energy, plot,
-%     animate
+%     animate, plotMode, animateMode
 %
 %   Elastic bodies tied together form one elastic group, reduced together
 %   (one frame, shared modes); a group supported on nodes (fix) is grounded.
@@ -361,6 +361,7 @@ methods
     %     R   3 x 3 x nu x nt frame rotations
     %     e   ne x nt         modal coordinates of the elastic groups
     %     nu  nDof x nt       velocities [v (world); omega (body); deta] per unit
+    %     u   nIn x nt        input signals (applied from each step to the next)
     %   Positions satisfy the constraints at every step (Newton tolerance),
     %   velocities are projected onto them (mass-orthogonal).
     %
@@ -403,9 +404,9 @@ methods
         end
 
         x = struct('r', zeros(3, nb, nt+1), 'R', zeros(3, 3, nb, nt+1), ...
-                   'e', zeros(numel(q.e), nt+1), 'nu', zeros(n, nt+1));
+                   'e', zeros(numel(q.e), nt+1), 'nu', zeros(n, nt+1), 'u', zeros(numel(s.In), nt+1));
         Y = zeros(numel(s.Out), nt+1);
-        x.r(:,:,1) = q.r;  x.R(:,:,:,1) = q.R;  x.e(:,1) = q.e;  x.nu(:,1) = nu;
+        x.r(:,:,1) = q.r;  x.R(:,:,:,1) = q.R;  x.e(:,1) = q.e;  x.nu(:,1) = nu;  x.u(:,1) = u;
         Y(:,1) = cell2mat(struct2cell(y0));
         yk = y0;
         for k = 1:nt
@@ -437,7 +438,7 @@ methods
             end
             acc = an;  wd = w;
             yk = s.outputs(q, nu, w);
-            x.r(:,:,k+1) = q.r;  x.R(:,:,:,k+1) = q.R;  x.e(:,k+1) = q.e;  x.nu(:,k+1) = nu;
+            x.r(:,:,k+1) = q.r;  x.R(:,:,:,k+1) = q.R;  x.e(:,k+1) = q.e;  x.nu(:,k+1) = nu;  x.u(:,k+1) = u;
             Y(:,k+1) = cell2mat(struct2cell(yk));
         end
         y = struct();
@@ -481,9 +482,9 @@ methods
     %EQUILIBRIUM Static equilibrium under gravity, springs and constant
     %   inputs: x = s.equilibrium(Input = u0) starts from the initial
     %   configuration (or Initial) and returns the state (as from simulate,
-    %   one step, at rest). Coordinates without stiffness (free mechanisms)
-    %   stay where they are. Use it with simulate(Initial = x), linearize,
-    %   statespace, modes and plot.
+    %   one step, at rest, with the inputs in x.u). Coordinates without
+    %   stiffness (free mechanisms) stay where they are. Use it with
+    %   simulate(Initial = x), linearize, statespace, modes and plot.
         arguments
             s
             opts.Input double = []
@@ -507,7 +508,7 @@ methods
         if it == opts.MaxIter
             warning('fmbd:equilibrium', 'No equilibrium found (residual %.1e).', norm(res));
         end
-        x = s.state(q, nu);
+        x = s.state(q, nu, u);
     end
 
     function lin = linearize(s, x, opts)
@@ -516,8 +517,10 @@ methods
     %     M z'' + C z' + K z = B u,   y = Cz z + Cv z' + Ca z''
     %   in independent coordinates z (dq = T*z satisfies the linearised
     %   constraints, T orthonormal). K includes the stiffness from gravity,
-    %   constraint forces and preloaded springs. Returns a struct with M, C,
-    %   K, B, Cz, Cv, Ca, T, InputName and OutputName. Option Input = u0.
+    %   constraint forces, preloaded springs and the operating-point inputs
+    %   (they act through the geometry, e.g. a torque holding a spring).
+    %   Returns a struct with M, C, K, B, Cz, Cv, Ca, T, InputName and
+    %   OutputName. Option Input = u0 (default: x.u, e.g. from equilibrium).
         arguments
             s
             x struct = struct([])
@@ -528,7 +531,9 @@ methods
         if any(nu)
             warning('fmbd:linearize', 'The state is moving; the model is linearised at its velocities.');
         end
-        n = s.N;  u0 = s.inputVector(opts.Input);
+        n = s.N;  u0 = opts.Input;              % the inputs at the operating point
+        if isempty(u0) && ~isempty(x) && isfield(x, 'u') && ~isempty(x.u), u0 = x.u(:, end); end
+        u0 = s.inputVector(u0);
         [~, G] = s.constraints(q);
         T = null(G);  if isempty(G), T = eye(n); end
         [F, ~, ~, Mq] = s.forces(q, nu, u0);  nc = size(G, 1);
@@ -570,7 +575,7 @@ methods
     %                      body, joint and transmission dampers
     %     StaticCorrection add quasi-static shapes for the inputs when modes
     %                      are truncated (default true): exact DC gain
-    %     Input            constant inputs u0 at the operating point
+    %     Input            inputs u0 at the operating point (default: x.u)
     %     Format           "struct" (default: A, B, C, D, names, f) or "ss"
         arguments
             s
@@ -613,18 +618,19 @@ methods
         end
     end
 
-    function [f, V] = modes(s, x, n)
+    function [f, V] = modes(s, x, n, opts)
     %MODES Natural frequencies f (Hz) and mode shapes about a state at rest
     %   (default: the initial configuration; e.g. from equilibrium):
     %   [f, V] = s.modes(x, n). Unstable directions (e.g. an inverted
-    %   pendulum) give negative f. V (nDof x n) are velocity-like tangent
+    %   pendulum) give negative f. Option Input as in linearize. V (nDof x n) are velocity-like tangent
     %   directions; s.plot(s.perturb(x, V(:,k)*a)) shows mode k.
         arguments
             s
             x struct = struct([])
             n (1,1) double = inf
+            opts.Input double = []
         end
-        lin = s.linearize(x);
+        lin = s.linearize(x, Input = opts.Input);
         [P, lam] = eig((lin.K + lin.K')/2, lin.M, 'vector');
         [lam, i] = sort(real(lam));  n = min(n, numel(lam));
         lam(abs(lam) < 1e-10*max(abs(lam))) = 0;
@@ -632,12 +638,60 @@ methods
         V = lin.T*real(P(:, i(1:n)));
     end
 
+    function animateMode(s, x, v, opts)
+    %ANIMATEMODE Animate a mode shape: s.animateMode(x0, V(:,k)) with x0
+    %   and V from modes, oscillating about x0 in slow motion (vibration
+    %   modes are too fast for real time). The phase follows the wall clock.
+    %   Options: Amplitude (largest node displacement, default 0.05 m),
+    %   Frequency (Hz, shown with the slow-motion factor), Rate (cycles per
+    %   second, default 1), Duration (s, default 3), Title.
+        arguments
+            s
+            x struct
+            v (:,1) double
+            opts.Amplitude (1,1) double {mustBePositive} = 0.05
+            opts.Frequency double = []
+            opts.Rate (1,1) double {mustBePositive} = 1
+            opts.Duration (1,1) double {mustBePositive} = 3
+            opts.Title = []
+        end
+        [x, a, V0] = s.modeScale(x, v, opts.Amplitude);  nb = numel(s.Bodies);
+        cla;  h = drawBodies(s.Bodies, V0, num2cell(lines(nb), 2)');  axis manual
+        ttl = char(opts.Title);
+        if ~isempty(opts.Frequency)
+            ft = sprintf('%.1f Hz (%.0fx slow motion)', opts.Frequency, opts.Frequency/opts.Rate);
+            if opts.Frequency <= 0, ft = 'rigid-body / mechanism mode'; end
+            if isempty(ttl), ttl = ft; else, ttl = [ttl ': ' ft]; end
+        end
+        if ~isempty(ttl), title(ttl); end
+        playback(h, opts.Duration, @(c) setVertices(h, arrayfun(@(i) s.vertices(i, ...
+            s.perturb(x, a*sin(2*pi*opts.Rate*c)*v), 1, 1), 1:nb, 'UniformOutput', false)));
+    end
+
+    function h = plotMode(s, x, v, opts)
+    %PLOTMODE Draw a mode shape: s.plotMode(x0, V(:,k)) with x0 and V from
+    %   modes, displaced so that the largest node displacement is Amplitude
+    %   (default 0.05 m). Option Title. Returns one handle per body.
+        arguments
+            s
+            x struct
+            v (:,1) double
+            opts.Amplitude (1,1) double {mustBePositive} = 0.05
+            opts.Title = []
+        end
+        [x, a] = s.modeScale(x, v, opts.Amplitude);
+        h = s.plot(s.perturb(x, a*v));
+        if ~isempty(opts.Title), title(opts.Title); end
+        if nargout == 0, clear h, end
+    end
+
     function x = perturb(s, x, dq)
     %PERTURB State x moved along the tangent direction dq (nDof x 1), e.g.
     %   a mode shape from modes: s.plot(s.perturb(x, 0.05*V(:,k))).
         s.build();
-        [q, nu] = s.startState(x);
-        x = s.state(s.retract(q, dq), nu);
+        [q, nu] = s.startState(x);  u = [];
+        if isfield(x, 'u') && ~isempty(x.u), u = x.u(:, end); end
+        x = s.state(s.retract(q, dq), nu, s.inputVector(u));
     end
 
     function [Phi, X0] = modeShapes(s, body)
@@ -893,13 +947,16 @@ methods (Access = private)
     end
 
     function q = initialConfiguration(s, q)
-    % Satisfy the constraints with the joint positions, and elastic
-    % transmissions unstretched unless all their coordinates are set; the
-    % positions are ramped up for large angles. Elastic bodies stay undeformed.
-        tgt = zeros(0, 3);                       % joint, coordinate, value
+    % Satisfy the constraints and the joint positions exactly (hard), with
+    % elastic transmissions unstretched unless all their coordinates are
+    % set; the other joint coordinates stay as close to zero as possible
+    % (soft, in the null space of the hard equations). Positions are ramped
+    % up for large angles; elastic bodies stay undeformed.
+        tgt = zeros(0, 3);  soft = zeros(0, 2);  % [joint, coordinate, value], [joint, coordinate]
         for j = 1:numel(s.Joints)
-            v = s.Joints(j).position;
-            for d = 1:numel(v), tgt(end+1, :) = [j, d, v(d)]; end %#ok<AGROW>
+            v = s.Joints(j).position;  nf = nnz(s.Joints(j).free);
+            for d = 1:numel(v), tgt(end+1, :) = [j, d, v(d)]; end                 %#ok<AGROW>
+            if isempty(v), soft = [soft; j*ones(nf, 1), (1:nf)']; end              %#ok<AGROW>
         end
         given = @(T) all(arrayfun(@(t) strcmp(t.kind, 'joint') && ...
                      ~isempty(s.Joints(t.idx).position), T.terms));
@@ -920,8 +977,17 @@ methods (Access = private)
                 for T = relax
                     [d, Jd] = s.stretch(T, q);  g = [g; d];  G = [G; Jd];               %#ok<AGROW>
                 end
-                if isempty(g) || max(abs(g)) < 1e-12, break, end
-                dq = zeros(s.N, 1);  dq(rigid) = -lsqminnorm(G(:, rigid), g);
+                gs = zeros(size(soft, 1), 1);  Gs = zeros(size(soft, 1), s.N);
+                for i = 1:size(soft, 1)
+                    [v, Jv] = s.coord('joint', soft(i,1), q);  gs(i) = v(soft(i,2));  Gs(i,:) = Jv(soft(i,2), :);
+                end
+                Gh = G(:, rigid);  dh = -lsqminnorm(Gh, g);   % hard equations, minimum norm
+                if ~isempty(gs)                               % soft: in the null space of the hard ones
+                    Nh = null(full(Gh));  if isempty(Gh), Nh = eye(numel(rigid)); end
+                    dh = dh - Nh*lsqminnorm(Gs(:, rigid)*Nh, gs + Gs(:, rigid)*dh);
+                end
+                if max(abs([g; 0])) < 1e-12 && norm(dh) < 1e-12, break, end
+                dq = zeros(s.N, 1);  dq(rigid) = dh;
                 q = s.retract(q, dq);
             end
         end
@@ -980,9 +1046,21 @@ methods (Access = private)
         end
     end
 
-    function x = state(~, q, nu)
+    function [x, a, V0] = modeScale(s, x, v, amplitude)
+    % State x (default: initial), the factor a that makes the largest node
+    % displacement of a*v equal to amplitude, and the node positions V0.
+        s.build();  nb = numel(s.Bodies);
+        if isempty(x), x = s.state(s.q0, s.nu0); end
+        V0 = arrayfun(@(i) s.vertices(i, x, size(x.nu, 2), 1), 1:nb, 'UniformOutput', false);
+        e = 1e-6;  x1 = s.perturb(x, e*v);         % node motion per unit amplitude
+        D = arrayfun(@(i) (s.vertices(i, x1, 1, 1) - V0{i})/e, 1:nb, 'UniformOutput', false);
+        a = amplitude/max([cellfun(@(d) max(vecnorm(d, 2, 2)), D), eps]);
+    end
+
+    function x = state(s, q, nu, u)
     % A one-step state struct as returned by simulate.
-        x = struct('r', q.r, 'R', q.R, 'e', q.e, 'nu', nu);
+        if nargin < 4, u = zeros(numel(s.In), 1); end
+        x = struct('r', q.r, 'R', q.R, 'e', q.e, 'nu', nu, 'u', u);
     end
 
     function V = vertices(s, i, x, k, scale)

@@ -91,6 +91,32 @@ B1 = O4 + c*[cos(ang)', sin(ang)'];  [~, k] = min(vecnorm(B1 - B0, 2, 2));  B1 =
 q4 = atan2(B1(2) - O4(2), B1(1) - O4(1)) - atan2(B0(2) - O4(2), B0(1) - O4(1));
 check('Four-bar: Position on the crank == position analysis', [y.q1(1), y.q4(1)], [th, q4], 1e-10);
 
+% joints without a Position start at 0 (Position on the elbow of a chain)
+s = fmbd.System();
+s.add(fmbd.Body.pointMass(1, [0.2 0 0], 1e-3*eye(3), Name = 'l1'));
+s.add(fmbd.Body.pointMass(1, [0.6 0 0], 1e-3*eye(3), Name = 'l2'));
+s.joint('ground', 'l1', 'revolute', Point = [0 0 0], Name = 'shoulder');
+s.joint('l1', 'l2', 'revolute', Point = [0.4 0 0], Position = pi/2, Name = 'elbow');
+s.output('q1', 'shoulder');  s.output('q2', 'elbow');
+[~, y] = s.simulate([0 1e-3]);
+check('Position on the elbow only: shoulder stays at 0', [y.q1(1), y.q2(1)], [0, pi/2], 1e-12);
+
+% operating-point inputs: an arm held at theta against its joint springs
+% (equilibrium inputs, kept in x.u) == the same arm built at theta
+th = 0.8;  kj = 200;
+for built = [false true]
+    s = fmbd.System();
+    c2 = [0.2 0 0] + built*([cos(th) sin(th) 0]*0.1 - [0.1 0 0]) + [0.1 0 0];
+    s.add(fmbd.Body.pointMass(0.1, [0.1 0 0], 1e-4*eye(3), Name = 'l1'));
+    s.add(fmbd.Body.pointMass(0.1, c2, 1e-4*eye(3), Name = 'l2'));
+    s.joint('ground', 'l1', 'revolute', Point = [0 0 0], Stiffness = kj, Name = 'shoulder');
+    s.joint('l1', 'l2', 'revolute', Point = [0.2 0 0], Stiffness = kj, Name = 'elbow', ...
+            Position = (~built)*th);
+    s.input('tau1', 'shoulder');  s.input('tau2', 'elbow');
+    if built, f2 = s.modes(); else, f1 = s.modes(s.equilibrium(Input = kj*[0; th])); end
+end
+check('Linearised with holding torques (x.u) == relaxed at that pose', f1, f2, 1e-9);
+
 % linearisation: gravity stiffness of a hanging and an inverted pendulum
 label = {'hanging pendulum: f = sqrt(m g l/J)', 'inverted pendulum: f = -sqrt(m g l/J)'};
 for sg = [-1 1]                                          % centre of mass below/above the hinge
