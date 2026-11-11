@@ -1,0 +1,186 @@
+function testFmbd()
+%TESTFMBD Verification of the fmbd package. Requires Gmsh (see fmbd.meshSTL)
+%   and, for the comparisons with the linear finite-element model, fembd.
+
+addpath(fileparts(fileparts(mfilename('fullpath'))));
+tmp = tempname;  mkdir(tmp);  cleanup = onCleanup(@() rmdir(tmp, 's'));
+g = 9.81;  ode = odeset('RelTol', 1e-12, 'AbsTol', 1e-12);
+
+% double compound pendulum vs Lagrange equations (ode45)
+m1 = 1.5;  m2 = 0.8;  L1 = 0.4;  lc1 = 0.2;  lc2 = 0.25;  I1 = 0.02;  I2 = 0.01;
+s = fmbd.System(Gravity = [0 0 -g]);
+s.add(fmbd.Body.pointMass(m1, [lc1 0 0], I1*eye(3), Name = 'link1'));
+s.add(fmbd.Body.pointMass(m2, [L1+lc2 0 0], I2*eye(3), Name = 'link2'));
+s.joint('ground', 'link1', 'revolute', Point = [0 0 0], Axis = [0 1 0], Name = 'j1');
+s.joint('link1', 'link2', 'revolute', Point = [L1 0 0], Axis = [0 1 0], Name = 'j2');
+s.output('ry1', 'link1', [], 5);  s.output('ry2', 'link2', [], 5);  s.output('q2', 'j2');
+[t, y] = s.simulate([0 1], Step = 2.5e-4);
+c12 = @(z) m2*L1*lc2*cos(z(1) - z(2));  s12 = @(z) m2*L1*lc2*sin(z(1) - z(2));
+f = @(t, z) [z(3:4); [I1 + m1*lc1^2 + m2*L1^2, c12(z); c12(z), I2 + m2*lc2^2] \ ...
+    -[s12(z)*z(4)^2 + (m1*lc1 + m2*L1)*g*sin(z(1)); -s12(z)*z(3)^2 + m2*lc2*g*sin(z(2))]];
+[~, z] = ode45(f, t, [pi/2; pi/2; 0; 0], ode);
+check('Double pendulum vs Lagrange (ode45)', pi/2 - unwrap([y.ry1 y.ry2]), z(:,1:2), 2e-5);
+check('Joint angle == difference of link angles', wrapToPi(y.q2 - (y.ry2 - y.ry1)), 0, 1e-12);
+
+% damped elastic belt at large angles == exact linear solution (parallel axes)
+s = belt(true);  [t, y] = s.simulate([0 0.3], Step = 1e-4);
+Kq = [50/9, -50/3; -50/3, 300 + 50];  Dq = [1e-3 + 0.02/9, -0.02/3; -0.02/3, 0.05 + 0.02];
+Mq = diag([1e-4, 0.01 + 2*0.2^2]);  A = [zeros(2), eye(2); -Mq\Kq, -Mq\Dq];
+X = cell2mat(arrayfun(@(tk) expm(A*tk)*[1.5; 0.5; 0; 0], t', 'UniformOutput', false))';
+check('Belt at 1.5 rad == linear solution', [y.qm y.qa], X(:, 1:2), 2e-4);
+
+% elastic transmission starts relaxed: the motor follows the link's Position
+s = belt(false);  [~, y] = s.simulate([0 1e-3]);
+check('Belt relaxed at start: motor = N x link Position', y.qm(1), 3*0.5, 1e-12);
+
+% rigid transmission, motor torque, redundant support
+N = 3;  Jm = 1e-4;  Js = 0.01 + 2*0.2^2;  tau = 0.02;
+s = fmbd.System();
+s.add(fmbd.Body.pointMass(2, [0.2 0 0], 0.01*eye(3), Name = 'link'));
+s.add(fmbd.Body.pointMass(0.1, [0.5 0 0], Jm*eye(3), Name = 'rotor'));
+s.joint('ground', 'link',  'revolute', Point = [0 0 0], Name = 'axis');
+s.joint('ground', 'rotor', 'revolute', Point = [0.5 0 0], Name = 'motor');
+s.transmission({'motor', 'axis'}, [1/N -1]);
+s.fix('rotor', 1:3);                                     % redundant with the motor joint
+s.input('tau', 'motor');  s.output('qm', 'motor');  s.output('qa', 'axis');
+[t, y] = s.simulate([0 0.5], Step = 1e-3, Input = @(t, y) tau);
+check('Rigid transmission + torque, (Jm + Js/N^2) qm'''' = tau', ...
+      [y.qm, N*y.qa], repmat(0.5*tau/(Jm + Js/N^2)*t.^2, 1, 2), 1e-7);
+
+% heavy top on a spherical joint, started by Position and Velocity
+s = fmbd.System(Gravity = [0 0 -g]);
+Jt = diag([2 2 4])*1e-3;
+s.add(fmbd.Body.pointMass(1, [0 0 0.1], Jt, Name = 'top'));
+s.joint('ground', 'top', 'spherical', Point = [0 0 0], Position = [0.3 0 0], ...
+        Velocity = [0 0 60], Name = 'pivot');
+[t, ~, x] = s.simulate([0 0.2], Step = 1e-4, Rho = 0.9);
+E = s.energy(x);  R0 = x.R(:,:,1,1);  w0 = x.nu(4:6,1);  cb = R0'*x.r(:,1,1);
+Jp = Jt + (cb'*cb*eye(3) - cb*cb');                    % body frame = world-aligned at definition
+f = @(t, z) [reshape(reshape(z(1:9), 3, 3)*hat3(z(10:12)), 9, 1); ...
+             Jp\(cross(cb, reshape(z(1:9), 3, 3)'*[0; 0; -g]) - cross(z(10:12), Jp*z(10:12)))];
+[~, z] = ode45(f, [0 0.2], [R0(:); w0], ode);
+check(sprintf('Heavy top (%.0f rad/s), energy', norm(w0)), E.total/E.total(1), 1, 1e-6);
+check('Heavy top vs Euler equations (ode45)', x.r(:,1,end), reshape(z(end,1:9), 3, 3)*cb, 1e-6);
+
+% free fall along a prismatic joint
+s = fmbd.System(Gravity = [1 2 -g]);
+s.add(fmbd.Body.pointMass(3, [0.1 0.2 0.3], 0.01*eye(3), Name = 'slider'));
+s.joint('ground', 'slider', 'prismatic', Axis = [0 0 1], Name = 'z');
+s.output('z', 'z');
+[t, y] = s.simulate([0 0.3], Step = 1e-2);
+check('Free fall on a prismatic joint', y.z, -0.5*g*t.^2, 1e-12);
+
+% closed loop: Position on the crank of a four-bar == position analysis
+O2 = [0 0];  A0 = [0 0.1];  B0 = [0.3 0.15];  O4 = [0.3 0];  th = 0.5;
+s = fmbd.System();
+pts = {O2, A0; A0, B0; B0, O4};  nm = {'crank', 'coupler', 'rocker'};
+for i = 1:3
+    c = ([pts{i,1}, 0] + [pts{i,2}, 0])/2;
+    s.add(fmbd.Body.pointMass(0.2, c, 1e-3*eye(3), Name = nm{i}));
+end
+s.joint('ground',  'crank',   'revolute', Point = [O2 0], Position = th, Name = 'j1');
+s.joint('crank',   'coupler', 'revolute', Point = [A0 0], Name = 'j2');
+s.joint('coupler', 'rocker',  'revolute', Point = [B0 0], Name = 'j3');
+s.joint('ground',  'rocker',  'revolute', Point = [O4 0], Name = 'j4');
+s.output('q1', 'j1');  s.output('q4', 'j4');
+[~, y] = s.simulate([0 1e-3]);
+A1 = O2 + (A0 - O2)*[cos(th) sin(th); -sin(th) cos(th)];   % crank rotated by th (row vector)
+b = norm(B0 - A0);  c = norm(B0 - O4);  d = norm(A1 - O4);
+ang = atan2(A1(2) - O4(2), A1(1) - O4(1)) + [1 -1]*acos((c^2 + d^2 - b^2)/(2*c*d));
+B1 = O4 + c*[cos(ang)', sin(ang)'];  [~, k] = min(vecnorm(B1 - B0, 2, 2));  B1 = B1(k,:);
+q4 = atan2(B1(2) - O4(2), B1(1) - O4(1)) - atan2(B0(2) - O4(2), B0(1) - O4(1));
+check('Four-bar: Position on the crank == position analysis', [y.q1(1), y.q4(1)], [th, q4], 1e-10);
+
+% elastic bodies: cantilever with a tip mass on its second coupling
+Lb = 0.5;  hb = 0.02;  beam = fullfile(tmp, 'beam.stl');
+fmbd.boxSTL(beam, [0 0 0], [Lb hb hb]);
+steel = fmbd.material(210e9, 0.3, 7800);
+s = elasticBeam(beam, steel, Lb, [0 2e-5], 10);
+s.add(fmbd.Body.pointMass(0.3, [Lb + 0.03, hb/2, hb/2], 1e-4*eye(3), Name = 'mass'));
+s.joint('ground', 'root', 'fixed');  s.joint('tip', 'mass', 'fixed', Point = [Lb hb/2 hb/2]);
+s.input('Fz', 'mass', [], 3);  s.output('uz', 'mass', [], 3);
+s.output('mid', 'beam', @(X) abs(X(:,1) - Lb/2) < 0.006, 3);
+[t, y] = s.simulate([0 0.02], Step = 4e-5, Input = @(t, y) 1, Rho = 0.95);
+if exist('fembd.Assembly', 'class')                      % same model in fembd
+    a = fembd.Assembly();
+    a.add(fembd.Body(beam, steel, Size = 0.01, Order = 1, Name = 'beam', Damping = [0 2e-5]));
+    a.couple('beam', @(X) X(:,1) < 1e-9, Name = 'root');
+    a.couple('beam', @(X) X(:,1) > Lb - 1e-9, Name = 'tip');
+    a.add(fembd.Body.pointMass(0.3, [Lb + 0.03, hb/2, hb/2], 1e-4*eye(3), Name = 'mass'));
+    a.joint('ground', 'root', 'fixed');  a.joint('tip', 'mass', 'fixed', Point = [Lb hb/2 hb/2]);
+    a.input('Fz', 'mass', [], 3);  a.output('uz', 'mass', [], 3);
+    a.output('mid', 'beam', @(X) abs(X(:,1) - Lb/2) < 0.006, 3);
+    [~, yf] = a.nonlinear(Modes = 10).simulate([0 0.02], Step = 4e-5, Input = @(t, y) 1, Rho = 0.95);
+    check('Elastic: fmbd == fembd.Model (same reduction)', [y.uz y.mid]/max(abs(yf.uz)), ...
+          [yf.uz yf.mid]/max(abs(yf.uz)), 1e-9);
+    sys = a.statespace(Modes = 30, Damping = 0);
+    Ad = expm(sys.A*(t(2) - t(1)));  Bd = sys.A\((Ad - eye(size(Ad)))*sys.B);
+    xs = zeros(size(sys.A, 1), 1);  Yl = zeros(numel(t), 2);
+    for k = 2:numel(t), xs = Ad*xs + Bd;  Yl(k,:) = (sys.C*xs)'; end
+    check('Elastic: tip mass and node set == linear FE model (fembd)', ...
+          [y.uz, y.mid]./max(abs(Yl)), Yl./max(abs(Yl)), 1e-3);
+end
+
+% elastic bodies: stiff flexible pendulum == rigid pendulum (3 rad swing)
+stiff = fmbd.material(210e12, 0.3, 7800);
+[~, yr] = pendulum(beam, stiff, Lb, true, g).simulate([0 0.6]);
+[~, ye] = pendulum(beam, stiff, Lb, false, g).simulate([0 0.6]);
+check(sprintf('Elastic: stiff pendulum (%.1f rad) == rigid', max(abs(yr.th))), ye.th, yr.th, 1e-4);
+
+% elastic bodies: energy conservation; kinetic energy from the inertia
+% invariants == nodal 1/2 xdot' M xdot
+s = pendulum(beam, fmbd.material(2e9, 0.3, 7800), Lb, false, g);
+[~, ~, x] = s.simulate([0 0.6], Step = 5e-4, Rho = 1);
+E = s.energy(x);  k = size(x.nu, 2);  [Phi, X0] = s.modeShapes('beam');
+[~, Mb] = s.Bodies{1}.matrices();
+U = X0' + reshape(Phi*x.e(:,k), 3, []);  w = x.nu(4:6,k);
+xd = x.nu(1:3,k) + x.R(:,:,1,k)*(cross(repmat(w, 1, size(U, 2)), U) + ...
+     reshape(Phi*x.nu(7:end,k), 3, []));
+check(sprintf('Elastic: soft pendulum energy (strain %.0e J)', max(E.strain)), ...
+      (E.total - E.total(1))/max(E.kinetic), 0, 1e-5);
+check('Elastic: kinetic energy, invariants == nodal', E.kinetic(k), 0.5*full(xd(:)'*Mb*xd(:)), 1e-10);
+end
+
+function s = belt(posed)
+% Link on a torsion spring, driven by a rotor through a damped elastic belt.
+s = fmbd.System();
+s.add(fmbd.Body.pointMass(2, [0.2 0 0], 0.01*eye(3), Name = 'link'));
+s.add(fmbd.Body.pointMass(0.1, [0.5 0 0], 1e-4*eye(3), Name = 'rotor'));
+pm = [];  if posed, pm = 1.5; end
+s.joint('ground', 'link',  'revolute', Point = [0 0 0], Stiffness = 300, Damping = 0.05, ...
+        Position = 0.5, Name = 'axis');
+s.joint('ground', 'rotor', 'revolute', Point = [0.5 0 0], Damping = 1e-3, Position = pm, Name = 'motor');
+s.transmission({'motor', 'axis'}, [1/3 -1], Stiffness = 50, Damping = 0.02);
+s.output('qm', 'motor');  s.output('qa', 'axis');
+end
+
+function s = elasticBeam(file, mat, L, damping, modes)
+% Elastic Tet4 beam along x with couplings at both ends.
+s = fmbd.System();
+s.add(fmbd.Body.elastic(file, mat, Size = 0.01, Order = 1, Name = 'beam', Damping = damping, Modes = modes));
+s.couple('beam', @(X) X(:,1) < 1e-9, Name = 'root');
+s.couple('beam', @(X) X(:,1) > L - 1e-9, Name = 'tip');
+end
+
+function s = pendulum(file, mat, L, rigid, g)
+% Beam pendulum hinged about y at its root, rigid or elastic.
+if rigid
+    s = fmbd.System();
+    s.add(fmbd.Body(file, mat, Size = 0.01, Order = 1, Name = 'beam', Rigid = true));
+    s.joint('ground', 'beam', 'revolute', Point = [0 0.01 0.01], Axis = [0 1 0], Name = 'hinge');
+else
+    s = elasticBeam(file, mat, L, [0 0], 6);
+    s.joint('ground', 'root', 'revolute', Point = [0 0.01 0.01], Axis = [0 1 0], Name = 'hinge');
+end
+s.Gravity = [0 0 -g];
+s.output('th', 'hinge');
+end
+
+function S = hat3(v), S = [0 -v(3) v(2); v(3) 0 -v(1); -v(2) v(1) 0]; end
+
+function check(name, val, ref, tol)
+err = max(abs(val(:) - ref(:))./max(abs(ref(:)), 1));
+if isequal(ref, 0), err = max(abs(val(:))); end
+status = "PASS";  if err > tol, status = "FAIL"; end
+fprintf('%-4s  %-55s err = %.2e\n', status, name, err);
+end
