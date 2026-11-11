@@ -137,6 +137,26 @@ check('Equilibrium: k th = m g l cos(th)', y.th(1), th, 1e-10);
 check('Linearised at the equilibrium (preloaded spring)', s.modes(x), ...
       sqrt((10 + 2*g*0.3*sin(th))/(0.01 + 2*0.3^2))/(2*pi), 1e-8);
 
+% equilibrium: converges on a gravity-loaded four-bar 1 km from the origin
+% (relative constraint tolerance), and stops early when there is none
+P = {[0 0 0], [0.05 0.1 0], [0.3 0.15 0], [0.25 0 0]};  O = [1e3 0 0];
+s = fmbd.System(Gravity = [0 -g 0]);
+for i = 1:3
+    s.add(fmbd.Body.pointMass(0.3, O + (P{i} + P{i+1})/2, 1e-3*eye(3), Name = sprintf('l%d', i)));
+end
+s.joint('ground', 'l1', 'revolute', Point = O + P{1}, Stiffness = 5);
+s.joint('l1', 'l2', 'revolute', Point = O + P{2});
+s.joint('l2', 'l3', 'revolute', Point = O + P{3});
+s.joint('ground', 'l3', 'revolute', Point = O + P{4});
+[~, info] = s.equilibrium();
+check('Equilibrium far from the origin converges (<= 10 iterations)', ...
+      [info.converged, info.iterations <= 10], [1 1], 0);
+s = fmbd.System(Gravity = [0 0 -g]);                    % free horizontal pendulum: no equilibrium
+s.add(fmbd.Body.pointMass(1, [0.3 0 0], 1e-3*eye(3), Name = 'p'));
+s.joint('ground', 'p', 'revolute', Point = [0 0 0], Axis = [0 1 0]);
+w = warning('off', 'fmbd:equilibrium');  [~, info] = s.equilibrium();  warning(w);
+check('No equilibrium: stops early and reports it', [info.converged, info.iterations <= 10], [0 1], 0);
+
 % state space of the belt drive == the exact frequency response, and the DC gain
 % with one mode plus static correction
 s = belt(false);  s.input('tau', 'motor');  s.output('wa', 'axis', Type = 'velocity');

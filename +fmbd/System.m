@@ -478,13 +478,24 @@ methods
         E.total = E.kinetic + E.gravity + E.strain + E.springs;
     end
 
-    function x = equilibrium(s, opts)
+    function [x, info] = equilibrium(s, opts)
     %EQUILIBRIUM Static equilibrium under gravity, springs and constant
     %   inputs: x = s.equilibrium(Input = u0) starts from the initial
     %   configuration (or Initial) and returns the state (as from simulate,
     %   one step, at rest, with the inputs in x.u). Coordinates without
     %   stiffness (free mechanisms) stay where they are. Use it with
     %   simulate(Initial = x), linearize, statespace, modes and plot.
+    %
+    %   Newton iterations with a backtracking line search. Converged when
+    %   the force residual is below Tol (relative to the forces) and the
+    %   constraint residual below Tol (relative to the model size). If the
+    %   residual stops decreasing, it is accepted at round-off level, and
+    %   otherwise the iterations stop with a warning (e.g. a free mechanism
+    %   with a net force has no equilibrium).
+    %   [x, info] = ... also returns info: converged, iterations, force
+    %   (relative force residual) and constraint (constraint residual).
+    %
+    %   Options: Input, Initial, Tol (default 1e-10), MaxIter (default 100)
         arguments
             s
             opts.Input double = []
@@ -495,18 +506,39 @@ methods
         s.build();
         [q, ~] = s.startState(opts.Initial);  n = s.N;  nu = zeros(n, 1);
         u = s.inputVector(opts.Input);
-        [~, G] = s.constraints(q);  nc = size(G, 1);  lam = zeros(nc, 1);
+        L = max([1; abs(q.r(:))]);                 % model size, for the constraint tolerance
+        F = s.forces(q, nu, u);  [g, G] = s.constraints(q);  nc = size(G, 1);
+        lam = lsqminnorm(G', F);
+        res = @(F, G, g, lam) [F - G'*lam; g];      % force balance, constraints
+        r = res(F, G, g, lam);
+        err = @(r, F) [norm(r(1:n))/max(norm(F), 1), max(abs([r(n+1:end); 0]))/L];
+        best = inf;  stall = 0;  conv = false;
         for it = 1:opts.MaxIter
-            F = s.forces(q, nu, u);  [g, G] = s.constraints(q);
-            if it == 1, lam = lsqminnorm(G', F); end
-            res = [F - G'*lam; g];                  % force balance, constraints
-            if norm(res(1:n)) < opts.Tol*max(norm(F), 1) && max(abs([g; 0])) < 1e-12, break, end
+            e = err(r, F);
+            if all(e < opts.Tol), conv = true;  break, end
+            m = max(e/opts.Tol);                    % progress measure
+            if m < 0.5*best, best = m;  stall = 0; else, stall = stall + 1; end
+            if stall >= 4                           % plateau: round-off floor, or no equilibrium
+                conv = all(e < 1e3*opts.Tol);
+                break
+            end
             Kt = s.stiffness(q, u, lam);            % -d(F - G'*lam)/dq
-            dx = lsqminnorm([Kt, G'; G, zeros(nc)], [res(1:n); -g]);   % minimum norm: free mechanisms stay
-            q = s.retract(q, dx(1:n));  lam = lam + dx(n+1:end);
+            dx = lsqminnorm([Kt, G'; G, zeros(nc)], [r(1:n); -g]);   % minimum norm: free mechanisms stay
+            a = 1;  r0 = norm(r);
+            for ls = 1:6                            % backtracking line search on |res|
+                q1 = s.retract(q, a*dx(1:n));  lam1 = lam + a*dx(n+1:end);
+                F1 = s.forces(q1, nu, u);  [g1, G1] = s.constraints(q1);  r1 = res(F1, G1, g1, lam1);
+                if norm(r1) < r0 || ls == 6, break, end
+                a = a/2;
+            end
+            [q, lam, F, G, g, r] = deal(q1, lam1, F1, G1, g1, r1);
         end
-        if it == opts.MaxIter
-            warning('fmbd:equilibrium', 'No equilibrium found (residual %.1e).', norm(res));
+        e = err(r, F);
+        info = struct('converged', conv, 'iterations', it, 'force', e(1), 'constraint', e(2)*L);
+        if ~conv
+            warning('fmbd:equilibrium', ['No equilibrium found after %d iterations (force residual ' ...
+                '%.1e, constraint residual %.1e); a free coordinate may carry a net force.'], ...
+                it, e(1), e(2)*L);
         end
         x = s.state(q, nu, u);
     end

@@ -114,7 +114,7 @@ Methods: `b.matrices()` (K, M of the mesh, also `Lumped`, `MassOnly`), `b.massPr
 | Method | Description |
 |---|---|
 | `[t, y, x] = s.simulate(tspan, Step=, Input=, Rho=, Tol=, Initial=)` | Time integration. `Input = @(t, y)` returns the input signals from the outputs of the previous step (a sampled controller). `y`: struct of output signals. `x`: states (`r`, `R`, `e`, `nu`, `u` per step). `Initial`: start from a state (e.g. an equilibrium). `Rho` (0.8): numerical damping of high frequencies, 1 = none |
-| `x0 = s.equilibrium(Input=, Initial=)` | Static equilibrium under gravity, springs and constant inputs; free mechanisms stay where they are. The inputs are kept in `x0.u` |
+| `[x0, info] = s.equilibrium(Input=, Initial=, Tol=, MaxIter=)` | Static equilibrium under gravity, springs and constant inputs; free mechanisms stay where they are. The inputs are kept in `x0.u`. Newton with line search; stops at a plateau (accepted at round-off level, otherwise a warning: e.g. a free coordinate with a net force). `info`: `converged`, `iterations`, `force`, `constraint` |
 | `lin = s.linearize(x0, Input=)` | `M z'' + C z' + K z = B u`, `y = Cz z + Cv z' + Ca z''` in independent coordinates `z` (`dq = T z`) |
 | `sys = s.statespace(x0, Modes=, Damping=, StaticCorrection=, Input=, Format=)` | Modal state space `[η; η̇]`: rigid-body/mechanism modes as double integrators, static correction for truncated modes (exact DC gain), modal `Damping` on top of the physical dampers, acceleration feedthrough. `Format = "ss"` (Control System Toolbox) |
 | `[f, V] = s.modes(x0, n, Input=)` | Natural frequencies (Hz; unstable directions negative) and mode shapes |
@@ -212,7 +212,10 @@ iterations. Positions satisfy the constraints at every step; velocities are proj
 high frequencies.
 
 ### 4.7 Equilibrium and linearisation
-`equilibrium` solves `F(q, 0, u₀) = Gᵀλ`, `g(q) = 0` by Newton with minimum-norm steps.
+`equilibrium` solves `F(q, 0, u₀) = Gᵀλ`, `g(q) = 0` by Newton with minimum-norm steps and a
+backtracking line search. It converges when the force residual (relative to the forces) and the
+constraint residual (relative to the model size) are below `Tol`; when the residual stops
+decreasing, it accepts a round-off-level residual and otherwise stops with a warning.
 `linearize` differentiates the same forces: `K = −∂(F − Gᵀλ)/∂q` (central differences on the
 tangent space, with the dynamic multipliers λ), `C = −∂F/∂ν` (exact: the forces are at most
 quadratic in ν), `B = ∂F/∂u`, and eliminates the constraints with an orthonormal null-space basis
