@@ -1,6 +1,5 @@
 function testFmbd()
-%TESTFMBD Verification of the fmbd package. Requires Gmsh (see fmbd.meshSTL)
-%   and, for the comparisons with the linear finite-element model, fembd.
+%TESTFMBD Verification of the fmbd package. Requires Gmsh (see fmbd.meshSTL).
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 tmp = tempname;  mkdir(tmp);  cleanup = onCleanup(@() rmdir(tmp, 's'));
@@ -138,7 +137,7 @@ check('Equilibrium: k th = m g l cos(th)', y.th(1), th, 1e-10);
 check('Linearised at the equilibrium (preloaded spring)', s.modes(x), ...
       sqrt((10 + 2*g*0.3*sin(th))/(0.01 + 2*0.3^2))/(2*pi), 1e-8);
 
-% state space of the belt drive == fembd (linear FE path), and the DC gain
+% state space of the belt drive == the exact frequency response, and the DC gain
 % with one mode plus static correction
 s = belt(false);  s.input('tau', 'motor');  s.output('wa', 'axis', Type = 'velocity');
 S1 = s.statespace();  S3 = s.statespace(Modes = 1);
@@ -159,53 +158,43 @@ check('State space: 1 mode + static correction keeps the DC gain', ...
 Lb = 0.5;  hb = 0.02;  beam = fullfile(tmp, 'beam.stl');
 fmbd.boxSTL(beam, [0 0 0], [Lb hb hb]);
 steel = fmbd.material(210e9, 0.3, 7800);
-s = elasticBeam(beam, steel, Lb, [0 2e-5], 10);
-s.add(fmbd.Body.pointMass(0.3, [Lb + 0.03, hb/2, hb/2], 1e-4*eye(3), Name = 'mass'));
-s.joint('ground', 'root', 'fixed');  s.joint('tip', 'mass', 'fixed', Point = [Lb hb/2 hb/2]);
-s.input('Fz', 'mass', [], 3);  s.output('uz', 'mass', [], 3);
-s.output('mid', 'beam', @(X) abs(X(:,1) - Lb/2) < 0.006, 3);
-[t, y] = s.simulate([0 0.02], Step = 4e-5, Input = @(t, y) 1, Rho = 0.95);
-if exist('fembd.Assembly', 'class')                      % same model in fembd
-    a = fembd.Assembly();
-    a.add(fembd.Body(beam, steel, Size = 0.01, Order = 1, Name = 'beam', Damping = [0 2e-5]));
-    a.couple('beam', @(X) X(:,1) < 1e-9, Name = 'root');
-    a.couple('beam', @(X) X(:,1) > Lb - 1e-9, Name = 'tip');
-    a.add(fembd.Body.pointMass(0.3, [Lb + 0.03, hb/2, hb/2], 1e-4*eye(3), Name = 'mass'));
-    a.joint('ground', 'root', 'fixed');  a.joint('tip', 'mass', 'fixed', Point = [Lb hb/2 hb/2]);
-    a.input('Fz', 'mass', [], 3);  a.output('uz', 'mass', [], 3);
-    a.output('mid', 'beam', @(X) abs(X(:,1) - Lb/2) < 0.006, 3);
-    [~, yf] = a.nonlinear(Modes = 10).simulate([0 0.02], Step = 4e-5, Input = @(t, y) 1, Rho = 0.95);
-    check('Elastic: fmbd == fembd.Model (same reduction)', [y.uz y.mid]/max(abs(yf.uz)), ...
-          [yf.uz yf.mid]/max(abs(yf.uz)), 1e-9);
-    sys = a.statespace(Modes = 30, Damping = 0);
-    Ad = expm(sys.A*(t(2) - t(1)));  Bd = sys.A\((Ad - eye(size(Ad)))*sys.B);
-    xs = zeros(size(sys.A, 1), 1);  Yl = zeros(numel(t), 2);
-    for k = 2:numel(t), xs = Ad*xs + Bd;  Yl(k,:) = (sys.C*xs)'; end
-    check('Elastic: tip mass and node set == linear FE model (fembd)', ...
-          [y.uz, y.mid]./max(abs(Yl)), Yl./max(abs(Yl)), 1e-3);
+[~, y] = elasticBeamTip(beam, steel, Lb, hb, 10).simulate([0 0.02], Step = 4e-5, ...
+                                                       Input = @(t, y) 1, Rho = 0.95);
+[~, yr] = elasticBeamTip(beam, steel, Lb, hb, 40).simulate([0 0.02], Step = 4e-5, ...
+                                                        Input = @(t, y) 1, Rho = 0.95);
+check('Elastic: tip mass and node set, 10 modes == 40 modes', [y.uz, y.mid]./max(abs([yr.uz yr.mid])), ...
+      [yr.uz yr.mid]./max(abs([yr.uz yr.mid])), 1e-3);
 
-    % equilibrium under gravity and modes == linear FE model (full mesh)
-    s.Gravity = [0 0 -g];  xe = s.equilibrium();  [~, ye] = s.simulate([0 1e-4], Initial = xe, Step = 1e-4);
-    [K, M, T] = a.system();  [~, Mu] = a.assemble();  dm = a.dof('mass');
-    gv = zeros(a.nDof, 1);  gv(3:3:3*size(a.X, 1)) = -g;  gv(dm(3)) = -g;
-    u = T*(K\(T'*(Mu*gv)));  [~, fref] = fembd.modes(K, M, 4);
-    check('Elastic: gravity sag at equilibrium == FE statics', ye.uz(1), u(dm(3)), 1e-6);
-    check('Elastic: modes at equilibrium == FE modes (10 CB modes)', s.modes(xe, 4), fref, 1e-5);
+% equilibrium under gravity and the first mode of a Tet10 cantilever
+% (clamped on nodes) == Euler-Bernoulli
+s = fmbd.System(Gravity = [0 0 -g]);
+s.add(fmbd.Body.elastic(beam, steel, Size = hb/2, Name = 'beam', Modes = 4));
+s.fix('beam', @(X) X(:,1) < 1e-6);
+s.output('tipz', 'beam', @(X) X(:,1) > Lb - 1e-6, 3);
+xe = s.equilibrium();  [~, ye] = s.simulate([0 1e-4], Initial = xe, Step = 1e-4);
+EI = 210e9*hb^4/12;  q = 7800*hb^2*g;
+check('Elastic: gravity sag at equilibrium == q L^4/(8 EI)', ye.tipz(1)/(-q*Lb^4/(8*EI)), 1, 1e-2);
+check('Elastic: first mode at equilibrium == Euler-Bernoulli', s.modes(xe, 1), ...
+      1.875104^2/(2*pi)*sqrt(EI/(7800*hb^2*Lb^4)), 1e-2);
 
-    % elastic body tied to a rigid body (a coupling + fixed joint) == fembd
-    b3 = {fullfile(tmp, 'l3.stl'), fullfile(tmp, 'r3.stl')};
-    fmbd.boxSTL(b3{1}, [0 0 0], [Lb/2 hb hb]);  fmbd.boxSTL(b3{2}, [Lb/2 0 0], [Lb hb hb]);
+% elastic body tied to a rigid body (a coupling + fixed joint) == tied to a
+% very stiff elastic body
+b3 = {fullfile(tmp, 'l3.stl'), fullfile(tmp, 'r3.stl')};
+fmbd.boxSTL(b3{1}, [0 0 0], [Lb/2 hb hb]);  fmbd.boxSTL(b3{2}, [Lb/2 0 0], [Lb hb hb]);
+f = cell(1, 2);
+for rigid = [true false]
     s = fmbd.System();
     s.add(fmbd.Body.elastic(b3{1}, steel, Size = hb/2, Name = 'left', Modes = 20));
-    s.add(fmbd.Body(b3{2}, steel, Size = hb/2, Name = 'right', Rigid = true));
+    if rigid
+        s.add(fmbd.Body(b3{2}, steel, Size = hb/2, Name = 'right', Rigid = true));
+    else
+        stiff = fmbd.material(210e15, 0.3, 7800);
+        s.add(fmbd.Body.elastic(b3{2}, stiff, Size = hb/2, Name = 'right', Modes = 4));
+    end
     s.fix('left', @(X) X(:,1) < 1e-6);  s.tie('right', 'left');
-    a = fembd.Assembly();
-    a.add(fembd.Body(b3{1}, steel, Size = hb/2, Name = 'left'));
-    a.add(fembd.Body(b3{2}, steel, Size = hb/2, Name = 'right', Rigid = true));
-    a.fix('left', @(X) X(:,1) < 1e-6);  a.tie('right', 'left');
-    [K, M] = a.system();  [~, fref] = fembd.modes(K, M, 4);
-    check('Tie elastic-rigid == fembd', s.modes([], 4), fref, 1e-5);
+    f{rigid + 1} = s.modes([], 4);
 end
+check('Tie elastic-rigid == tie to a very stiff elastic body', f{2}, f{1}, 5e-4);
 
 % acceleration outputs: mass on a spring under gravity and a step force
 s = fmbd.System(Gravity = [0 0 -g]);
@@ -280,6 +269,15 @@ s.joint('ground', 'link',  'revolute', Point = [0 0 0], Stiffness = 300, Damping
 s.joint('ground', 'rotor', 'revolute', Point = [0.5 0 0], Damping = 1e-3, Position = pm, Name = 'motor');
 s.transmission({'motor', 'axis'}, [1/3 -1], Stiffness = 50, Damping = 0.02);
 s.output('qm', 'motor');  s.output('qa', 'axis');
+end
+
+function s = elasticBeamTip(file, mat, L, h, modes)
+% Clamped elastic beam with a point mass on its tip coupling.
+s = elasticBeam(file, mat, L, [0 2e-5], modes);
+s.add(fmbd.Body.pointMass(0.3, [L + 0.03, h/2, h/2], 1e-4*eye(3), Name = 'mass'));
+s.joint('ground', 'root', 'fixed');  s.joint('tip', 'mass', 'fixed', Point = [L h/2 h/2]);
+s.input('Fz', 'mass', [], 3);  s.output('uz', 'mass', [], 3);
+s.output('mid', 'beam', @(X) abs(X(:,1) - L/2) < 0.006, 3);
 end
 
 function s = elasticBeam(file, mat, L, damping, modes)
