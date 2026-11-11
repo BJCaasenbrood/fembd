@@ -18,9 +18,13 @@ classdef System < handle
 %
 %   Model description (the system is built when it is first used, and
 %   rebuilt after any change):
-%     add, couple, joint, transmission, fix, input, output
+%     add, couple, tie, joint, transmission, fix, input, output
 %   Analysis:
-%     simulate, energy, animate, plot
+%     simulate, equilibrium, linearize, statespace, modes, energy, plot,
+%     animate
+%
+%   Elastic bodies tied together form one elastic group, reduced together
+%   (one frame, shared modes); a group supported on nodes (fix) is grounded.
 %
 %   Conventions:
 %     The configuration in which the bodies are defined is the relaxed
@@ -44,7 +48,8 @@ properties (SetAccess = private)
     Joints = struct('Name', {}, 'A', {}, 'B', {}, 'p', {}, 'R', {}, 'free', {}, 'k', {}, ...
                     'damp', {}, 'position', {}, 'velocity', {})
     Transmissions = struct('Name', {}, 'terms', {}, 'coef', {}, 'k', {}, 'damp', {})
-    Fixes = struct('kind', {}, 'idx', {}, 'dirs', {})
+    Ties = struct('master', {}, 'slave', {}, 'snodes', {}, 'mnodes', {}, 'N', {}, 'n', {}, 'A', {}, 'k', {})
+    Fixes = struct('kind', {}, 'idx', {}, 'dirs', {}, 'nodes', {})
     Inputs = struct('Name', {}, 'kind', {}, 'idx', {}, 'dir', {}, 'nodes', {}, 'type', {})
     Outputs = struct('Name', {}, 'kind', {}, 'idx', {}, 'dir', {}, 'nodes', {}, 'type', {})
 end
@@ -57,7 +62,10 @@ end
 
 properties (Access = private)
     built = false
-    Bd                      % bodies: elastic, m, J, c0, Xl, ne, Phi, Q, s, CR, Kc, Dc, Mee, Psi, cols, ecols
+    Bd                      % units (rigid bodies, elastic groups): elastic, m, J, c0, Xl, ne, Phi,
+                            % Q, s, CR, Kc, Dc, Mee, Psi, cpl, cols, ecols
+    Ub                      % unit of each body
+    Uo                      % node offset of each body in its unit
     An                      % anchors (body frames, couplings): body, frame, x0, Psi
     Rf                      % reference points: anchor, s (offset in the anchor frame), x0
     Jn                      % joints and ground supports: A, B (anchors), a, b, QA, QB, free, k, c
@@ -125,6 +133,46 @@ methods
         assert(~ismember(name, s.names()), 'fmbd:couple', 'The name %s is already used.', name);
         s.Refs(end+1) = struct('Name', name, 'body', i, 'nodes', nodes, 'x', x(:)');
         s.built = false;
+    end
+
+    function ns = tie(s, master, slave, opts)
+    %TIE Bond the surface of slave to the surface of master: slave surface
+    %   nodes within Tol of the master surface follow the closest master
+    %   point (interpolated with the master face). Use the finer mesh as
+    %   slave. Returns the number of tied nodes.
+    %     two elastic bodies    rigid tie, or an elastic interface with
+    %                           Stiffness = [kn kt] (per unit area); the
+    %                           bodies become one elastic group
+    %     elastic and rigid     the tied nodes of the elastic body become a
+    %                           coupling, fixed to the rigid body
+    %   Options: Tol (default 0.1 x median face edge of the finer surface),
+    %            Stiffness, Select (selector on the slave nodes)
+        arguments
+            s
+            master
+            slave
+            opts.Tol double = []
+            opts.Stiffness double = []
+            opts.Select = []
+        end
+        [~, im] = s.lookup(master, false);  [~, is] = s.lookup(slave, false);
+        bm = s.Bodies{im};  bs = s.Bodies{is};
+        assert(~isempty(bm.F) && ~isempty(bs.F), 'fmbd:tie', 'A point mass has no surface; use a joint.');
+        assert(~(bm.Rigid && bs.Rigid), 'fmbd:tie', 'Two rigid bodies cannot be tied; use a fixed joint.');
+        if bs.Rigid, [bm, bs, im, is] = deal(bs, bm, is, im); end   % the rigid body is the master
+        assert(~bm.Rigid || isempty(opts.Stiffness), 'fmbd:tie', ['An elastic interface to a ' ...
+            'rigid body is not supported; use a coupling and a joint with Stiffness.']);
+        [sn, mn, Nw, nrm, area] = tieNodes(bm, bs, opts.Tol, opts.Select);
+        ns = numel(sn);
+        if ns == 0, warning('fmbd:tie', 'No slave nodes within the tolerance.'); return, end
+        if bm.Rigid
+            c = s.couple(bs.Name, sn, Name = sprintf('%s_tie%d', bs.Name, numel(s.Refs) + 1));
+            s.joint(bm.Name, c, 'fixed', Point = s.Refs(end).x, Name = sprintf('%s_tie', c));
+        else
+            s.Ties(end+1) = struct('master', im, 'slave', is, 'snodes', sn, 'mnodes', mn, ...
+                                   'N', Nw, 'n', nrm, 'A', area, 'k', opts.Stiffness);
+            s.built = false;
+        end
     end
 
     function name = joint(s, A, B, type, opts)
@@ -238,16 +286,30 @@ methods
         s.built = false;
     end
 
-    function fix(s, id, dirs)
-    %FIX Support: s.fix(ref, dirs) holds a reference point (rigid body or
-    %   coupling) in the directions dirs (default 1:6, [ux uy uz rx ry rz],
-    %   world axes); s.fix(joint, dirs) holds joint coordinates at their
-    %   Position (default all).
-        if nargin < 3, dirs = []; end
-        [kind, k] = s.lookup(id, true);
-        assert(ismember(kind, {'joint', 'ref'}), 'fmbd:fix', ['%s is not a joint or reference ' ...
-            'point; support an elastic body through a coupling.'], string(id));
-        s.Fixes(end+1) = struct('kind', kind, 'idx', k, 'dirs', dirs);
+    function fix(s, id, varargin)
+    %FIX Support:
+    %   s.fix(ref, dirs)         holds a reference point (rigid body or
+    %                            coupling) in dirs (default 1:6, [ux uy uz
+    %                            rx ry rz], world axes)
+    %   s.fix(joint, dirs)       holds joint coordinates at their Position
+    %   s.fix(body, sel, dirs)   clamps nodes of an elastic body (dirs
+    %                            default 1:3); its elastic group is grounded,
+    %                            so the supports must hold it (e.g. a face)
+        if numel(varargin) >= 2 || (isscalar(varargin) && isa(varargin{1}, 'function_handle'))
+            sel = varargin{1};  dirs = 1:3;  if numel(varargin) >= 2, dirs = varargin{2}; end
+            [kind, k] = s.lookup(id, false);
+            assert(strcmp(kind, 'body') && ~s.Bodies{k}.Rigid, 'fmbd:fix', ...
+                'Node supports are for elastic bodies; support a rigid body with s.fix(body, dirs).');
+            nodes = s.Bodies{k}.nodes(sel);
+            assert(~isempty(nodes), 'fmbd:fix', 'No nodes selected.');
+            s.Fixes(end+1) = struct('kind', 'nodes', 'idx', k, 'dirs', dirs, 'nodes', nodes);
+        else
+            dirs = [];  if isscalar(varargin), dirs = varargin{1}; end
+            [kind, k] = s.lookup(id, true);
+            assert(ismember(kind, {'joint', 'ref'}), 'fmbd:fix', ['%s is not a joint or reference ' ...
+                'point; clamp nodes of an elastic body with s.fix(body, sel).'], string(id));
+            s.Fixes(end+1) = struct('kind', kind, 'idx', k, 'dirs', dirs, 'nodes', []);
+        end
         s.built = false;
     end
 
@@ -267,17 +329,24 @@ methods
     function output(s, name, id, sel, dirs, opts)
     %OUTPUT Named output (sensor), one signal per direction: joint
     %   coordinates, reference-point coordinates or the average displacement
-    %   of a node set, selected as in input. Type: 'displacement' (default)
-    %   or 'velocity'.
+    %   of a node set, selected as in input. Type: 'displacement' (default),
+    %   'velocity' or 'acceleration'.
         arguments
             s
             name (1,:) char
             id
             sel = []
             dirs = []
-            opts.Type (1,:) char {mustBeMember(opts.Type, {'displacement', 'velocity'})} = 'displacement'
+            opts.Type (1,:) char {mustBeMember(opts.Type, {'displacement', 'velocity', 'acceleration'})} = 'displacement'
         end
         s.Outputs = [s.Outputs, s.signalSpec(name, id, sel, dirs, opts.Type)];
+        s.built = false;
+    end
+
+    function update(s)
+    %UPDATE Rebuild the system on its next use, after changing a body
+    %   directly (e.g. b.Modes, b.Damping, b.setMass); changes made through
+    %   the System methods are picked up automatically.
         s.built = false;
     end
 
@@ -287,10 +356,11 @@ methods
     %   [t, y, x] = s.simulate([t0 t1]) starts in the initial configuration
     %   (joint Position and Velocity) and returns the times t, the outputs y
     %   (struct, one field per output signal) and the states x, a struct with
-    %     r   3 x nb x nt     frame positions (centre of mass of rigid bodies)
-    %     R   3 x 3 x nb x nt frame rotations
-    %     e   ne x nt         modal coordinates of the elastic bodies
-    %     nu  nDof x nt       velocities [v (world); omega (body); deta] per body
+    %     r   3 x nu x nt     frame positions per unit (a rigid body, at its
+    %                         centre of mass, or an elastic group)
+    %     R   3 x 3 x nu x nt frame rotations
+    %     e   ne x nt         modal coordinates of the elastic groups
+    %     nu  nDof x nt       velocities [v (world); omega (body); deta] per unit
     %   Positions satisfy the constraints at every step (Newton tolerance),
     %   velocities are projected onto them (mass-orthogonal).
     %
@@ -321,12 +391,16 @@ methods
         nb = numel(s.Bd);  n = s.N;
 
         [q, nu] = s.startState(opts.Initial);  u = zeros(numel(s.In), 1);
-        y0 = s.outputs(q, nu);
-        if ~isempty(opts.Input), u = opts.Input(t(1), y0); end
         [F, ~, ~, Mq] = s.forces(q, nu, u);
         [~, G] = s.constraints(q);  nc = size(G, 1);
         sol = [Mq, G'; G, zeros(nc)]\[F; -s.convective(q, nu)];
         wd = sol(1:n);  lam = sol(n+1:end);  acc = wd;
+        y0 = s.outputs(q, nu, wd);
+        if ~isempty(opts.Input)                  % first input, then consistent accelerations
+            u = opts.Input(t(1), y0);  F = s.forces(q, nu, u);
+            sol = [Mq, G'; G, zeros(nc)]\[F; -s.convective(q, nu)];
+            wd = sol(1:n);  lam = sol(n+1:end);  acc = wd;  y0 = s.outputs(q, nu, wd);
+        end
 
         x = struct('r', zeros(3, nb, nt+1), 'R', zeros(3, 3, nb, nt+1), ...
                    'e', zeros(numel(q.e), nt+1), 'nu', zeros(n, nt+1));
@@ -362,7 +436,7 @@ methods
                 p = [Mq, G'; G, zeros(nc)]\[zeros(n, 1); -G*nu];  nu = nu + p(1:n);
             end
             acc = an;  wd = w;
-            yk = s.outputs(q, nu);
+            yk = s.outputs(q, nu, w);
             x.r(:,:,k+1) = q.r;  x.R(:,:,:,k+1) = q.R;  x.e(:,k+1) = q.e;  x.nu(:,k+1) = nu;
             Y(:,k+1) = cell2mat(struct2cell(yk));
         end
@@ -439,11 +513,11 @@ methods
     function lin = linearize(s, x, opts)
     %LINEARIZE Linear model about a state at rest (default: the initial
     %   configuration), e.g. from equilibrium:
-    %     M z'' + C z' + K z = B u,   y = Cz z + Cv z'
+    %     M z'' + C z' + K z = B u,   y = Cz z + Cv z' + Ca z''
     %   in independent coordinates z (dq = T*z satisfies the linearised
     %   constraints, T orthonormal). K includes the stiffness from gravity,
     %   constraint forces and preloaded springs. Returns a struct with M, C,
-    %   K, B, Cz, Cv, T, InputName and OutputName. Option Input = u0.
+    %   K, B, Cz, Cv, Ca, T, InputName and OutputName. Option Input = u0.
         arguments
             s
             x struct = struct([])
@@ -471,14 +545,18 @@ methods
             du = zeros(numel(s.In), 1);  du(i) = 1;
             Bq(:, i) = s.forces(q, nu, u0 + du) - s.forces(q, nu, u0);
         end
-        no = numel(s.Out);  Yq = zeros(no, n);  Yv = zeros(no, n);
+        no = numel(s.Out);  Yq = zeros(no, n);  Yv = zeros(no, n);  Ya = zeros(no, n);
         for i = 1:no
             sg = s.Out(i);  [~, Jc] = s.coord(sg.kind, sg.idx, q);
-            if strcmp(sg.type, 'velocity'), Yv(i,:) = Jc(sg.dir, :); else, Yq(i,:) = Jc(sg.dir, :); end
+            switch sg.type
+                case 'displacement', Yq(i,:) = Jc(sg.dir, :);
+                case 'velocity',     Yv(i,:) = Jc(sg.dir, :);
+                otherwise,           Ya(i,:) = Jc(sg.dir, :);
+            end
         end
-        Mq = s.massMatrix(q);
         lin = struct('M', T'*Mq*T, 'C', T'*Cq*T, 'K', T'*Kq*T, 'B', T'*Bq, 'Cz', Yq*T, ...
-                     'Cv', Yv*T, 'T', T, 'InputName', {s.InputName}, 'OutputName', {s.OutputName});
+                     'Cv', Yv*T, 'Ca', Ya*T, 'T', T, 'InputName', {s.InputName}, ...
+                     'OutputName', {s.OutputName});
         lin.M = (lin.M + lin.M')/2;
     end
 
@@ -526,7 +604,8 @@ methods
         Z = diag(2*zeta.*w) + V'*lin.C*V;  Om2 = V'*lin.K*V;
         A = [zeros(nr), eye(nr); -Om2, -Z];
         Bs = [zeros(nr, size(B, 2)); V'*B];
-        Cs = [lin.Cz*V, lin.Cv*V];  Ds = zeros(size(Cs, 1), size(B, 2));
+        Ca = lin.Ca*V;  Bm = V'*B;                  % accelerations: eta'' = -Om2 eta - Z eta' + Bm u
+        Cs = [lin.Cz*V - Ca*Om2, lin.Cv*V - Ca*Z];  Ds = Ca*Bm;
         sys = struct('A', A, 'B', Bs, 'C', Cs, 'D', Ds, 'InputName', {lin.InputName}, ...
                      'OutputName', {lin.OutputName}, 'f', sign(lam).*sqrt(abs(lam))/(2*pi));
         if opts.Format == "ss"
@@ -569,8 +648,10 @@ methods
     %   with r, R and eta from simulate (x.r, x.R, x.e).
         s.build();
         [kind, i] = s.lookup(body, false);
-        assert(strcmp(kind, 'body') && s.Bd(i).elastic, 'fmbd:modeShapes', 'Not an elastic body.');
-        Phi = s.Bd(i).Phi;  X0 = s.Bd(i).Xl;
+        B = s.Bd(s.Ub(i));
+        assert(strcmp(kind, 'body') && B.elastic, 'fmbd:modeShapes', 'Not an elastic body.');
+        rows = s.Uo(i) + (1:s.Bodies{i}.nNode);  d = 3*rows - [2; 1; 0];
+        Phi = B.Phi(d(:), :);  X0 = B.Xl(rows, :);
     end
 
     function h = plot(s, x, k, opts)
@@ -587,7 +668,7 @@ methods
         s.build();
         if isempty(x), x = s.state(s.q0, s.nu0); end
         if isempty(k), k = size(x.nu, 2); end
-        nb = numel(s.Bd);
+        nb = numel(s.Bodies);
         V = arrayfun(@(i) s.vertices(i, x, k, opts.Scale), 1:nb, 'UniformOutput', false);
         h = drawBodies(s.Bodies, V, num2cell(lines(nb), 2)');
         if nargout == 0, clear h, end
@@ -607,7 +688,7 @@ methods
             opts.Title (1,:) char = ''
         end
         s.build();
-        nb = numel(s.Bd);
+        nb = numel(s.Bodies);
         V = @(k) arrayfun(@(i) s.vertices(i, x, k, opts.Scale), 1:nb, 'UniformOutput', false);
         cla;  h = s.plot(x, 1, Scale = opts.Scale);
         X = reshape(permute(x.r, [1 3 2]), 3, [])';           % all frame positions
@@ -684,40 +765,52 @@ methods (Access = private)
     %% Build: frames, anchors, constraints, initial configuration
     function build(s)
         if s.built, return, end
-        nb = numel(s.Bodies);  off = 0;  eoff = 0;
+        nb = numel(s.Bodies);
+        % units: each rigid body, and each group of elastic bodies tied together
+        par = 1:nb;
+        for T = s.Ties
+            a = T.master;  while par(a) ~= a, a = par(a); end
+            b = T.slave;   while par(b) ~= b, b = par(b); end
+            par(max(a, b)) = min(a, b);
+        end
+        top = zeros(1, nb);
+        for i = 1:nb, a = i;  while par(a) ~= a, a = par(a); end, top(i) = a; end
+        roots = unique(top, 'stable');  nu = numel(roots);
+        s.Ub = zeros(1, nb);  s.Uo = zeros(1, nb);  off = 0;  eoff = 0;
         s.An = struct('body', {}, 'frame', {}, 'x0', {}, 'Psi', {});
         s.Bd = [];
-        for i = 1:nb
-            b = s.Bodies{i};
-            if b.Rigid
-                [mb, c, J] = b.massProperties();
+        for u = 1:nu
+            members = find(top == roots(u));  s.Ub(members) = u;
+            if isscalar(members) && s.Bodies{members}.Rigid
+                b = s.Bodies{members};  [mb, c, J] = b.massProperties();
                 B = struct('elastic', false, 'm', mb, 'J', J, 'c0', c(:), 'Xl', b.X - c(:)', ...
                            'ne', 0, 'Phi', zeros(3*b.nNode, 0), 'Q', [], 's', [], 'CR', [], ...
-                           'Kc', [], 'Dc', [], 'Mee', [], 'Psi', zeros(6, 0, 0), 'cpl', []);
+                           'Kc', [], 'Dc', [], 'Mee', [], 'Psi', zeros(6, 0, 0), 'cpl', [], ...
+                           'grounded', false);
             else
-                cpl = find([s.Refs.body] == i & ~cellfun(@isempty, {s.Refs.nodes}));
-                assert(~isempty(cpl), 'fmbd:System', ['%s: an elastic body needs at least one ' ...
-                       'coupling (s.couple); its first coupling carries the body frame.'], b.Name);
-                B = elasticBody(b, s.Refs(cpl));  B.cpl = cpl;
+                noff = cumsum([0, cellfun(@(b) b.nNode, s.Bodies(members))]);
+                s.Uo(members) = noff(1:end-1);
+                B = s.elasticGroup(members);
             end
             B.cols = off + (1:6 + B.ne);  B.ecols = eoff + (1:B.ne);
             off = off + 6 + B.ne;  eoff = eoff + B.ne;
             s.Bd = [s.Bd, B];
-            s.An(i) = struct('body', i, 'frame', true, 'x0', zeros(3, 1), 'Psi', zeros(6, B.ne));
+            s.An(u) = struct('body', u, 'frame', true, 'x0', zeros(3, 1), 'Psi', zeros(6, B.ne));
         end
         s.N = off;
-        q = struct('r', reshape([s.Bd.c0], 3, nb), 'R', repmat(eye(3), 1, 1, nb), 'e', zeros(eoff, 1));
+        q = struct('r', reshape([s.Bd.c0], 3, nu), 'R', repmat(eye(3), 1, 1, nu), 'e', zeros(eoff, 1));
 
-        % reference points: rigid bodies -> body anchor; couplings -> own anchor
+        % reference points: rigid bodies -> unit anchor; couplings -> own
+        % anchor (the first coupling of a free elastic group is its frame)
         s.Rf = struct('anchor', {}, 's', {}, 'x0', {});
         for k = 1:numel(s.Refs)
-            i = s.Refs(k).body;  x = s.Refs(k).x(:);  B = s.Bd(i);
+            u = s.Ub(s.Refs(k).body);  x = s.Refs(k).x(:);  B = s.Bd(u);
             if isempty(s.Refs(k).nodes)
-                s.Rf(k) = struct('anchor', i, 's', x - B.c0, 'x0', x);
-            elseif B.cpl(1) == k                 % the first coupling carries the body frame
-                s.Rf(k) = struct('anchor', i, 's', zeros(3, 1), 'x0', x);
+                s.Rf(k) = struct('anchor', u, 's', x - B.c0, 'x0', x);
+            elseif ~B.grounded && B.cpl(1) == k
+                s.Rf(k) = struct('anchor', u, 's', zeros(3, 1), 'x0', x);
             else
-                s.An(end+1) = struct('body', i, 'frame', false, 'x0', x - B.c0, ...
+                s.An(end+1) = struct('body', u, 'frame', false, 'x0', x - B.c0, ...
                                      'Psi', B.Psi(:,:,B.cpl == k));
                 s.Rf(k) = struct('anchor', numel(s.An), 's', zeros(3, 1), 'x0', x);
             end
@@ -732,6 +825,7 @@ methods (Access = private)
         s.Lk = struct('joint', {}, 'dir', {}, 'value', {});
         for f = s.Fixes
             dirs = f.dirs;
+            if strcmp(f.kind, 'nodes'), continue, end      % in the elastic group reduction
             if strcmp(f.kind, 'ref')
                 if isempty(dirs), dirs = 1:6; end
                 s.addJoint(0, f.idx, s.Refs(f.idx).x(:), eye(3), ~ismember(1:6, dirs), ...
@@ -743,6 +837,10 @@ methods (Access = private)
                     s.Lk(end+1) = struct('joint', f.idx, 'dir', d, 'value', v);
                 end
             end
+        end
+        for u = find([s.Bd.grounded])             % elastic groups clamped on nodes
+            s.Jn(end+1) = struct('A', 0, 'B', u, 'a', s.Bd(u).c0, 'b', zeros(3, 1), 'QA', eye(3), ...
+                                 'QB', eye(3), 'free', false(1, 6), 'k', zeros(6, 1), 'c', zeros(6, 1));
         end
         s.Tr = struct('terms', {}, 'coef', {}, 'k', {}, 'c', {});
         for T = s.Transmissions
@@ -785,11 +883,11 @@ methods (Access = private)
     % Signals -> (kind, idx, dir, type); node sets become average-displacement signals.
         sig = struct('kind', {list.kind}, 'idx', {list.idx}, 'dir', {list.dir}, 'type', {list.type});
         for c = find(strcmp({list.kind}, 'body'))
-            i = list(c).idx;  B = s.Bd(i);  nodes = list(c).nodes(:);
+            i = list(c).idx;  u = s.Ub(i);  B = s.Bd(u);  nodes = s.Uo(i) + list(c).nodes(:);
             d = 3*nodes' - [2; 1; 0];  P = zeros(3, B.ne);
             if B.ne > 0, P = reshape(mean(reshape(B.Phi(d(:), :), 3, numel(nodes), B.ne), 2), 3, B.ne); end
-            s.Nd(end+1) = struct('body', i, 'u0', mean(B.Xl(nodes, :), 1)', 'Phi', P, ...
-                                 'x0', mean(s.Bodies{i}.X(nodes, :), 1)');
+            s.Nd(end+1) = struct('body', u, 'u0', mean(B.Xl(nodes, :), 1)', 'Phi', P, ...
+                                 'x0', mean(s.Bodies{i}.X(list(c).nodes, :), 1)');
             sig(c).kind = 'node';  sig(c).idx = numel(s.Nd);
         end
     end
@@ -890,10 +988,45 @@ methods (Access = private)
     function V = vertices(s, i, x, k, scale)
     % Node positions of body i at step k (deformation magnified by scale);
     % the centre of mass for a point mass.
-        B = s.Bd(i);  U = B.Xl;
-        if isempty(U), V = x.r(:,i,k)';  return, end
-        if B.elastic, U = U + scale*reshape(B.Phi*x.e(B.ecols, k), 3, [])'; end
-        V = U*x.R(:,:,i,k)' + x.r(:,i,k)';
+        u = s.Ub(i);  B = s.Bd(u);  rows = s.Uo(i) + (1:s.Bodies{i}.nNode);
+        if isempty(rows), V = x.r(:,u,k)';  return, end
+        U = B.Xl(rows, :);
+        if B.elastic
+            d = 3*rows - [2; 1; 0];
+            U = U + scale*reshape(B.Phi(d(:), :)*x.e(B.ecols, k), 3, [])';
+        end
+        V = U*x.R(:,:,u,k)' + x.r(:,u,k)';
+    end
+
+    function B = elasticGroup(s, members)
+    % Reduced data of the elastic bodies members (tied together): their
+    % couplings, ties, node supports and node-set input loads, in group
+    % node numbering.
+        go = zeros(1, numel(s.Bodies));  go(members) = s.Uo(members);
+        nn = sum(cellfun(@(b) b.nNode, s.Bodies(members)));
+        cpl = find(ismember([s.Refs.body], members) & ~cellfun(@isempty, {s.Refs.nodes}));
+        C = struct('Name', {}, 'nodes', {}, 'x', {});
+        for k = cpl
+            C(end+1) = struct('Name', s.Refs(k).Name, 'nodes', go(s.Refs(k).body) + s.Refs(k).nodes(:), ...
+                              'x', s.Refs(k).x);                                    %#ok<AGROW>
+        end
+        Tg = s.Ties(ismember([s.Ties.master], members));
+        for t = 1:numel(Tg)
+            Tg(t).snodes = go(Tg(t).slave) + Tg(t).snodes;  Tg(t).mnodes = go(Tg(t).master) + Tg(t).mnodes;
+        end
+        sup = zeros(0, 1);
+        for f = s.Fixes(strcmp({s.Fixes.kind}, 'nodes') & ismember([s.Fixes.idx], members))
+            d = 3*(go(f.idx) + f.nodes(:)') - 3 + f.dirs(:);  sup = [sup; d(:)];         %#ok<AGROW>
+        end
+        loads = zeros(3*nn, 0);                   % node-set inputs: static correction shapes
+        for g = s.Inputs(strcmp({s.Inputs.kind}, 'body') & ismember([s.Inputs.idx], members))
+            f = zeros(3*nn, 1);  f(3*(go(g.idx) + g.nodes(:)) - 3 + g.dir) = 1/numel(g.nodes);
+            loads = [loads, f];                                                         %#ok<AGROW>
+        end
+        name = strjoin(cellfun(@(b) b.Name, s.Bodies(members), 'UniformOutput', false), ' + ');
+        B = reduceGroup(s.Bodies(members), C, Tg, unique(sup), loads, ...
+                        sum(cellfun(@(b) b.Modes, s.Bodies(members))), name);
+        B.cpl = cpl;
     end
 
     function [ra, Ra, Jv, Jw] = anchorKin(s, k, q)
@@ -1056,12 +1189,24 @@ methods (Access = private)
         end
     end
 
-    function y = outputs(s, q, nu)
-    % Output signals as a struct (fields in the order of OutputName).
+    function y = outputs(s, q, nu, a)
+    % Output signals as a struct (fields in the order of OutputName), with
+    % the accelerations a = dnu/dt for acceleration outputs.
         v = zeros(numel(s.Out), 1);
         for i = 1:numel(s.Out)
             sg = s.Out(i);  [c, Jc] = s.coord(sg.kind, sg.idx, q);
-            if strcmp(sg.type, 'velocity'), v(i) = Jc(sg.dir, :)*nu; else, v(i) = c(sg.dir); end
+            switch sg.type
+                case 'displacement', v(i) = c(sg.dir);
+                case 'velocity',     v(i) = Jc(sg.dir, :)*nu;
+                otherwise                        % J a + dJ/dt nu
+                    v(i) = Jc(sg.dir, :)*a;
+                    if any(nu)
+                        e = 1e-6/norm(nu);
+                        [~, Jp] = s.coord(sg.kind, sg.idx, s.retract(q, e*nu));
+                        [~, Jm] = s.coord(sg.kind, sg.idx, s.retract(q, -e*nu));
+                        v(i) = v(i) + (Jp(sg.dir, :) - Jm(sg.dir, :))*nu/(2*e);
+                    end
+            end
         end
         y = cell2struct(num2cell(v), matlab.lang.makeValidName(s.OutputName(:)), 1);
         if isempty(s.Out), y = struct(); end
@@ -1089,42 +1234,91 @@ methods (Access = private)
 end
 end
 
-function B = elasticBody(b, cpl)
-% Floating-frame data of an elastic body: frame at its first coupling,
-% Craig-Bampton modes (first coupling clamped, the others as 6-dof
-% interfaces; coupled nodes follow their coupling rigidly, RBE2), and the
-% inertia invariants Q_ab = U_a' Ms U_b with U = [X0, Phi].
-nn = b.nNode;  nc = numel(cpl);
+function B = reduceGroup(bodies, cpl, ties, sup, loads, nModes, name)
+% Floating-frame data of an elastic group (bodies tied together). The frame
+% is the first coupling (clamped), or, for a group supported on nodes,
+% fixed at the first coupling or the centroid. Coupled nodes follow their
+% coupling rigidly (RBE2), tie slaves the master surface; the other
+% couplings are 6-dof interfaces. Craig-Bampton modes plus static shapes
+% of the node-set loads; inertia invariants Q_ab = U_a' Ms U_b with
+% U = [X0, Phi].
+X = cell2mat(cellfun(@(b) b.X, bodies(:), 'UniformOutput', false));  nn = size(X, 1);
+K = cell(1, numel(bodies));  M = K;  D = K;
+for i = 1:numel(bodies)
+    [K{i}, M{i}] = bodies{i}.matrices();
+    D{i} = bodies{i}.Damping(1)*M{i} + bodies{i}.Damping(2)*K{i};
+end
+K = blkdiag(K{:});  M = blkdiag(M{:});  D = blkdiag(D{:});
+for t = ties(arrayfun(@(t) ~isempty(t.k), ties))          % elastic interfaces: K += G' Ds G
+    ns = numel(t.snodes);  kn = t.k(1);  kt = t.k(end);
+    nnT = permute(t.n, [2 3 1]).*permute(t.n, [3 2 1]);
+    Db = reshape(t.A, 1, 1, []).*(kt*eye(3) + (kn - kt)*nnT);
+    [p, q, i] = ndgrid(1:3, 1:3, 1:ns);
+    Ds = sparse(3*(i(:) - 1) + p(:), 3*(i(:) - 1) + q(:), Db(:));
+    G = gapOperator(t, nn);
+    K = K + G'*Ds*G;
+end
+grounded = ~isempty(sup);  nc = numel(cpl);
+assert(grounded || nc > 0, 'fmbd:System', ['%s: an elastic body needs a coupling (s.couple), ' ...
+       'which carries its frame, or node supports (s.fix).'], name);
+
+% roles of the nodes: coupled, tie slave, supported dofs, free
 owner = zeros(nn, 1);
 for c = 1:nc
     if any(owner(cpl(c).nodes))
-        error('fmbd:System', '%s: couplings %s and %s share nodes.', ...
-              b.Name, cpl(max(owner(cpl(c).nodes))).Name, cpl(c).Name);
+        error('fmbd:System', '%s: couplings %s and %s share nodes.', name, ...
+              cpl(max(owner(cpl(c).nodes))).Name, cpl(c).Name);
     end
     owner(cpl(c).nodes) = c;
 end
-free = find(~owner);  nf = numel(free);
-rows = reshape(3*free' - [2; 1; 0], [], 1);  I = rows;  Jc = (1:3*nf)';  V = ones(3*nf, 1);
-for c = 2:nc                                       % u = u_c + theta_c x (x - x_c)
-    p = cpl(c).nodes(:);  d = b.X(p, :) - cpl(c).x;  base = 3*nf + 6*(c - 2);  np = numel(p);
-    r = 3*p' - [2; 1; 0];
-    I = [I; r(:); reshape(repmat(3*p' - [2; 1; 0], 3, 1), [], 1)];                   %#ok<AGROW>
-    Jc = [Jc; repmat(base + (1:3)', np, 1); reshape(repmat(base + [4 5 6], 3, np), [], 1)]; %#ok<AGROW>
-    H = zeros(3, 3, np);                            % -hat(d) per node
+rigidTies = ties(arrayfun(@(t) isempty(t.k), ties));
+slave = false(nn, 1);
+for t = rigidTies, slave(t.snodes) = true; end
+assert(~any(slave & owner > 0), 'fmbd:System', '%s: a tied node is also in a coupling.', name);
+for t = rigidTies
+    assert(~any(slave(t.mnodes(:))), 'fmbd:System', '%s: chained ties (a master node is tied).', name);
+end
+fixed = false(3*nn, 1);  fixed(sup) = true;
+assert(~any(fixed(reshape(3*find(owner > 0 | slave)' - [2; 1; 0], [], 1))), 'fmbd:System', ...
+       '%s: supported nodes cannot be coupled or tied.', name);
+iface = 1:nc;  if ~grounded, iface = 2:nc; end          % the first coupling is the frame
+freeDof = find(~fixed & ~reshape(repmat((owner > 0 | slave)', 3, 1), [], 1));
+nf = numel(freeDof);  nq = nf + 6*numel(iface);
+I = freeDof;  J = (1:nf)';  V = ones(nf, 1);
+for ii = 1:numel(iface)                                 % u = u_c + theta_c x (x - x_c)
+    c = iface(ii);  pn = cpl(c).nodes(:);  d = X(pn, :) - cpl(c).x;  base = nf + 6*(ii - 1);  np = numel(pn);
+    r = 3*pn' - [2; 1; 0];
+    I = [I; r(:); reshape(repmat(r, 3, 1), [], 1)];                                  %#ok<AGROW>
+    J = [J; repmat(base + (1:3)', np, 1); reshape(repmat(base + [4 5 6], 3, np), [], 1)]; %#ok<AGROW>
+    H = zeros(3, 3, np);                                % -hat(d) per node
     H(1,2,:) = d(:,3);  H(1,3,:) = -d(:,2);  H(2,1,:) = -d(:,3);
     H(2,3,:) = d(:,1);  H(3,1,:) = d(:,2);   H(3,2,:) = -d(:,1);
     V = [V; ones(3*np, 1); H(:)];                                                      %#ok<AGROW>
 end
-T = sparse(I, Jc, V, 3*nn, 3*nf + 6*(nc - 1));
-[K, M] = b.matrices();  D = b.Damping(1)*M + b.Damping(2)*K;
-Kr = T'*K*T;  Mr = T'*M*T;  Dr = T'*D*T;
-ib = 3*nf + (1:6*(nc - 1))';
-[Kc, Mc, Vr] = fmbd.craigBampton((Kr + Kr')/2, (Mr + Mr')/2, ib, b.Modes);
+T = sparse(I, J, V, 3*nn, nq);
+if ~isempty(rigidTies)                                  % tie slaves follow the master surface
+    P = sparse(3*nn, 3*nn);
+    for t = rigidTies, P = P - gapOperator(t, nn, true); end
+    T = T + P*T;
+end
+Kr = T'*K*T;  Mr = T'*M*T;  Dr = T'*D*T;  Kr = (Kr + Kr')/2;  Mr = (Mr + Mr')/2;
+ib = (nf + 1:nq)';
+[~, ~, Vr] = fmbd.craigBampton(Kr, Mr, ib, nModes);
+if ~isempty(loads)                                      % residual attachment shapes of the loads
+    in = (1:nf)';  fr = T'*loads;  xs = zeros(nq, size(loads, 2));
+    xs(in, :) = decomposition(Kr(in, in), 'chol')\full(fr(in, :));
+    xs = xs - Vr*((Vr'*Mr*Vr)\(Vr'*Mr*xs));
+    [Qs, Ss] = eig(full(xs'*Mr*xs + (xs'*Mr*xs)')/2, 'vector');
+    kp = Ss > 1e-10*max([Ss; eps]);
+    Vr = [Vr, xs*Qs(:, kp)./sqrt(Ss(kp))'];
+end
 ne = size(Vr, 2);
+Kc = Vr'*Kr*Vr;  Mc = Vr'*Mr*Vr;  Dc = Vr'*Dr*Vr;
 Phi = full(T*Vr);
 Psi = zeros(6, ne, nc);
-for c = 2:nc, Psi(:,:,c) = Vr(3*nf + 6*(c - 2) + (1:6), :); end
-x0 = cpl(1).x(:);  Xl = b.X - x0';
+for ii = 1:numel(iface), Psi(:,:,iface(ii)) = Vr(nf + 6*(ii - 1) + (1:6), :); end
+if nc > 0, x0 = cpl(1).x(:); else, x0 = mean(X, 1)'; end
+Xl = X - x0';
 Ms = M(1:3:end, 1:3:end);
 Uf = reshape(cat(3, Xl, permute(reshape(Phi, 3, nn, ne), [2 1 3])), nn, []);   % [X0, Phi_1, ...] per node
 MU = Ms*Uf;
@@ -1135,10 +1329,64 @@ CR = zeros(3, 1 + ne, ne);                             % cross(U_a, Phi_j) momen
 for aa = 1:1 + ne
     for j = 1:ne, CR(:, aa, j) = cr(Q(:,:,aa,j+1)); end
 end
-Dc = Vr'*Dr*Vr;
 B = struct('elastic', true, 'm', full(sum(Ms(:))), 'J', [], 'c0', x0, 'Xl', Xl, 'ne', ne, ...
-           'Phi', Phi, 'Q', Q, 's', s, 'CR', CR, 'Kc', Kc, 'Dc', (Dc + Dc')/2, 'Mee', Mc, ...
-           'Psi', Psi, 'cpl', []);
+           'Phi', Phi, 'Q', Q, 's', s, 'CR', CR, 'Kc', (Kc + Kc')/2, 'Dc', (Dc + Dc')/2, ...
+           'Mee', (Mc + Mc')/2, 'Psi', Psi, 'cpl', [], 'grounded', grounded);
+end
+
+function G = gapOperator(t, nn, masterOnly)
+% Sparse gap operator G*u = u_slave - sum_j N_j u_master,j of a tie (rows
+% at the slave dofs); with masterOnly, the master part only.
+if nargin < 3, masterOnly = false; end
+d = reshape(1:3, 1, 1, 3);  ns = numel(t.snodes);
+if masterOnly
+    rows = 3*(t.snodes(:) - 1) + d + 0*t.mnodes;  cols = 3*t.mnodes - 3 + d;
+    vals = -t.N + 0*d;
+    G = sparse(rows(:), cols(:), vals(:), 3*nn, 3*nn);
+else
+    nodes = [t.snodes(:), t.mnodes];
+    rows = 3*(0:ns - 1)' + d + 0*nodes;  cols = 3*nodes - 3 + d;
+    vals = [ones(ns, 1), -t.N] + 0*d;
+    G = sparse(rows(:), cols(:), vals(:), 3*ns, 3*nn);
+end
+end
+
+function [sn, mn, N, n, A] = tieNodes(bm, bs, tol, select)
+% Slave surface nodes sn within tol of the master surface, their master
+% face nodes mn, shape-function weights N, master normals n and slave
+% nodal areas A.
+Fm = bm.F;
+Am = bm.X(Fm(:,1),:);  Bm = bm.X(Fm(:,2),:);  Cm = bm.X(Fm(:,3),:);
+if isempty(tol)
+    edge = @(b, F) median(vecnorm(b.X(F(:,[2 3 1]),:) - b.X(F(:,1:3),:), 2, 2));
+    tol = 0.1*min(edge(bm, Fm), edge(bs, bs.F));
+end
+sn = unique(bs.F(:));
+if ~isempty(select), sn = sn(select(bs.X(sn,:))); end
+lo = min(min(Am, Bm), Cm) - tol;  hi = max(max(Am, Bm), Cm) + tol;
+sn = sn(all(bs.X(sn,:) >= min(lo) & bs.X(sn,:) <= max(hi), 2));
+d = inf(numel(sn), 1);  f = zeros(numel(sn), 1);  l = zeros(numel(sn), 3);
+for i = 1:numel(sn)
+    p = bs.X(sn(i),:);
+    c = find(all(p >= lo & p <= hi, 2));
+    if isempty(c), continue, end
+    [dc, lc] = closestOnTri(p, Am(c,:), Bm(c,:), Cm(c,:));
+    [d(i), k] = min(dc);  f(i) = c(k);  l(i,:) = lc(k,:);
+end
+on = d <= tol;  sn = sn(on);  f = f(on);  l = l(on,:);
+mn = Fm(f, :);  N = triShape(l, size(Fm, 2));
+n = cross(Bm(f,:) - Am(f,:), Cm(f,:) - Am(f,:), 2);  n = n./vecnorm(n, 2, 2);
+% nodal areas of the slave interface (face weights) from slave faces that
+% touch a tied node and face the master surface
+Fs = bs.F;
+nf = cross(bs.X(Fs(:,2),:) - bs.X(Fs(:,1),:), bs.X(Fs(:,3),:) - bs.X(Fs(:,1),:), 2);
+nm = zeros(bs.nNode, 3);  nm(sn,:) = n;
+nm = reshape(sum(reshape(nm(Fs,:), [size(Fs) 3]), 2), [], 3);
+on = dot(nf, nm, 2) < -0.5*vecnorm(nf, 2, 2).*vecnorm(nm, 2, 2);
+Fs = Fs(on,:);  ar = vecnorm(nf(on,:), 2, 2)/2;
+w = [1 1 1]/3;  if size(Fs, 2) == 6, w = [3 3 3 16 16 16]/57; end
+nodeA = accumarray(Fs(:), reshape(ar.*w, [], 1), [bs.nNode 1]);
+A = nodeA(sn);
 end
 
 function [Mb, Fb] = elasticTerms(B, R, eta, nu, g)

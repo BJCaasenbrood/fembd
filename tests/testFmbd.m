@@ -53,7 +53,7 @@ Jt = diag([2 2 4])*1e-3;
 s.add(fmbd.Body.pointMass(1, [0 0 0.1], Jt, Name = 'top'));
 s.joint('ground', 'top', 'spherical', Point = [0 0 0], Position = [0.3 0 0], ...
         Velocity = [0 0 60], Name = 'pivot');
-[t, ~, x] = s.simulate([0 0.2], Step = 1e-4, Rho = 0.9);
+[~, ~, x] = s.simulate([0 0.2], Step = 1e-4, Rho = 0.9);
 E = s.energy(x);  R0 = x.R(:,:,1,1);  w0 = x.nu(4:6,1);  cb = R0'*x.r(:,1,1);
 Jp = Jt + (cb'*cb*eye(3) - cb*cb');                    % body frame = world-aligned at definition
 f = @(t, z) [reshape(reshape(z(1:9), 3, 3)*hat3(z(10:12)), 9, 1); ...
@@ -165,7 +165,63 @@ if exist('fembd.Assembly', 'class')                      % same model in fembd
     u = T*(K\(T'*(Mu*gv)));  [~, fref] = fembd.modes(K, M, 4);
     check('Elastic: gravity sag at equilibrium == FE statics', ye.uz(1), u(dm(3)), 1e-6);
     check('Elastic: modes at equilibrium == FE modes (10 CB modes)', s.modes(xe, 4), fref, 1e-5);
+
+    % elastic body tied to a rigid body (a coupling + fixed joint) == fembd
+    b3 = {fullfile(tmp, 'l3.stl'), fullfile(tmp, 'r3.stl')};
+    fmbd.boxSTL(b3{1}, [0 0 0], [Lb/2 hb hb]);  fmbd.boxSTL(b3{2}, [Lb/2 0 0], [Lb hb hb]);
+    s = fmbd.System();
+    s.add(fmbd.Body.elastic(b3{1}, steel, Size = hb/2, Name = 'left', Modes = 20));
+    s.add(fmbd.Body(b3{2}, steel, Size = hb/2, Name = 'right', Rigid = true));
+    s.fix('left', @(X) X(:,1) < 1e-6);  s.tie('right', 'left');
+    a = fembd.Assembly();
+    a.add(fembd.Body(b3{1}, steel, Size = hb/2, Name = 'left'));
+    a.add(fembd.Body(b3{2}, steel, Size = hb/2, Name = 'right', Rigid = true));
+    a.fix('left', @(X) X(:,1) < 1e-6);  a.tie('right', 'left');
+    [K, M] = a.system();  [~, fref] = fembd.modes(K, M, 4);
+    check('Tie elastic-rigid == fembd', s.modes([], 4), fref, 1e-5);
 end
+
+% acceleration outputs: mass on a spring under gravity and a step force
+s = fmbd.System(Gravity = [0 0 -g]);
+s.add(fmbd.Body.pointMass(2, [0 0 0], 1e-3*eye(3), Name = 'm'));
+s.joint('ground', 'm', 'prismatic', Axis = [0 0 1], Stiffness = 800, Name = 'z');
+s.input('F', 'z');  s.output('a', 'z', Type = 'acceleration');
+s.output('az', 'm', [], 3, Type = 'acceleration');
+[t, y] = s.simulate([0 0.2], Step = 1e-4, Input = @(t, y) 3);
+check('Acceleration outputs (joint, point) vs analytic', [y.a y.az], repmat((1.5 - g)*cos(20*t), 1, 2), 2e-5);
+S = s.statespace();
+check('State space: acceleration feedthrough D = 1/m', S.D, [0.5; 0.5], 1e-12);
+
+% ties and node supports: non-matching halves, clamped on nodes, vs the
+% monolithic beam; a stiff elastic interface vs the rigid tie
+half = {fullfile(tmp, 'left.stl'), fullfile(tmp, 'right.stl'), fullfile(tmp, 'full.stl')};
+fmbd.boxSTL(half{1}, [0 0 0], [Lb/2 hb hb]);  fmbd.boxSTL(half{2}, [Lb/2 0 0], [Lb hb hb]);
+fmbd.boxSTL(half{3}, [0 0 0], [Lb hb hb]);
+clamp = @(X) X(:,1) < 1e-6;
+s = fmbd.System();
+s.add(fmbd.Body.elastic(half{3}, steel, Size = hb/2, Name = 'beam', Modes = 20));
+s.fix('beam', clamp);  fmono = s.modes([], 4);
+for kind = ["rigid", "elastic"]
+    s = fmbd.System();
+    s.add(fmbd.Body.elastic(half{1}, steel, Size = hb/2, Name = 'left', Modes = 10));
+    s.add(fmbd.Body.elastic(half{2}, steel, Size = hb/3, Name = 'right', Modes = 10));
+    s.fix('left', clamp);
+    if kind == "rigid", ns = s.tie('left', 'right'); else, s.tie('left', 'right', Stiffness = 1e16); end
+    check(sprintf('Tie (%s, %d slave nodes): halves == monolithic beam', kind, ns), ...
+          s.modes([], 4), fmono, 1e-3);
+end
+
+% static correction: a node-set load away from couplings keeps the exact
+% static gain even without vibration modes
+s = fmbd.System();
+s.add(fmbd.Body.elastic(half{3}, steel, Size = hb/2, Name = 'beam', Modes = 0));
+s.fix('beam', clamp);
+tipSel = @(X) X(:,1) > Lb - 1e-6;
+s.input('F', 'beam', tipSel, 3);  s.output('w', 'beam', tipSel, 3);
+S = s.statespace();  dc = -S.C*(S.A\S.B);
+s.Bodies{1}.Modes = 30;  s.update();             % many modes, same load shape
+S30 = s.statespace();
+check('Static correction: node-set load, DC gain with 0 modes == 30 modes', dc, -S30.C*(S30.A\S30.B), 1e-9);
 
 % elastic bodies: stiff flexible pendulum == rigid pendulum (3 rad swing)
 stiff = fmbd.material(210e12, 0.3, 7800);
