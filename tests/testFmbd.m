@@ -91,6 +91,44 @@ B1 = O4 + c*[cos(ang)', sin(ang)'];  [~, k] = min(vecnorm(B1 - B0, 2, 2));  B1 =
 q4 = atan2(B1(2) - O4(2), B1(1) - O4(1)) - atan2(B0(2) - O4(2), B0(1) - O4(1));
 check('Four-bar: Position on the crank == position analysis', [y.q1(1), y.q4(1)], [th, q4], 1e-10);
 
+% linearisation: gravity stiffness of a hanging and an inverted pendulum
+label = {'hanging pendulum: f = sqrt(m g l/J)', 'inverted pendulum: f = -sqrt(m g l/J)'};
+for sg = [-1 1]                                          % centre of mass below/above the hinge
+    s = fmbd.System(Gravity = [0 0 -g]);
+    s.add(fmbd.Body.pointMass(2, [0 0 sg*0.3], 0.01*eye(3), Name = 'p'));
+    s.joint('ground', 'p', 'revolute', Point = [0 0 0], Axis = [0 1 0], Name = 'h');
+    check(['Linearised ' label{(sg + 3)/2}], s.modes(), -sg*sqrt(2*g*0.3/(0.01 + 2*0.3^2))/(2*pi), 1e-10);
+end
+
+% equilibrium of a pendulum on a torsion spring, k th = m g l cos(th), and
+% the linearised frequency there
+s = fmbd.System(Gravity = [0 0 -g]);
+s.add(fmbd.Body.pointMass(2, [0.3 0 0], 0.01*eye(3), Name = 'p'));
+s.joint('ground', 'p', 'revolute', Point = [0 0 0], Axis = [0 1 0], Stiffness = 10, Name = 'h');
+s.output('th', 'h');
+x = s.equilibrium();  [~, y] = s.simulate([0 1e-3], Initial = x);
+th = fzero(@(th) 10*th - 2*g*0.3*cos(th), 0.5);
+check('Equilibrium: k th = m g l cos(th)', y.th(1), th, 1e-10);
+check('Linearised at the equilibrium (preloaded spring)', s.modes(x), ...
+      sqrt((10 + 2*g*0.3*sin(th))/(0.01 + 2*0.3^2))/(2*pi), 1e-8);
+
+% state space of the belt drive == fembd (linear FE path), and the DC gain
+% with one mode plus static correction
+s = belt(false);  s.input('tau', 'motor');  s.output('wa', 'axis', Type = 'velocity');
+S1 = s.statespace();  S3 = s.statespace(Modes = 1);
+Hs = @(S, w) S.C*((1i*w*eye(size(S.A)) - S.A)\S.B) + S.D;
+Kq = [50/9, -50/3; -50/3, 300 + 50];  Dq = [1e-3 + 0.02/9, -0.02/3; -0.02/3, 0.05 + 0.02];
+Mq = diag([1e-4, 0.01 + 2*0.2^2]);
+Hx = @(w) (-w^2*Mq + 1i*w*Dq + Kq)\[1; 0];                          % [motor; axis] per unit torque
+w = 2*pi*[0.1 3 10 60 300];  err = 0;
+for k = 1:numel(w)
+    Hq = Hx(w(k));  Hr = [Hq(1); Hq(2); 1i*w(k)*Hq(2)];             % qm, qa, wa
+    err = max(err, norm(Hs(S1, w(k)) - Hr)/norm(Hr));
+end
+check('State space: belt drive FRF == exact', err, 0, 1e-9);
+check('State space: 1 mode + static correction keeps the DC gain', ...
+      S3.C(1,:)*(S3.A\S3.B), S1.C(1,:)*(S1.A\S1.B), 1e-10);
+
 % elastic bodies: cantilever with a tip mass on its second coupling
 Lb = 0.5;  hb = 0.02;  beam = fullfile(tmp, 'beam.stl');
 fmbd.boxSTL(beam, [0 0 0], [Lb hb hb]);
@@ -119,6 +157,14 @@ if exist('fembd.Assembly', 'class')                      % same model in fembd
     for k = 2:numel(t), xs = Ad*xs + Bd;  Yl(k,:) = (sys.C*xs)'; end
     check('Elastic: tip mass and node set == linear FE model (fembd)', ...
           [y.uz, y.mid]./max(abs(Yl)), Yl./max(abs(Yl)), 1e-3);
+
+    % equilibrium under gravity and modes == linear FE model (full mesh)
+    s.Gravity = [0 0 -g];  xe = s.equilibrium();  [~, ye] = s.simulate([0 1e-4], Initial = xe, Step = 1e-4);
+    [K, M, T] = a.system();  [~, Mu] = a.assemble();  dm = a.dof('mass');
+    gv = zeros(a.nDof, 1);  gv(3:3:3*size(a.X, 1)) = -g;  gv(dm(3)) = -g;
+    u = T*(K\(T'*(Mu*gv)));  [~, fref] = fembd.modes(K, M, 4);
+    check('Elastic: gravity sag at equilibrium == FE statics', ye.uz(1), u(dm(3)), 1e-6);
+    check('Elastic: modes at equilibrium == FE modes (10 CB modes)', s.modes(xe, 4), fref, 1e-5);
 end
 
 % elastic bodies: stiff flexible pendulum == rigid pendulum (3 rad swing)

@@ -302,6 +302,8 @@ methods
     %     Rho    spectral radius at infinity, 0..1 (default 0.8): 1 has no
     %            numerical damping, lower values damp high frequencies
     %     Tol    Newton tolerance on the accelerations, relative (default 1e-8)
+    %     Initial  start state instead of the initial configuration, e.g.
+    %            from equilibrium, or a simulation x (its last step)
         arguments
             s
             tspan (1,2) double
@@ -309,6 +311,7 @@ methods
             opts.Input = []
             opts.Rho (1,1) double {mustBeInRange(opts.Rho, 0, 1)} = 0.8
             opts.Tol (1,1) double {mustBePositive} = 1e-8
+            opts.Initial struct = struct([])
         end
         s.build();
         nt = max(1, round(diff(tspan)/opts.Step));  h = diff(tspan)/nt;
@@ -317,7 +320,7 @@ methods
         gm = 0.5 + af - am;  be = 0.25*(gm + 0.5)^2;  ca = (1 - af)/(1 - am);
         nb = numel(s.Bd);  n = s.N;
 
-        q = s.q0;  nu = s.nu0;  u = zeros(numel(s.In), 1);
+        [q, nu] = s.startState(opts.Initial);  u = zeros(numel(s.In), 1);
         y0 = s.outputs(q, nu);
         if ~isempty(opts.Input), u = opts.Input(t(1), y0); end
         [F, ~, ~, Mq] = s.forces(q, nu, u);
@@ -398,6 +401,164 @@ methods
             end
         end
         E.total = E.kinetic + E.gravity + E.strain + E.springs;
+    end
+
+    function x = equilibrium(s, opts)
+    %EQUILIBRIUM Static equilibrium under gravity, springs and constant
+    %   inputs: x = s.equilibrium(Input = u0) starts from the initial
+    %   configuration (or Initial) and returns the state (as from simulate,
+    %   one step, at rest). Coordinates without stiffness (free mechanisms)
+    %   stay where they are. Use it with simulate(Initial = x), linearize,
+    %   statespace, modes and plot.
+        arguments
+            s
+            opts.Input double = []
+            opts.Initial struct = struct([])
+            opts.Tol (1,1) double {mustBePositive} = 1e-10
+            opts.MaxIter (1,1) double = 100
+        end
+        s.build();
+        [q, ~] = s.startState(opts.Initial);  n = s.N;  nu = zeros(n, 1);
+        u = s.inputVector(opts.Input);
+        [~, G] = s.constraints(q);  nc = size(G, 1);  lam = zeros(nc, 1);
+        for it = 1:opts.MaxIter
+            F = s.forces(q, nu, u);  [g, G] = s.constraints(q);
+            if it == 1, lam = lsqminnorm(G', F); end
+            res = [F - G'*lam; g];                  % force balance, constraints
+            if norm(res(1:n)) < opts.Tol*max(norm(F), 1) && max(abs([g; 0])) < 1e-12, break, end
+            Kt = s.stiffness(q, u, lam);            % -d(F - G'*lam)/dq
+            dx = lsqminnorm([Kt, G'; G, zeros(nc)], [res(1:n); -g]);   % minimum norm: free mechanisms stay
+            q = s.retract(q, dx(1:n));  lam = lam + dx(n+1:end);
+        end
+        if it == opts.MaxIter
+            warning('fmbd:equilibrium', 'No equilibrium found (residual %.1e).', norm(res));
+        end
+        x = s.state(q, nu);
+    end
+
+    function lin = linearize(s, x, opts)
+    %LINEARIZE Linear model about a state at rest (default: the initial
+    %   configuration), e.g. from equilibrium:
+    %     M z'' + C z' + K z = B u,   y = Cz z + Cv z'
+    %   in independent coordinates z (dq = T*z satisfies the linearised
+    %   constraints, T orthonormal). K includes the stiffness from gravity,
+    %   constraint forces and preloaded springs. Returns a struct with M, C,
+    %   K, B, Cz, Cv, T, InputName and OutputName. Option Input = u0.
+        arguments
+            s
+            x struct = struct([])
+            opts.Input double = []
+        end
+        s.build();
+        [q, nu] = s.startState(x);
+        if any(nu)
+            warning('fmbd:linearize', 'The state is moving; the model is linearised at its velocities.');
+        end
+        n = s.N;  u0 = s.inputVector(opts.Input);
+        [~, G] = s.constraints(q);
+        T = null(G);  if isempty(G), T = eye(n); end
+        [F, ~, ~, Mq] = s.forces(q, nu, u0);  nc = size(G, 1);
+        sol = lsqminnorm([Mq, G'; G, zeros(nc)], [F; -s.convective(q, nu)]);   % constraint forces
+        lam = sol(n+1:end);                         % (dynamic, so also away from equilibrium)
+        Kq = s.stiffness(q, u0, lam, nu);
+        Cq = zeros(n);  e = 1;                      % forces are at most quadratic in nu,
+        for j = 1:n                                 % so central differences are exact
+            d = zeros(n, 1);  d(j) = e;
+            Cq(:, j) = -(s.forces(q, nu + d, u0) - s.forces(q, nu - d, u0))/(2*e);
+        end
+        Bq = zeros(n, numel(s.In));
+        for i = 1:numel(s.In)                       % forces are linear in the inputs
+            du = zeros(numel(s.In), 1);  du(i) = 1;
+            Bq(:, i) = s.forces(q, nu, u0 + du) - s.forces(q, nu, u0);
+        end
+        no = numel(s.Out);  Yq = zeros(no, n);  Yv = zeros(no, n);
+        for i = 1:no
+            sg = s.Out(i);  [~, Jc] = s.coord(sg.kind, sg.idx, q);
+            if strcmp(sg.type, 'velocity'), Yv(i,:) = Jc(sg.dir, :); else, Yq(i,:) = Jc(sg.dir, :); end
+        end
+        Mq = s.massMatrix(q);
+        lin = struct('M', T'*Mq*T, 'C', T'*Cq*T, 'K', T'*Kq*T, 'B', T'*Bq, 'Cz', Yq*T, ...
+                     'Cv', Yv*T, 'T', T, 'InputName', {s.InputName}, 'OutputName', {s.OutputName});
+        lin.M = (lin.M + lin.M')/2;
+    end
+
+    function sys = statespace(s, x, opts)
+    %STATESPACE State-space model from the inputs to the outputs, about a
+    %   state at rest (default: the initial configuration; e.g. from
+    %   equilibrium). States are modal, [eta; deta].
+    %     Modes            number of modes (default: all); rigid-body and
+    %                      mechanism modes are exact double integrators
+    %     Damping          modal damping ratio (default 0), added to the
+    %                      body, joint and transmission dampers
+    %     StaticCorrection add quasi-static shapes for the inputs when modes
+    %                      are truncated (default true): exact DC gain
+    %     Input            constant inputs u0 at the operating point
+    %     Format           "struct" (default: A, B, C, D, names, f) or "ss"
+        arguments
+            s
+            x struct = struct([])
+            opts.Modes (1,1) double {mustBePositive} = inf
+            opts.Damping double = 0
+            opts.StaticCorrection (1,1) logical = true
+            opts.Input double = []
+            opts.Format (1,1) string {mustBeMember(opts.Format, ["struct", "ss"])} = "struct"
+        end
+        lin = s.linearize(x, Input = opts.Input);
+        K = (lin.K + lin.K')/2;  M = lin.M;  B = lin.B;  nz = size(K, 1);
+        [P, lam] = eig(K, M, 'vector');
+        [lam, i] = sort(real(lam));  P = real(P(:, i));
+        lam(abs(lam) < 1e-10*max(abs(lam))) = 0;  % round-off rigid/mechanism modes: exactly 0
+        nm = min(opts.Modes, nz);  V = P(:, 1:nm);
+        if opts.StaticCorrection && nm < nz && ~isempty(B)
+            sigma = 0;  if any(lam(1:nm) <= 0), sigma = -1e-6*max(abs(lam)); end
+            X = (K - sigma*M)\B;  X = X - V*(V'*(M*X));
+            [Q, S] = eig((X'*M*X + (X'*M*X)')/2, 'vector');  kp = S > 1e-12*max([S; eps]);
+            W = [V, X*Q(:,kp)./sqrt(S(kp))'];
+            [P2, l2] = eig((W'*K*W + (W'*K*W)')/2, (W'*M*W + (W'*M*W)')/2, 'vector');
+            [l2, i] = sort(real(l2));  V = W*real(P2(:, i));  lam = l2;
+            lam(abs(lam) < 1e-10*max(abs(lam))) = 0;
+        else
+            lam = lam(1:nm);
+        end
+        V = V./sqrt(dot(V, M*V));  nr = size(V, 2);
+        zeta = opts.Damping(:);  if isscalar(zeta), zeta = zeta*ones(nr, 1); end
+        w = sqrt(max(lam, 0));
+        Z = diag(2*zeta.*w) + V'*lin.C*V;  Om2 = V'*lin.K*V;
+        A = [zeros(nr), eye(nr); -Om2, -Z];
+        Bs = [zeros(nr, size(B, 2)); V'*B];
+        Cs = [lin.Cz*V, lin.Cv*V];  Ds = zeros(size(Cs, 1), size(B, 2));
+        sys = struct('A', A, 'B', Bs, 'C', Cs, 'D', Ds, 'InputName', {lin.InputName}, ...
+                     'OutputName', {lin.OutputName}, 'f', sign(lam).*sqrt(abs(lam))/(2*pi));
+        if opts.Format == "ss"
+            sys = ss(A, Bs, Cs, Ds, 'InputName', lin.InputName, 'OutputName', lin.OutputName);
+        end
+    end
+
+    function [f, V] = modes(s, x, n)
+    %MODES Natural frequencies f (Hz) and mode shapes about a state at rest
+    %   (default: the initial configuration; e.g. from equilibrium):
+    %   [f, V] = s.modes(x, n). Unstable directions (e.g. an inverted
+    %   pendulum) give negative f. V (nDof x n) are velocity-like tangent
+    %   directions; s.plot(s.perturb(x, V(:,k)*a)) shows mode k.
+        arguments
+            s
+            x struct = struct([])
+            n (1,1) double = inf
+        end
+        lin = s.linearize(x);
+        [P, lam] = eig((lin.K + lin.K')/2, lin.M, 'vector');
+        [lam, i] = sort(real(lam));  n = min(n, numel(lam));
+        lam(abs(lam) < 1e-10*max(abs(lam))) = 0;
+        f = sign(lam(1:n)).*sqrt(abs(lam(1:n)))/(2*pi);
+        V = lin.T*real(P(:, i(1:n)));
+    end
+
+    function x = perturb(s, x, dq)
+    %PERTURB State x moved along the tangent direction dq (nDof x 1), e.g.
+    %   a mode shape from modes: s.plot(s.perturb(x, 0.05*V(:,k))).
+        s.build();
+        [q, nu] = s.startState(x);
+        x = s.state(s.retract(q, dq), nu);
     end
 
     function [Phi, X0] = modeShapes(s, body)
@@ -693,6 +854,34 @@ methods (Access = private)
     end
 
     %% Kinematics, constraints and forces
+    function [q, nu] = startState(s, x)
+    % Configuration and velocities of a state struct (its last step), or
+    % the initial configuration when x is empty.
+        if isempty(x), q = s.q0;  nu = s.nu0;  return, end
+        k = size(x.nu, 2);
+        q = struct('r', x.r(:,:,k), 'R', x.R(:,:,:,k), 'e', x.e(:,k));  nu = x.nu(:,k);
+    end
+
+    function u = inputVector(s, u)
+    % Input signals as a column (default zero).
+        if isempty(u), u = zeros(numel(s.In), 1); end
+        u = u(:);
+        assert(numel(u) == numel(s.In), 'fmbd:System', '%d input value(s) expected.', numel(s.In));
+    end
+
+    function K = stiffness(s, q, u, lam, nu)
+    % Tangent stiffness K = -d(F - G'*lam)/dq by central differences on the
+    % tangent space (gravity, springs, elastic and constraint-force terms).
+        if nargin < 5, nu = zeros(s.N, 1); end
+        n = s.N;  K = zeros(n);  e = 1e-5;          % ~ eps^(1/3): truncation vs round-off
+        for j = 1:n
+            d = zeros(n, 1);  d(j) = e;
+            qp = s.retract(q, d);  qm = s.retract(q, -d);
+            [~, Gp] = s.constraints(qp);  [~, Gm] = s.constraints(qm);
+            K(:, j) = -((s.forces(qp, nu, u) - Gp'*lam) - (s.forces(qm, nu, u) - Gm'*lam))/(2*e);
+        end
+    end
+
     function x = state(~, q, nu)
     % A one-step state struct as returned by simulate.
         x = struct('r', q.r, 'R', q.R, 'e', q.e, 'nu', nu);
