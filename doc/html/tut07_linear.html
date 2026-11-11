@@ -1,0 +1,326 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<META http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      -->
+<title>tut07_linear</title>
+<meta name="generator" content="MATLAB 24.1">
+<link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
+<meta name="DC.date" content="2026-11-11">
+<meta name="DC.source" content="tut07_linear.m">
+<style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; }
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+span.typesection { color:#A0522D }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style>
+</head>
+<body>
+<div class="content">
+<h2>Contents</h2>
+<div>
+<ul>
+<li>
+<a href="#1">Tutorial 7 - Linear analysis: equilibrium, modes and state space</a>
+</li>
+<li>
+<a href="#2">1. A horizontal arm with an elastic forearm</a>
+</li>
+<li>
+<a href="#3">2. Equilibrium under gravity</a>
+</li>
+<li>
+<a href="#4">3. Modes at several operating points</a>
+</li>
+<li>
+<a href="#5">4. State space</a>
+</li>
+<li>
+<a href="#6">5. A controller designed on the linear model</a>
+</li>
+</ul>
+</div>
+<h2 id="1">Tutorial 7 - Linear analysis: equilibrium, modes and state space</h2>
+<p>The nonlinear system gives a linear model about any state at rest:</p>
+<pre class="language-matlab">M <span class="string">z''</span> <span class="string">+</span> <span class="string">C</span> <span class="string">z' + K z = B u,   y = Cz z + Cv z'</span> <span class="string">+</span> <span class="string">Ca</span> <span class="string">z''</span>
+</pre>
+<p>in independent coordinates z (the constraints are eliminated). K includes the stiffness from gravity, constraint forces and preloaded springs. This tutorial covers:</p>
+<div>
+<ul>
+<li>
+<tt>equilibrium</tt>: the static state under gravity and constant inputs</li>
+<li>
+<tt>modes</tt> at several operating points (configuration-dependent dynamics)</li>
+<li>
+<tt>linearize</tt> and <tt>statespace</tt>: modal state space, static correction, damping, acceleration outputs</li>
+<li>a controller designed on the linear model, checked in the nonlinear one</li>
+</ul>
+</div>
+<pre class="codeinput">addpath(fileparts(fileparts(mfilename(<span class="string">'fullpath'</span>))));
+out = fullfile(tempdir, <span class="string">'fmbdTutorials'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
+</pre>
+<h2 id="2">1. A horizontal arm with an elastic forearm</h2>
+<p>A rigid upper arm and an elastic forearm (as in Tutorial 1), on revolute joints about z, with gravity along -z. The joints are free: in the horizontal plane gravity does not turn them, so every pose is an equilibrium. The elbow angle is set with Position.</p>
+<pre class="codeinput">fmbd.boxSTL(fullfile(out, <span class="string">'upper.stl'</span>),   [0 -0.02 -0.01],     [0.3 0.02 0.01]);
+fmbd.boxSTL(fullfile(out, <span class="string">'forearm.stl'</span>), [0.3 -0.015 -0.005], [0.6 0.015 0.005]);
+steel = fmbd.material(210e9, 0.30, 7850);  alu = fmbd.material(70e9, 0.33, 2700);
+upper   = fmbd.Body(fullfile(out, <span class="string">'upper.stl'</span>), steel, Size = 0.02, Rigid = true, Name = <span class="string">'upper'</span>);
+forearm = fmbd.Body.elastic(fullfile(out, <span class="string">'forearm.stl'</span>), alu, Size = 0.006, Modes = 6, <span class="keyword">...</span>
+                            Damping = [0 2e-5], Name = <span class="string">'forearm'</span>);
+arm = @(elbow) scara(upper, forearm, elbow);
+</pre>
+<h2 id="3">2. Equilibrium under gravity</h2>
+<p>
+<tt>equilibrium</tt> solves the static equations (here: the forearm sags under gravity; the free joint angles stay at their Position).</p>
+<pre class="codeinput">s = arm(0);
+x0 = s.equilibrium();  [~, y] = s.simulate([0 1e-4], Initial = x0, Step = 1e-4);
+fprintf(<span class="string">'gravity sag of the forearm tip: %.1f um\n'</span>, 1e6*y.tipz(1));
+</pre>
+<pre class="codeoutput">gravity sag of the forearm tip: -45.4 um
+</pre>
+<h2 id="4">3. Modes at several operating points</h2>
+<p>The forearm's first bending mode couples with the arm's rigid motion, which depends on the elbow angle: a linear model holds about one pose only. <tt>modes</tt> gives the frequencies (and shapes) at each equilibrium; the two free joints are mechanism modes at 0 Hz.</p>
+<pre class="codeinput">elbow = deg2rad(0:15:150);  f3 = zeros(size(elbow));
+<span class="keyword">for</span> k = 1:numel(elbow)
+    s = arm(elbow(k));  f = s.modes(s.equilibrium(), 4);  f3(k) = f(3);
+<span class="keyword">end</span>
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);  plot(rad2deg(elbow), f3, <span class="string">'o-'</span>);  grid <span class="string">on</span>
+xlabel(<span class="string">'elbow angle (deg)'</span>);  ylabel(<span class="string">'first elastic mode (Hz)'</span>);
+title(<span class="string">'Configuration-dependent dynamics'</span>);
+s = arm(pi/2);  x0 = s.equilibrium();  [f, V] = s.modes(x0, 4);
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);  s.plotMode(x0, V(:,3), Amplitude = 0.05, Title = sprintf(<span class="string">'Elbow 90 deg: %.1f Hz'</span>, f(3)));
+</pre>
+<img vspace="5" hspace="5" src="tut07_linear_01.png" alt=""> <img vspace="5" hspace="5" src="tut07_linear_02.png" alt=""> <h2 id="5">4. State space</h2>
+<p>
+<tt>statespace</tt> returns A, B, C, D in modal coordinates [eta; deta] (or an ss object with Format = "ss", Control System Toolbox). Modes truncates the model; the static correction then keeps the DC gain exact. Damping adds a modal damping ratio to the physical dampers (here the forearm's Rayleigh damping). Acceleration outputs have a feedthrough D.</p>
+<pre class="codeinput">sys = s.statespace(x0, Modes = 6);
+fprintf(<span class="string">'%d states; inputs %s; outputs %s\n'</span>, size(sys.A, 1), strjoin(sys.InputName, <span class="string">', '</span>), <span class="keyword">...</span>
+        strjoin(sys.OutputName, <span class="string">', '</span>));
+fprintf(<span class="string">'D (tip acceleration per unit torque): %s\n'</span>, mat2str(sys.D(end,:), 3));
+<span class="comment">% frequency response tau2 -&gt; elbow angle and tip acceleration, computed</span>
+<span class="comment">% directly from A, B, C, D</span>
+fHz = logspace(0, 3.3, 600);  H = zeros(numel(sys.OutputName), numel(fHz));
+<span class="keyword">for</span> k = 1:numel(fHz)
+    Hk = sys.C*((2i*pi*fHz(k)*eye(size(sys.A)) - sys.A)\sys.B) + sys.D;  H(:,k) = Hk(:,2);
+<span class="keyword">end</span>
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
+subplot(2, 1, 1);  loglog(fHz, abs(H(strcmp(sys.OutputName, <span class="string">'th2'</span>),:)));  grid <span class="string">on</span>
+ylabel(<span class="string">'|th2/tau2| (rad/N m)'</span>);  title(<span class="string">'Elbow torque to elbow angle and tip acceleration'</span>);
+subplot(2, 1, 2);  loglog(fHz, abs(H(strcmp(sys.OutputName, <span class="string">'tipa'</span>),:)));  grid <span class="string">on</span>
+xlabel(<span class="string">'frequency (Hz)'</span>);  ylabel(<span class="string">'|a_{tip}/tau2| (m/s^2/N m)'</span>);
+</pre>
+<pre class="codeoutput">16 states; inputs tau1, tau2; outputs th1, th2, w1, w2, tipz, tipa
+D (tip acceleration per unit torque): [-0.000104 -0.0241]
+</pre>
+<img vspace="5" hspace="5" src="tut07_linear_03.png" alt=""> <h2 id="6">5. A controller designed on the linear model</h2>
+<p>A PD controller on both joints, closed around the linear model, predicts the response to a small elbow step. The nonlinear simulation with the same controller in the loop agrees, as long as the motion stays small.</p>
+<pre class="codeinput">kp = [16; 1.5];  kd = [1.8; 0.15];  r = [0; 0.02];             <span class="comment">% step of 0.02 rad on the elbow</span>
+iy = cellfun(@(n) find(strcmp(sys.OutputName, n)), {<span class="string">'th1'</span>, <span class="string">'th2'</span>, <span class="string">'w1'</span>, <span class="string">'w2'</span>});
+Kc = [diag(kp), diag(kd)];                                     <span class="comment">% u = Kc*([r; 0] - y)</span>
+Acl = sys.A - sys.B*Kc*sys.C(iy,:);  Bcl = sys.B*Kc*[r; 0; 0];
+h = 5e-4;  t = (0:h:1)';  Ad = expm(Acl*h);  Bd = Acl\((Ad - eye(size(Ad)))*Bcl);
+z = zeros(size(Acl, 1), 1);  thLin = zeros(numel(t), 1);
+<span class="keyword">for</span> k = 2:numel(t), z = Ad*z + Bd;  thLin(k) = sys.C(iy(2),:)*z; <span class="keyword">end</span>
+pd = @(t, y) kp.*([0; pi/2 + r(2)] - [y.th1; y.th2]) - kd.*[y.w1; y.w2];
+[t, y] = s.simulate([0 1], Step = h, Input = pd, Initial = x0);
+fprintf(<span class="string">'elbow step: linear vs nonlinear max difference %.1e rad (step %.2f rad)\n'</span>, <span class="keyword">...</span>
+        max(abs(thLin - (y.th2 - pi/2))), r(2));
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);  plot(t, thLin, t, y.th2 - pi/2, <span class="string">'--'</span>, <span class="string">'LineWidth'</span>, 1.5);  grid <span class="string">on</span>
+xlabel(<span class="string">'time (s)'</span>);  ylabel(<span class="string">'elbow angle - 90 deg (rad)'</span>);  legend(<span class="string">'linear'</span>, <span class="string">'nonlinear'</span>);
+
+<span class="keyword">function</span> s = scara(upper, forearm, elbow)
+<span class="comment">% Horizontal two-link arm at a given elbow angle.</span>
+s = fmbd.System(Gravity = [0 0 -9.81]);
+s.add(upper);  s.add(forearm);
+s.couple(<span class="string">'forearm'</span>, @(X) X(:,1) &lt; 0.3 + 1e-6, Name = <span class="string">'root'</span>, Point = [0.3 0 0]);
+tip = @(X) X(:,1) &gt; 0.6 - 1e-6;
+s.joint(<span class="string">'ground'</span>, <span class="string">'upper'</span>, <span class="string">'revolute'</span>, Point = [0 0 0],   Name = <span class="string">'shoulder'</span>);
+s.joint(<span class="string">'upper'</span>,  <span class="string">'root'</span>,  <span class="string">'revolute'</span>, Point = [0.3 0 0], Name = <span class="string">'elbow'</span>, Position = elbow);
+s.input(<span class="string">'tau1'</span>, <span class="string">'shoulder'</span>);  s.input(<span class="string">'tau2'</span>, <span class="string">'elbow'</span>);
+s.output(<span class="string">'th1'</span>, <span class="string">'shoulder'</span>);  s.output(<span class="string">'th2'</span>, <span class="string">'elbow'</span>);
+s.output(<span class="string">'w1'</span>, <span class="string">'shoulder'</span>, Type = <span class="string">'velocity'</span>);  s.output(<span class="string">'w2'</span>, <span class="string">'elbow'</span>, Type = <span class="string">'velocity'</span>);
+s.output(<span class="string">'tipz'</span>, <span class="string">'forearm'</span>, tip, 3);
+s.output(<span class="string">'tipa'</span>, <span class="string">'forearm'</span>, tip, 3, Type = <span class="string">'acceleration'</span>);
+<span class="keyword">end</span>
+</pre>
+<pre class="codeoutput">elbow step: linear vs nonlinear max difference 6.5e-05 rad (step 0.02 rad)
+</pre>
+<img vspace="5" hspace="5" src="tut07_linear_04.png" alt=""> <p class="footer">
+<br>
+<a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2024a</a>
+<br>
+</p>
+</div>
+<!--
+##### SOURCE BEGIN #####
+%% Tutorial 7 - Linear analysis: equilibrium, modes and state space
+% The nonlinear system gives a linear model about any state at rest:
+%
+%   M z'' + C z' + K z = B u,   y = Cz z + Cv z' + Ca z''
+%
+% in independent coordinates z (the constraints are eliminated). K includes
+% the stiffness from gravity, constraint forces and preloaded springs. This
+% tutorial covers:
+%
+% * |equilibrium|: the static state under gravity and constant inputs
+% * |modes| at several operating points (configuration-dependent dynamics)
+% * |linearize| and |statespace|: modal state space, static correction,
+%   damping, acceleration outputs
+% * a controller designed on the linear model, checked in the nonlinear one
+
+addpath(fileparts(fileparts(mfilename('fullpath'))));
+out = fullfile(tempdir, 'fmbdTutorials');  if ~isfolder(out), mkdir(out); end
+
+%% 1. A horizontal arm with an elastic forearm
+% A rigid upper arm and an elastic forearm (as in Tutorial 1), on revolute
+% joints about z, with gravity along -z. The joints are free: in the
+% horizontal plane gravity does not turn them, so every pose is an
+% equilibrium. The elbow angle is set with Position.
+fmbd.boxSTL(fullfile(out, 'upper.stl'),   [0 -0.02 -0.01],     [0.3 0.02 0.01]);
+fmbd.boxSTL(fullfile(out, 'forearm.stl'), [0.3 -0.015 -0.005], [0.6 0.015 0.005]);
+steel = fmbd.material(210e9, 0.30, 7850);  alu = fmbd.material(70e9, 0.33, 2700);
+upper   = fmbd.Body(fullfile(out, 'upper.stl'), steel, Size = 0.02, Rigid = true, Name = 'upper');
+forearm = fmbd.Body.elastic(fullfile(out, 'forearm.stl'), alu, Size = 0.006, Modes = 6, ...
+                            Damping = [0 2e-5], Name = 'forearm');
+arm = @(elbow) scara(upper, forearm, elbow);
+
+%% 2. Equilibrium under gravity
+% |equilibrium| solves the static equations (here: the forearm sags under
+% gravity; the free joint angles stay at their Position).
+s = arm(0);
+x0 = s.equilibrium();  [~, y] = s.simulate([0 1e-4], Initial = x0, Step = 1e-4);
+fprintf('gravity sag of the forearm tip: %.1f um\n', 1e6*y.tipz(1));
+
+%% 3. Modes at several operating points
+% The forearm's first bending mode couples with the arm's rigid motion,
+% which depends on the elbow angle: a linear model holds about one pose
+% only. |modes| gives the frequencies (and shapes) at each equilibrium; the
+% two free joints are mechanism modes at 0 Hz.
+elbow = deg2rad(0:15:150);  f3 = zeros(size(elbow));
+for k = 1:numel(elbow)
+    s = arm(elbow(k));  f = s.modes(s.equilibrium(), 4);  f3(k) = f(3);
+end
+figure('Color', 'w');  plot(rad2deg(elbow), f3, 'o-');  grid on
+xlabel('elbow angle (deg)');  ylabel('first elastic mode (Hz)');
+title('Configuration-dependent dynamics');
+s = arm(pi/2);  x0 = s.equilibrium();  [f, V] = s.modes(x0, 4);
+figure('Color', 'w');  s.plotMode(x0, V(:,3), Amplitude = 0.05, Title = sprintf('Elbow 90 deg: %.1f Hz', f(3)));
+
+%% 4. State space
+% |statespace| returns A, B, C, D in modal coordinates [eta; deta] (or an
+% ss object with Format = "ss", Control System Toolbox). Modes truncates
+% the model; the static correction then keeps the DC gain exact. Damping
+% adds a modal damping ratio to the physical dampers (here the forearm's
+% Rayleigh damping). Acceleration outputs have a feedthrough D.
+sys = s.statespace(x0, Modes = 6);
+fprintf('%d states; inputs %s; outputs %s\n', size(sys.A, 1), strjoin(sys.InputName, ', '), ...
+        strjoin(sys.OutputName, ', '));
+fprintf('D (tip acceleration per unit torque): %s\n', mat2str(sys.D(end,:), 3));
+% frequency response tau2 -> elbow angle and tip acceleration, computed
+% directly from A, B, C, D
+fHz = logspace(0, 3.3, 600);  H = zeros(numel(sys.OutputName), numel(fHz));
+for k = 1:numel(fHz)
+    Hk = sys.C*((2i*pi*fHz(k)*eye(size(sys.A)) - sys.A)\sys.B) + sys.D;  H(:,k) = Hk(:,2);
+end
+figure('Color', 'w');
+subplot(2, 1, 1);  loglog(fHz, abs(H(strcmp(sys.OutputName, 'th2'),:)));  grid on
+ylabel('|th2/tau2| (rad/N m)');  title('Elbow torque to elbow angle and tip acceleration');
+subplot(2, 1, 2);  loglog(fHz, abs(H(strcmp(sys.OutputName, 'tipa'),:)));  grid on
+xlabel('frequency (Hz)');  ylabel('|a_{tip}/tau2| (m/s^2/N m)');
+
+%% 5. A controller designed on the linear model
+% A PD controller on both joints, closed around the linear model, predicts
+% the response to a small elbow step. The nonlinear simulation with the
+% same controller in the loop agrees, as long as the motion stays small.
+kp = [16; 1.5];  kd = [1.8; 0.15];  r = [0; 0.02];             % step of 0.02 rad on the elbow
+iy = cellfun(@(n) find(strcmp(sys.OutputName, n)), {'th1', 'th2', 'w1', 'w2'});
+Kc = [diag(kp), diag(kd)];                                     % u = Kc*([r; 0] - y)
+Acl = sys.A - sys.B*Kc*sys.C(iy,:);  Bcl = sys.B*Kc*[r; 0; 0];
+h = 5e-4;  t = (0:h:1)';  Ad = expm(Acl*h);  Bd = Acl\((Ad - eye(size(Ad)))*Bcl);
+z = zeros(size(Acl, 1), 1);  thLin = zeros(numel(t), 1);
+for k = 2:numel(t), z = Ad*z + Bd;  thLin(k) = sys.C(iy(2),:)*z; end
+pd = @(t, y) kp.*([0; pi/2 + r(2)] - [y.th1; y.th2]) - kd.*[y.w1; y.w2];
+[t, y] = s.simulate([0 1], Step = h, Input = pd, Initial = x0);
+fprintf('elbow step: linear vs nonlinear max difference %.1e rad (step %.2f rad)\n', ...
+        max(abs(thLin - (y.th2 - pi/2))), r(2));
+figure('Color', 'w');  plot(t, thLin, t, y.th2 - pi/2, 'REPLACE_WITH_DASH_DASH', 'LineWidth', 1.5);  grid on
+xlabel('time (s)');  ylabel('elbow angle - 90 deg (rad)');  legend('linear', 'nonlinear');
+
+function s = scara(upper, forearm, elbow)
+% Horizontal two-link arm at a given elbow angle.
+s = fmbd.System(Gravity = [0 0 -9.81]);
+s.add(upper);  s.add(forearm);
+s.couple('forearm', @(X) X(:,1) < 0.3 + 1e-6, Name = 'root', Point = [0.3 0 0]);
+tip = @(X) X(:,1) > 0.6 - 1e-6;
+s.joint('ground', 'upper', 'revolute', Point = [0 0 0],   Name = 'shoulder');
+s.joint('upper',  'root',  'revolute', Point = [0.3 0 0], Name = 'elbow', Position = elbow);
+s.input('tau1', 'shoulder');  s.input('tau2', 'elbow');
+s.output('th1', 'shoulder');  s.output('th2', 'elbow');
+s.output('w1', 'shoulder', Type = 'velocity');  s.output('w2', 'elbow', Type = 'velocity');
+s.output('tipz', 'forearm', tip, 3);
+s.output('tipa', 'forearm', tip, 3, Type = 'acceleration');
+end
+
+##### SOURCE END #####
+-->
+</body>
+</html>

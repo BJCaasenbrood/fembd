@@ -115,10 +115,9 @@ s.joint('link1',  'link2', 'revolute', Point = P{2});
 s.joint('link2',  'link3', 'revolute', Point = P{3});
 s.joint('ground', 'link3', 'revolute', Point = P{4}, Name = 'rocker');   % closes the loop
 s.input('tau', 'crank');  s.output('crank', 'crank');  s.output('rocker', 'rocker');
-[t, y, x] = s.simulate([0 0.6], Step = 1e-3, Input = @(t, y) 0.02);
+[~, y] = s.simulate([0 0.6], Step = 1e-3, Input = @(t, y) 0.02);
 figure('Color', 'w');  plot(y.crank, y.rocker, 'LineWidth', 1.5);  grid on
 xlabel('crank angle (rad)');  ylabel('rocker angle (rad)');  title('Four-bar: rocker vs crank');
-figure('Color', 'w');  s.plot(x, 1);  hold on;  s.plot(x);  view(2);  title('Four-bar: start and end');
 
 %% 8. Transmissions: belts and gears
 % |s.transmission| relates coordinates of different joints (or absolute

@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>demoSerialArm</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-10">
+<meta name="DC.date" content="2026-11-11">
 <meta name="DC.source" content="demoSerialArm.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -79,110 +79,99 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <pre class="codeinput">
 <span class="comment">%DEMOSERIALARM Two-link arm with revolute joints (couplings and joints).</span>
 <span class="comment">%   Two aluminium links are hinged to ground and to each other about z, with</span>
-<span class="comment">%   torsion springs in the joints (e.g. motor/gearbox stiffness). The links</span>
-<span class="comment">%   are elastic, attached to the joints through rigid couplings (RBE2) on</span>
-<span class="comment">%   their end faces; set rigidLinks = true to make them rigid instead.</span>
-<span class="comment">%   The model is reduced to the two joint coordinates plus a few modes, and</span>
-<span class="comment">%   the arm is posed at different elbow angles (a.pose) to show how the</span>
-<span class="comment">%   dynamics depend on the configuration.</span>
+<span class="comment">%   torsion springs in the joints (servo stiffness). The links are elastic,</span>
+<span class="comment">%   attached to the joints through rigid couplings (RBE2) on their end</span>
+<span class="comment">%   faces; set rigidLinks = true to make them rigid instead. The arm is</span>
+<span class="comment">%   linearised at several elbow angles, held by the joint torques, to show</span>
+<span class="comment">%   how the dynamics depend on the configuration.</span>
 <span class="comment">%</span>
-<span class="comment">%   ground --(joint1)-- link1 --(joint2)-- link2</span>
+<span class="comment">%   ground --(shoulder)-- link1 --(elbow)-- link2</span>
 
 rigidLinks = false;
-
 addpath(fileparts(fileparts(mfilename(<span class="string">'fullpath'</span>))));
-out = fullfile(tempdir, <span class="string">'femArm'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
+out = fullfile(tempdir, <span class="string">'fmbdArm'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
 
 <span class="comment">% geometry (mm): links along x, 200 x 20 x 10</span>
-fembd.boxSTL(fullfile(out, <span class="string">'link1.stl'</span>), [0 -10 -5],   [200 10 5]);
-fembd.boxSTL(fullfile(out, <span class="string">'link2.stl'</span>), [200 -10 -5], [400 10 5]);
-alu = fembd.material(70e9, 0.33, 2700);
-opt = {<span class="string">'Scale'</span>, 1e-3, <span class="string">'Size'</span>, 5, <span class="string">'Rigid'</span>, rigidLinks};
-link1 = fembd.Body(fullfile(out, <span class="string">'link1.stl'</span>), alu, opt{:});
-link2 = fembd.Body(fullfile(out, <span class="string">'link2.stl'</span>), alu, opt{:});
-
-a = fembd.Assembly();
-a.add(link1);  a.add(link2);
-
-<span class="comment">% joint attachment points: the rigid body itself, or a coupling of an end face</span>
-<span class="keyword">if</span> rigidLinks
-    [p1, p2a, p2b] = deal(<span class="string">'link1'</span>, <span class="string">'link1'</span>, <span class="string">'link2'</span>);
-<span class="keyword">else</span>
-    p1  = a.couple(<span class="string">'link1'</span>, @(X) X(:,1) &lt; 1e-9);          <span class="comment">% hub of link 1</span>
-    p2a = a.couple(<span class="string">'link1'</span>, @(X) X(:,1) &gt; 0.2 - 1e-9);    <span class="comment">% elbow, link 1 side</span>
-    p2b = a.couple(<span class="string">'link2'</span>, @(X) X(:,1) &lt; 0.2 + 1e-9);    <span class="comment">% elbow, link 2 side</span>
-<span class="keyword">end</span>
+fmbd.boxSTL(fullfile(out, <span class="string">'link1.stl'</span>), [0 -10 -5],   [200 10 5]);
+fmbd.boxSTL(fullfile(out, <span class="string">'link2.stl'</span>), [200 -10 -5], [400 10 5]);
+alu = fmbd.material(70e9, 0.33, 2700);
 kj = 200;                                                 <span class="comment">% joint stiffness, Nm/rad</span>
-j1 = a.joint(<span class="string">'ground'</span>, p1, <span class="string">'revolute'</span>, Point = [0 0 0],   Axis = [0 0 1], Stiffness = kj);
-j2 = a.joint(p2a, p2b,     <span class="string">'revolute'</span>, Point = [0.2 0 0], Axis = [0 0 1], Stiffness = kj);
 
-[K, M, T] = a.system();
-[V, f] = fembd.modes(K, M, 6);
-fprintf(<span class="string">'%d dofs after constraints\n'</span>, size(K, 1));
+arm = @(elbow) twoLink(out, alu, rigidLinks, kj, elbow);
+s = arm(0);
+[f, V] = s.modes([], 6);
+fprintf(<span class="string">'%d model dofs\n'</span>, s.nDof);
 disp(table((1:6)', f, <span class="string">'VariableNames'</span>, {<span class="string">'mode'</span>, <span class="string">'f_Hz'</span>}));
-
-<span class="comment">% actuator-level model: joint coordinates as boundary + 4 elastic modes</span>
-ib = a.qdof([a.dof(j1); a.dof(j2)]);
-[Kc, Mc, Vc] = fembd.craigBampton(K, M, ib, 4);
-[~, fc] = fembd.modes(Kc, Mc, 4);
-fprintf(<span class="string">'Craig-Bampton (%d dofs): %s Hz\n'</span>, size(Kc, 1), mat2str(fc', 4));
-disp(<span class="string">'Joint-space stiffness (Nm/rad):'</span>);  disp(Kc(1:2, 1:2));
-
 figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
 <span class="keyword">for</span> k = 1:4
-    subplot(2, 2, k);
-    u = T*V(:,k);
-    a.plot(u, 0.03/max(abs(u(1:3*size(a.X, 1)))));
+    subplot(2, 2, k);  s.plotMode([], V(:,k), Amplitude = 0.03);
     title(sprintf(<span class="string">'Mode %d: %.1f Hz'</span>, k, f(k)));  view(2);  axis <span class="string">off</span>
 <span class="keyword">end</span>
 
-<span class="comment">% configuration dependence: pose the elbow and rebuild K, M at each angle.</span>
-<span class="comment">% pose() moves link 2 (and its coupling) rigidly about the elbow axis.</span>
+<span class="comment">% actuator-level model: joint torques to joint angles, with 4 modes</span>
+s.output(<span class="string">'q1'</span>, <span class="string">'shoulder'</span>);   s.output(<span class="string">'q2'</span>, <span class="string">'elbow'</span>);       <span class="comment">% (inputs tau1, tau2: see twoLink)</span>
+S = s.statespace(Modes = 4);
+disp(<span class="string">'Joint-space static stiffness (Nm/rad):'</span>);  disp(inv(-S.C*(S.A\S.B)));
+
+<span class="comment">% configuration dependence: at each elbow angle, the servo torques hold the</span>
+<span class="comment">% arm against the joint springs (relaxed at zero), and the model is</span>
+<span class="comment">% linearised about that equilibrium</span>
 angles = 0:15:90;  fa = zeros(numel(angles), 2);
 <span class="keyword">for</span> k = 1:numel(angles)
-    a.pose(j2, deg2rad(angles(k)));
-    [Kp, Mp, Tp] = a.system();
-    [Vp, fp] = fembd.modes(Kp, Mp, 6);
-    U = Tp*Vp;  nz = 3*size(a.X, 1);                      <span class="comment">% in-plane: little z motion</span>
-    inPlane = vecnorm(U(3:3:nz, :)) &lt; 0.5*vecnorm(U(1:nz, :));
-    fi = fp(inPlane);  fa(k,:) = fi(1:2);
+    s = arm(deg2rad(angles(k)));
+    x = s.equilibrium(Input = kj*[0; deg2rad(angles(k))]);
+    fk = s.modes(x, 2);  fa(k,:) = fk(1:2);
 <span class="keyword">end</span>
-disp(table(angles', fa(:,1), fa(:,2), <span class="string">'VariableNames'</span>, {<span class="string">'elbow_deg'</span>, <span class="string">'inplane1_Hz'</span>, <span class="string">'inplane2_Hz'</span>}));
+disp(table(angles', fa(:,1), fa(:,2), <span class="string">'VariableNames'</span>, {<span class="string">'elbow_deg'</span>, <span class="string">'mode1_Hz'</span>, <span class="string">'mode2_Hz'</span>}));
+s = arm(deg2rad(60));  x = s.equilibrium(Input = kj*[0; deg2rad(60)]);
+[f1, V1] = s.modes(x, 1);
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);  s.plotMode(x, V1, Amplitude = 0.03);
+title(sprintf(<span class="string">'Elbow 60^o: mode 1 at %.1f Hz'</span>, f1));  view(2);
 
-a.pose(j1, deg2rad(30));  a.pose(j2, deg2rad(60));       <span class="comment">% shoulder 30, elbow 60</span>
-[Kp, Mp, Tp] = a.system();  [Vp, fp] = fembd.modes(Kp, Mp, 1);
-figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
-u = Tp*Vp(:,1);
-a.plot(u, 0.03/max(abs(u(1:3*size(a.X, 1)))));
-title(sprintf(<span class="string">'Shoulder 30^o, elbow 60^o: mode 1 at %.1f Hz'</span>, fp));  view(2);
-a.pose(j1, 0);  a.pose(j2, 0);                           <span class="comment">% back to straight</span>
+<span class="keyword">function</span> s = twoLink(out, mat, rigid, kj, elbow)
+<span class="comment">% Two-link arm with the elbow at a given angle (Position).</span>
+s = fmbd.System();
+opt = {<span class="string">'Scale'</span>, 1e-3, <span class="string">'Size'</span>, 5, <span class="string">'Rigid'</span>, rigid, <span class="string">'Modes'</span>, 6};
+s.add(fmbd.Body(fullfile(out, <span class="string">'link1.stl'</span>), mat, opt{:}, Name = <span class="string">'link1'</span>));
+s.add(fmbd.Body(fullfile(out, <span class="string">'link2.stl'</span>), mat, opt{:}, Name = <span class="string">'link2'</span>));
+<span class="keyword">if</span> rigid                                  <span class="comment">% joint attachment: the body, or an end-face coupling</span>
+    [p1, p2a, p2b] = deal(<span class="string">'link1'</span>, <span class="string">'link1'</span>, <span class="string">'link2'</span>);
+<span class="keyword">else</span>
+    p1  = s.couple(<span class="string">'link1'</span>, @(X) X(:,1) &lt; 1e-6);           <span class="comment">% hub of link 1</span>
+    p2a = s.couple(<span class="string">'link1'</span>, @(X) X(:,1) &gt; 0.2 - 1e-6);     <span class="comment">% elbow, link 1 side</span>
+    p2b = s.couple(<span class="string">'link2'</span>, @(X) X(:,1) &lt; 0.2 + 1e-6);     <span class="comment">% elbow, link 2 side</span>
+<span class="keyword">end</span>
+s.joint(<span class="string">'ground'</span>, p1, <span class="string">'revolute'</span>, Point = [0 0 0],   Stiffness = kj, Name = <span class="string">'shoulder'</span>);
+s.joint(p2a, p2b,     <span class="string">'revolute'</span>, Point = [0.2 0 0], Stiffness = kj, Name = <span class="string">'elbow'</span>, <span class="keyword">...</span>
+        Position = elbow);
+s.input(<span class="string">'tau1'</span>, <span class="string">'shoulder'</span>);  s.input(<span class="string">'tau2'</span>, <span class="string">'elbow'</span>);
+<span class="keyword">end</span>
 </pre>
-<pre class="codeoutput">22454 dofs after constraints
+<pre class="codeoutput">30 model dofs
     mode     f_Hz 
     ____    ______
 
      1      19.625
      2      51.599
      3      128.65
-     4      323.29
-     5      898.09
-     6      1336.2
+     4      323.31
+     5      898.13
+     6      1337.5
 
-Craig-Bampton (6 dofs): [19.63 51.6 128.6 323.3] Hz
-Joint-space stiffness (Nm/rad):
-  200.0000   -0.0000
-   -0.0000  200.0000
+Joint-space static stiffness (Nm/rad):
+  200.0000    0.0000
+    0.0000  200.0000
 
-    elbow_deg    inplane1_Hz    inplane2_Hz
-    _________    ___________    ___________
+    elbow_deg    mode1_Hz    mode2_Hz
+    _________    ________    ________
 
-        0          19.625         128.65   
-       15          19.763         122.77   
-       30          20.186         109.33   
-       45          20.918         94.903   
-       60          22.001         82.692   
-       75          23.495         73.274   
-       90          25.479         66.345   
+        0         19.625      51.599 
+       15         19.763      52.012 
+       30         20.186      53.279 
+       45         20.918       55.48 
+       60         22.001      58.765 
+       75         23.496      63.369 
+       90         25.479      66.346 
 
 </pre>
 <img vspace="5" hspace="5" src="demoSerialArm_01.png" alt=""> <img vspace="5" hspace="5" src="demoSerialArm_02.png" alt=""> <p class="footer">
@@ -195,83 +184,73 @@ Joint-space stiffness (Nm/rad):
 ##### SOURCE BEGIN #####
 %DEMOSERIALARM Two-link arm with revolute joints (couplings and joints).
 %   Two aluminium links are hinged to ground and to each other about z, with
-%   torsion springs in the joints (e.g. motor/gearbox stiffness). The links
-%   are elastic, attached to the joints through rigid couplings (RBE2) on
-%   their end faces; set rigidLinks = true to make them rigid instead.
-%   The model is reduced to the two joint coordinates plus a few modes, and
-%   the arm is posed at different elbow angles (a.pose) to show how the
-%   dynamics depend on the configuration.
+%   torsion springs in the joints (servo stiffness). The links are elastic,
+%   attached to the joints through rigid couplings (RBE2) on their end
+%   faces; set rigidLinks = true to make them rigid instead. The arm is
+%   linearised at several elbow angles, held by the joint torques, to show
+%   how the dynamics depend on the configuration.
 %
-%   ground REPLACE_WITH_DASH_DASH(joint1)REPLACE_WITH_DASH_DASH link1 REPLACE_WITH_DASH_DASH(joint2)REPLACE_WITH_DASH_DASH link2
+%   ground REPLACE_WITH_DASH_DASH(shoulder)REPLACE_WITH_DASH_DASH link1 REPLACE_WITH_DASH_DASH(elbow)REPLACE_WITH_DASH_DASH link2
 
 rigidLinks = false;
-
 addpath(fileparts(fileparts(mfilename('fullpath'))));
-out = fullfile(tempdir, 'femArm');  if ~isfolder(out), mkdir(out); end
+out = fullfile(tempdir, 'fmbdArm');  if ~isfolder(out), mkdir(out); end
 
 % geometry (mm): links along x, 200 x 20 x 10
-fembd.boxSTL(fullfile(out, 'link1.stl'), [0 -10 -5],   [200 10 5]);
-fembd.boxSTL(fullfile(out, 'link2.stl'), [200 -10 -5], [400 10 5]);
-alu = fembd.material(70e9, 0.33, 2700);
-opt = {'Scale', 1e-3, 'Size', 5, 'Rigid', rigidLinks};
-link1 = fembd.Body(fullfile(out, 'link1.stl'), alu, opt{:});
-link2 = fembd.Body(fullfile(out, 'link2.stl'), alu, opt{:});
-
-a = fembd.Assembly();
-a.add(link1);  a.add(link2);
-
-% joint attachment points: the rigid body itself, or a coupling of an end face
-if rigidLinks
-    [p1, p2a, p2b] = deal('link1', 'link1', 'link2');
-else
-    p1  = a.couple('link1', @(X) X(:,1) < 1e-9);          % hub of link 1
-    p2a = a.couple('link1', @(X) X(:,1) > 0.2 - 1e-9);    % elbow, link 1 side
-    p2b = a.couple('link2', @(X) X(:,1) < 0.2 + 1e-9);    % elbow, link 2 side
-end
+fmbd.boxSTL(fullfile(out, 'link1.stl'), [0 -10 -5],   [200 10 5]);
+fmbd.boxSTL(fullfile(out, 'link2.stl'), [200 -10 -5], [400 10 5]);
+alu = fmbd.material(70e9, 0.33, 2700);
 kj = 200;                                                 % joint stiffness, Nm/rad
-j1 = a.joint('ground', p1, 'revolute', Point = [0 0 0],   Axis = [0 0 1], Stiffness = kj);
-j2 = a.joint(p2a, p2b,     'revolute', Point = [0.2 0 0], Axis = [0 0 1], Stiffness = kj);
 
-[K, M, T] = a.system();
-[V, f] = fembd.modes(K, M, 6);
-fprintf('%d dofs after constraints\n', size(K, 1));
+arm = @(elbow) twoLink(out, alu, rigidLinks, kj, elbow);
+s = arm(0);
+[f, V] = s.modes([], 6);
+fprintf('%d model dofs\n', s.nDof);
 disp(table((1:6)', f, 'VariableNames', {'mode', 'f_Hz'}));
-
-% actuator-level model: joint coordinates as boundary + 4 elastic modes
-ib = a.qdof([a.dof(j1); a.dof(j2)]);
-[Kc, Mc, Vc] = fembd.craigBampton(K, M, ib, 4);
-[~, fc] = fembd.modes(Kc, Mc, 4);
-fprintf('Craig-Bampton (%d dofs): %s Hz\n', size(Kc, 1), mat2str(fc', 4));
-disp('Joint-space stiffness (Nm/rad):');  disp(Kc(1:2, 1:2));
-
 figure('Color', 'w');
 for k = 1:4
-    subplot(2, 2, k);
-    u = T*V(:,k);
-    a.plot(u, 0.03/max(abs(u(1:3*size(a.X, 1)))));
+    subplot(2, 2, k);  s.plotMode([], V(:,k), Amplitude = 0.03);
     title(sprintf('Mode %d: %.1f Hz', k, f(k)));  view(2);  axis off
 end
 
-% configuration dependence: pose the elbow and rebuild K, M at each angle.
-% pose() moves link 2 (and its coupling) rigidly about the elbow axis.
+% actuator-level model: joint torques to joint angles, with 4 modes
+s.output('q1', 'shoulder');   s.output('q2', 'elbow');       % (inputs tau1, tau2: see twoLink)
+S = s.statespace(Modes = 4);
+disp('Joint-space static stiffness (Nm/rad):');  disp(inv(-S.C*(S.A\S.B)));
+
+% configuration dependence: at each elbow angle, the servo torques hold the
+% arm against the joint springs (relaxed at zero), and the model is
+% linearised about that equilibrium
 angles = 0:15:90;  fa = zeros(numel(angles), 2);
 for k = 1:numel(angles)
-    a.pose(j2, deg2rad(angles(k)));
-    [Kp, Mp, Tp] = a.system();
-    [Vp, fp] = fembd.modes(Kp, Mp, 6);
-    U = Tp*Vp;  nz = 3*size(a.X, 1);                      % in-plane: little z motion
-    inPlane = vecnorm(U(3:3:nz, :)) < 0.5*vecnorm(U(1:nz, :));
-    fi = fp(inPlane);  fa(k,:) = fi(1:2);
+    s = arm(deg2rad(angles(k)));
+    x = s.equilibrium(Input = kj*[0; deg2rad(angles(k))]);
+    fk = s.modes(x, 2);  fa(k,:) = fk(1:2);
 end
-disp(table(angles', fa(:,1), fa(:,2), 'VariableNames', {'elbow_deg', 'inplane1_Hz', 'inplane2_Hz'}));
+disp(table(angles', fa(:,1), fa(:,2), 'VariableNames', {'elbow_deg', 'mode1_Hz', 'mode2_Hz'}));
+s = arm(deg2rad(60));  x = s.equilibrium(Input = kj*[0; deg2rad(60)]);
+[f1, V1] = s.modes(x, 1);
+figure('Color', 'w');  s.plotMode(x, V1, Amplitude = 0.03);
+title(sprintf('Elbow 60^o: mode 1 at %.1f Hz', f1));  view(2);
 
-a.pose(j1, deg2rad(30));  a.pose(j2, deg2rad(60));       % shoulder 30, elbow 60
-[Kp, Mp, Tp] = a.system();  [Vp, fp] = fembd.modes(Kp, Mp, 1);
-figure('Color', 'w');
-u = Tp*Vp(:,1);
-a.plot(u, 0.03/max(abs(u(1:3*size(a.X, 1)))));
-title(sprintf('Shoulder 30^o, elbow 60^o: mode 1 at %.1f Hz', fp));  view(2);
-a.pose(j1, 0);  a.pose(j2, 0);                           % back to straight
+function s = twoLink(out, mat, rigid, kj, elbow)
+% Two-link arm with the elbow at a given angle (Position).
+s = fmbd.System();
+opt = {'Scale', 1e-3, 'Size', 5, 'Rigid', rigid, 'Modes', 6};
+s.add(fmbd.Body(fullfile(out, 'link1.stl'), mat, opt{:}, Name = 'link1'));
+s.add(fmbd.Body(fullfile(out, 'link2.stl'), mat, opt{:}, Name = 'link2'));
+if rigid                                  % joint attachment: the body, or an end-face coupling
+    [p1, p2a, p2b] = deal('link1', 'link1', 'link2');
+else
+    p1  = s.couple('link1', @(X) X(:,1) < 1e-6);           % hub of link 1
+    p2a = s.couple('link1', @(X) X(:,1) > 0.2 - 1e-6);     % elbow, link 1 side
+    p2b = s.couple('link2', @(X) X(:,1) < 0.2 + 1e-6);     % elbow, link 2 side
+end
+s.joint('ground', p1, 'revolute', Point = [0 0 0],   Stiffness = kj, Name = 'shoulder');
+s.joint(p2a, p2b,     'revolute', Point = [0.2 0 0], Stiffness = kj, Name = 'elbow', ...
+        Position = elbow);
+s.input('tau1', 'shoulder');  s.input('tau2', 'elbow');
+end
 
 ##### SOURCE END #####
 -->

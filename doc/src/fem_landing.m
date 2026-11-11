@@ -1,66 +1,56 @@
-%% fembd: Finite Elements and Multibody Dynamics
-% *fembd* models assemblies of STL parts as multibody systems with rigid
-% and elastic bodies. Elastic parts are meshed with Gmsh; parts are
-% connected by joints, couplings, ties, springs, dampers and
-% transmissions. The same model gives a nonlinear simulation for large
-% motions (with controllers in the loop) and a linear finite-element
-% analysis about a pose (modes, frequency responses, state space,
-% Craig-Bampton reduction).
+%% fmbd: Flexible Multibody Dynamics
+% *fmbd* models assemblies of STL parts as flexible multibody systems.
+% Rigid parts need only their surface or mass properties; elastic parts are
+% meshed with Gmsh and reduced to a few modes in a moving frame. Parts are
+% connected by joints, couplings, ties, springs, dampers and transmissions.
+% One nonlinear model gives simulations of large motions (with controllers
+% in the loop), equilibria, and linear models about any operating point.
 %
-%   a = fembd.Assembly();
-%   a.add(fembd.Body.rigidSurface('link.stl', 7850, Scale = 1e-3));
-%   a.add(fembd.Body('tool.stl', fembd.material(70e9, 0.33, 2700), Scale = 1e-3));
-%   a.joint('ground', 'link', 'revolute', Name = 'shoulder');
-%   a.joint('link', a.couple('tool', @(X) X(:,1) < 0.201), 'fixed');
-%   a.input('tau', 'shoulder');  a.output('th', 'shoulder');
+%   s = fmbd.System(Gravity = [0 0 -9.81]);
+%   s.add(fmbd.Body.rigid('link.stl', 7850, Scale = 1e-3));
+%   s.add(fmbd.Body.elastic('tool.stl', fmbd.material(70e9, 0.33, 2700), Scale = 1e-3));
+%   s.joint('ground', 'link', 'revolute', Name = 'shoulder', Position = 0.3);
+%   s.joint('link', s.couple('tool', @(X) X(:,1) < 0.201), 'fixed');
+%   s.input('tau', 'shoulder');  s.output('th', 'shoulder');
 %
-%   m = a.nonlinear(Gravity = [0 0 -9.81]);      % nonlinear simulation
-%   [t, y, x] = m.simulate([0 1], Input = @(t, y) 20*(1 - y.th));
-%   m.animate(t, x);
-%
-%   sys = a.statespace(Modes = 20);              % linear, about the pose
+%   [t, y, x] = s.simulate([0 1], Input = @(t, y) 20*(1 - y.th));
+%   s.animate(t, x);
+%   x0 = s.equilibrium();  sys = s.statespace(x0, Modes = 20);
 %
 % Installation and Gmsh setup: see README.md in the toolbox folder. The
-% reference manual (formulation, API, recipes) is
-% <matlab:open(fullfile(fileparts(which('fembd.Assembly')),'..','docs','fembd.md')) docs/fembd.md>.
+% reference manual (model description, analyses, formulation, recipes) is
+% <matlab:open(fullfile(fileparts(fileparts(which('fmbd.System'))),'docs','fmbd.md')) docs/fmbd.md>.
 %
 %% Tutorials
 % Runnable scripts in the |tutorials| folder, each checked against theory
 % where possible.
 %
-% Modelling and simulation:
-%
 % # <tut01_firstModel.html Your First Model>: a two-link arm with an
-%   elastic forearm, simulated with PD control, then analysed linearly
-% # <tut02_meshing.html Meshing>: |meshSTL| options, Tet4 vs Tet10,
-%   Gmsh GUI meshes, |Scale| and |transform|
+%   elastic forearm: simulation with PD control, then linear analysis
+% # <tut02_meshing.html Meshing>: |meshSTL| options, Tet4 vs Tet10, Gmsh
+%   GUI meshes, |Scale| and |transform|
 % # <tut03_materials.html Materials and Mass>: orthotropic materials, mass
-%   properties, consistent vs lumped mass
-% # <tut04_rigidBodies.html Rigid Bodies>: reference dofs, tip masses,
-%   |RefPoint|, mesh-free rigid bodies
-% # <tut05_joints.html Couplings and Joints>: joint types, springs,
-%   locking, posing, closed loops, belt transmissions
-% # <tut06_ties.html Ties and Interfaces>: non-matching meshes, bonded
-%   ties, partial bonding, elastic interfaces
-%
-% Linear analysis about a pose:
-%
-% # <tut07_modes.html Modes>: a cantilever against Euler-Bernoulli
-% # <tut08_loadsStatics.html Loads and Statics>: dofs, supports, loads,
-%   gravity, reactions
-% # <tut09_dynamics.html Dynamics>: damping, frequency response, Newmark,
-%   state space
-% # <tut10_reduction.html Model Reduction>: Guyan and Craig-Bampton
+%   properties, Rayleigh damping
+% # <tut04_rigidBodies.html Rigid Bodies>: from a mesh, a surface or mass
+%   properties; tip masses; |setMass|
+% # <tut05_joints.html Couplings, Joints and Transmissions>: joint types,
+%   |Position|, large motions, closed loops, belts and gears
+% # <tut06_ties.html Ties and Supports>: non-matching meshes, elastic
+%   interfaces, node supports
+% # <tut07_linear.html Linear Analysis>: equilibrium, modes at several
+%   operating points, state space, a controller checked nonlinearly
+% # <tut08_elastic.html Elastic Bodies in Motion>: a flexible pendulum,
+%   modes, damping, the deformation field
 %
 %% Examples
 %
 % * <demoAssembly.html STL Assembly with a Rigid Payload>: elastic parts
-%   meshed separately, a rigid plate on an elastic joint
+%   meshed separately and tied, a rigid plate; modes and a state space
 % * <demoSerialArm.html Two-Link Arm with Joints>: elastic links on
-%   revolute joints, posed at several elbow angles
+%   revolute joints, linearised at several elbow angles
 % * <demoParallelFlexure.html Parallel Leaf-Spring Guide>: a flexure stage
 %   against beam theory
 %
 %% Reference
-% <fem_reference.html Function Reference>, or |doc fembd.Assembly|,
-% |doc fembd.Body|, |doc fembd.Model|.
+% <fem_reference.html Function Reference>, or |doc fmbd.System|,
+% |doc fmbd.Body|.

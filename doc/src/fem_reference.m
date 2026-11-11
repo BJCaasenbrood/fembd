@@ -1,51 +1,46 @@
 %% Function Reference
 % Click a name to open its reference page (generated from its help text),
-% or type |doc fembd.Name| in the Command Window.
+% or type |doc fmbd.Name| in the Command Window.
 %
-%% Model
+%% Bodies
 %
-% * <matlab:doc('fembd.Body') fembd.Body> - elastic or rigid body: mesh, material, K and M
-% * <matlab:doc('fembd.Body.rigidSurface') fembd.Body.rigidSurface> - rigid body from an STL surface (no meshing)
-% * <matlab:doc('fembd.Body.pointMass') fembd.Body.pointMass> - rigid body from mass properties only
-% * <matlab:doc('fembd.Body/setMass') setMass> - set a rigid body's mass properties (e.g. from CAD)
-% * <matlab:doc('fembd.Body/massProperties') massProperties> - mass, centre of mass and inertia of a body
-% * <matlab:doc('fembd.Assembly') fembd.Assembly> - bodies, connections, supports; reduced K, M and u = T*q
-% * <matlab:doc('fembd.Model') fembd.Model> - nonlinear multibody model (large rotations)
-% * <matlab:doc('fembd.material') fembd.material> - isotropic linear-elastic material
+% * <matlab:doc('fmbd.Body') fmbd.Body> - rigid or elastic body: geometry, material, mass properties
+% * <matlab:doc('fmbd.Body.elastic') fmbd.Body.elastic> - elastic body meshed with Gmsh
+% * <matlab:doc('fmbd.Body.rigid') fmbd.Body.rigid> - rigid body from an STL surface (no meshing)
+% * <matlab:doc('fmbd.Body.pointMass') fmbd.Body.pointMass> - rigid body from mass properties only
+% * <matlab:doc('fmbd.Body/setMass') setMass> - set a rigid body's mass properties (e.g. from CAD)
+% * <matlab:doc('fmbd.Body/massProperties') massProperties> - mass, centre of mass and inertia
+% * <matlab:doc('fmbd.material') fmbd.material> - isotropic linear-elastic material
 %
-%% Assembly methods
+%% System: model description
 %
-% * <matlab:doc('fembd.Assembly/add') add> - add a body
-% * <matlab:doc('fembd.Assembly/tie') tie> - bonded tie or elastic interface
-% * <matlab:doc('fembd.Assembly/couple') couple> - rigid coupling of nodes to a reference point
-% * <matlab:doc('fembd.Assembly/joint') joint> - kinematic joint between reference points
-% * <matlab:doc('fembd.Assembly/transmission') transmission> - elastic or rigid ratio between joints or bodies (belts, gears)
-% * <matlab:doc('fembd.Assembly/pose') pose> - move a joint to a finite position
-% * <matlab:doc('fembd.Assembly/fix') fix> - supports
-% * <matlab:doc('fembd.Assembly/dof') dof> - global dof indices
-% * <matlab:doc('fembd.Assembly/input') input> - named input (actuator, load)
-% * <matlab:doc('fembd.Assembly/output') output> - named output (sensor)
-% * <matlab:doc('fembd.Assembly/statespace') statespace> - state-space model with the inputs and outputs
-% * <matlab:doc('fembd.Assembly/ioMatrices') ioMatrices> - inputs and outputs in the full space
-% * <matlab:doc('fembd.Assembly/qdof') qdof> - positions of dofs in q
-% * <matlab:doc('fembd.Assembly/system') system> - reduced K, M and T
-% * <matlab:doc('fembd.Assembly/assemble') assemble> - unconstrained K and M
-% * <matlab:doc('fembd.Assembly/constraints') constraints> - the map u = T*q
-% * <matlab:doc('fembd.Assembly/plot') plot> - plot (deformed) bodies
-% * <matlab:doc('fembd.Assembly/animate') animate> - slow-motion mode animation
-% * <matlab:doc('fembd.Assembly/nonlinear') nonlinear> - nonlinear model of the assembly
-% * <matlab:doc('fembd.Model/simulate') Model.simulate> - time integration (generalised-alpha)
-% * <matlab:doc('fembd.Model/animate') Model.animate> - animation of a simulation
-% * <matlab:doc('fembd.Model/energy') Model.energy> - kinetic, gravity, strain and spring energies
+% * <matlab:doc('fmbd.System') fmbd.System> - the multibody system
+% * <matlab:doc('fmbd.System/add') add> - add a body
+% * <matlab:doc('fmbd.System/couple') couple> - rigid coupling of nodes to a reference point
+% * <matlab:doc('fmbd.System/tie') tie> - bonded tie or elastic interface between surfaces
+% * <matlab:doc('fmbd.System/joint') joint> - kinematic joint, with springs, dampers, Position, Velocity
+% * <matlab:doc('fmbd.System/transmission') transmission> - belt, gear or cable between coordinates
+% * <matlab:doc('fmbd.System/fix') fix> - supports of reference points, joints and nodes
+% * <matlab:doc('fmbd.System/input') input> - named input (actuator, load)
+% * <matlab:doc('fmbd.System/output') output> - named output (sensor)
+% * <matlab:doc('fmbd.System/update') update> - rebuild after changing a body directly
 %
-%% Analysis
+%% System: analysis
 %
-% * <matlab:doc('fembd.modes') fembd.modes> - natural frequencies and mode shapes
-% * <matlab:doc('fembd.craigBampton') fembd.craigBampton> - Craig-Bampton and Guyan reduction
+% * <matlab:doc('fmbd.System/simulate') simulate> - time integration (generalised-alpha)
+% * <matlab:doc('fmbd.System/equilibrium') equilibrium> - static equilibrium
+% * <matlab:doc('fmbd.System/linearize') linearize> - linear model about a state
+% * <matlab:doc('fmbd.System/statespace') statespace> - modal state-space model
+% * <matlab:doc('fmbd.System/modes') modes> - natural frequencies and mode shapes
+% * <matlab:doc('fmbd.System/energy') energy> - kinetic, gravity, strain and spring energies
+% * <matlab:doc('fmbd.System/plot') plot>, <matlab:doc('fmbd.System/animate') animate> - draw a state, play a simulation
+% * <matlab:doc('fmbd.System/plotMode') plotMode>, <matlab:doc('fmbd.System/animateMode') animateMode> - draw or animate a mode shape
+% * <matlab:doc('fmbd.System/modeShapes') modeShapes> - nodal mode shapes of an elastic body
 %
-%% Meshing and I/O
+%% Utilities
 %
-% * <matlab:doc('fembd.meshSTL') fembd.meshSTL> - tetrahedral mesh of an STL with Gmsh
-% * <matlab:doc('fembd.readMsh') fembd.readMsh> - read an ASCII Gmsh .msh file
-% * <matlab:doc('fembd.gmsh') fembd.gmsh> - run Gmsh
-% * <matlab:doc('fembd.boxSTL') fembd.boxSTL>, <matlab:doc('fembd.cylinderSTL') fembd.cylinderSTL> - simple test geometry
+% * <matlab:doc('fmbd.meshSTL') fmbd.meshSTL> - tetrahedral mesh of an STL with Gmsh
+% * <matlab:doc('fmbd.readMsh') fmbd.readMsh> - read an ASCII Gmsh .msh file
+% * <matlab:doc('fmbd.gmsh') fmbd.gmsh> - run Gmsh
+% * <matlab:doc('fmbd.modes') fmbd.modes>, <matlab:doc('fmbd.craigBampton') fmbd.craigBampton> - modes and reduction of K, M
+% * <matlab:doc('fmbd.boxSTL') fmbd.boxSTL>, <matlab:doc('fmbd.cylinderSTL') fmbd.cylinderSTL> - simple test geometry

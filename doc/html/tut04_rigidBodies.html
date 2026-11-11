@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>tut04_rigidBodies</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-10">
+<meta name="DC.date" content="2026-11-11">
 <meta name="DC.source" content="tut04_rigidBodies.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -83,142 +83,118 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <a href="#1">Tutorial 4 - Rigid bodies</a>
 </li>
 <li>
-<a href="#2">1. A rigid body</a>
+<a href="#2">1. Three ways to make a rigid body</a>
 </li>
 <li>
-<a href="#3">2. Reference dofs and mass properties</a>
+<a href="#3">2. An elastic beam with a rigid tip mass</a>
 </li>
 <li>
-<a href="#4">3. An elastic beam with a rigid tip mass</a>
+<a href="#4">3. Supporting a rigid body</a>
 </li>
 <li>
-<a href="#5">4. Supporting a rigid body</a>
+<a href="#5">4. The reference point</a>
 </li>
 <li>
-<a href="#6">5. Choosing the reference point</a>
+<a href="#6">5. Point masses</a>
 </li>
 <li>
-<a href="#7">6. Rigid bodies without a mesh: STL surface only</a>
-</li>
-<li>
-<a href="#8">7. Point masses: mass properties only</a>
+<a href="#7">6. Mass properties from CAD</a>
 </li>
 </ul>
 </div>
 <h2 id="1">Tutorial 4 - Rigid bodies</h2>
-<p>Parts that are much stiffer than the rest of a structure (a payload, a frame, a tool) can be modelled as rigid. A rigid body has 6 dofs at its reference point and no stiffness; its mesh only provides its mass, inertia and surface. This tutorial covers:</p>
+<p>Parts that are much stiffer than the rest of a structure (a link, a payload, a frame) can be modelled as rigid. A rigid body has a frame at its centre of mass that moves with 6 dofs; its geometry only provides its mass, inertia and surface. This tutorial covers:</p>
 <div>
 <ul>
-<li>creating rigid bodies, their reference dofs and mass properties</li>
-<li>tying elastic bodies to rigid ones</li>
-<li>supporting rigid bodies, and choosing the reference point</li>
-<li>rigid bodies without a volume mesh: STL surface or mass properties only</li>
+<li>rigid bodies from a mesh, from an STL surface, or from mass properties</li>
+<li>a rigid tip mass on an elastic beam (tie, or coupling + joint)</li>
+<li>supporting rigid bodies, and the reference point</li>
+<li>mass properties from CAD (<tt>setMass</tt>)</li>
 </ul>
 </div>
 <pre class="codeinput">addpath(fileparts(fileparts(mfilename(<span class="string">'fullpath'</span>))));
-out = fullfile(tempdir, <span class="string">'femTutorials'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
-fembd.boxSTL(fullfile(out, <span class="string">'beam.stl'</span>),  [0 0 0],       [1000 50 50]);
-fembd.boxSTL(fullfile(out, <span class="string">'block.stl'</span>), [1000 -25 -25], [1100 75 75]);
-steel = fembd.material(210e9, 0.3, 7850);
+out = fullfile(tempdir, <span class="string">'fmbdTutorials'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
+fmbd.boxSTL(fullfile(out, <span class="string">'beam.stl'</span>),  [0 0 0],       [1000 50 50]);
+fmbd.boxSTL(fullfile(out, <span class="string">'block.stl'</span>), [1000 -25 -25], [1100 75 75]);
+steel = fmbd.material(210e9, 0.3, 7850);
+clamp = @(X) X(:,1) &lt; 1e-6;
+m = 7850*0.1^3;                                <span class="comment">% block mass</span>
 </pre>
-<h2 id="2">1. A rigid body</h2>
-<p>Rigid = true; only the density of the material is used. A coarse Tet4 mesh is enough: the mass and inertia come out exact anyway.</p>
-<pre class="codeinput">block = fembd.Body(fullfile(out, <span class="string">'block.stl'</span>), struct(<span class="string">'rho'</span>, 7850), <span class="keyword">...</span>
-                 Size = 50, Order = 1, Scale = 1e-3, Rigid = true);
-fprintf(<span class="string">'reference point (centroid): %s m\n'</span>, mat2str(block.Ref, 3));
+<h2 id="2">1. Three ways to make a rigid body</h2>
+<div>
+<ul>
+<li>
+<tt>fmbd.Body(file, mat, Rigid = true)</tt>: meshed with Gmsh; a coarse Tet4 mesh is enough, the mass properties come out exact anyway.</li>
+<li>
+<tt>fmbd.Body.rigid(file, rho)</tt>: the STL surface only (no Gmsh); mass, centre of mass and inertia are computed exactly from the closed surface. This is the easiest for complex CAD parts.</li>
+<li>
+<tt>fmbd.Body.pointMass(m, c, J)</tt>: mass properties only, e.g. from a CAD report; it has no surface, so it is attached with a joint.</li>
+</ul>
+</div>
+<pre class="codeinput">blockM = fmbd.Body(fullfile(out, <span class="string">'block.stl'</span>), struct(<span class="string">'rho'</span>, 7850), Size = 50, Order = 1, <span class="keyword">...</span>
+                   Scale = 1e-3, Rigid = true, Name = <span class="string">'block'</span>);
+blockS = fmbd.Body.rigid(fullfile(out, <span class="string">'block.stl'</span>), 7850, Scale = 1e-3, Name = <span class="string">'block'</span>);
+[mM, cM, JM] = blockM.massProperties();  [mS, ~, JS] = blockS.massProperties();
+fprintf(<span class="string">'meshed: m = %.4f kg, Jxx = %.6f; surface: m = %.4f kg, Jxx = %.6f (exact %.4f, %.6f)\n'</span>, <span class="keyword">...</span>
+        mM, JM(1,1), mS, JS(1,1), m, m*2*0.1^2/12);
 </pre>
-<pre class="codeoutput">reference point (centroid): [1.05 0.025 0.025] m
+<pre class="codeoutput">meshed: m = 7.8500 kg, Jxx = 0.013083; surface: m = 7.8500 kg, Jxx = 0.013083 (exact 7.8500, 0.013083)
 </pre>
-<h2 id="3">2. Reference dofs and mass properties</h2>
-<p>In an assembly, a rigid body has 6 dofs [ux uy uz rx ry rz] (small rotations) at its reference point. All its nodes follow: u = u_ref + r x (x - x_ref) For a free rigid body, the reduced M is its 6x6 mass/inertia matrix.</p>
-<pre class="codeinput">a = fembd.Assembly();  a.add(block);
-[K, M] = a.system();  M = full(M);
-m = 7850*0.1^3;
-fprintf(<span class="string">'reduced size %d, K = 0: %d\n'</span>, size(K, 1), nnz(K) == 0);
-fprintf(<span class="string">'mass %.3f kg (exact %.3f), Ixx %.5f kg m^2 (exact %.5f)\n'</span>, <span class="keyword">...</span>
-        M(1,1), m, M(4,4), m*(2*0.1^2)/12);
-disp(a.dof(<span class="string">'block'</span>)');                  <span class="comment">% its 6 global dofs (after node dofs)</span>
-</pre>
-<pre class="codeoutput">reduced size 6, K = 0: 1
-mass 7.850 kg (exact 7.850), Ixx 0.01308 kg m^2 (exact 0.01308)
-        1051        1052        1053        1054        1055        1056
-
-</pre>
-<h2 id="4">3. An elastic beam with a rigid tip mass</h2>
-<p>A tie between an elastic and a rigid body always uses the rigid body as master, whatever order you give.</p>
-<pre class="codeinput">beam = fembd.Body(fullfile(out, <span class="string">'beam.stl'</span>), steel, Size = 25, Scale = 1e-3);
-a = fembd.Assembly();  a.add(beam);  a.add(block);
-a.tie(<span class="string">'beam'</span>, <span class="string">'block'</span>);
-a.fix(<span class="string">'beam'</span>, @(X) X(:,1) &lt; 1e-9);
-[K, M, T] = a.system();  [V, f] = fembd.modes(K, M, 4);
-
+<h2 id="3">2. An elastic beam with a rigid tip mass</h2>
+<p>A tie between an elastic and a rigid body makes the tied nodes of the elastic body a coupling, fixed to the rigid body.</p>
+<pre class="codeinput">beam = @() fmbd.Body.elastic(fullfile(out, <span class="string">'beam.stl'</span>), steel, Size = 25, Scale = 1e-3, Name = <span class="string">'beam'</span>);
+s = fmbd.System();  s.add(beam());  s.add(blockS);
+s.tie(<span class="string">'block'</span>, <span class="string">'beam'</span>);  s.fix(<span class="string">'beam'</span>, clamp);
+[f, V] = s.modes([], 4);
 <span class="comment">% Estimate: cantilever with a point mass at the tip (Rayleigh, plus 0.24 of</span>
-<span class="comment">% the beam mass). The block's centre of mass actually lies 50 mm beyond the</span>
-<span class="comment">% tip, and the block has rotary inertia; both lower the FE value.</span>
+<span class="comment">% the beam mass). The block's centre of mass lies 50 mm beyond the tip, and</span>
+<span class="comment">% the block has rotary inertia; both lower the FE value.</span>
 EI = 210e9*0.05^4/12;  mb = 7850*0.05^2;
-fEst = sqrt(3*EI/(m + 0.24*mb))/(2*pi);
-fprintf(<span class="string">'f1: FE %.2f Hz, point-mass estimate %.2f Hz\n'</span>, f(1), fEst);
-
-u = T*V(:,1);
-figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);  a.plot(u, 0.1/max(abs(u(1:3*size(a.X, 1)))));
-title(sprintf(<span class="string">'Mode 1 with rigid tip mass: %.1f Hz'</span>, f(1)));
-<span class="comment">% Note: u also holds the rotation dofs of the reference point (radians),</span>
-<span class="comment">% so the plot scale uses only the node dofs.</span>
+fprintf(<span class="string">'f1: %.2f Hz, point-mass estimate %.2f Hz\n'</span>, f(1), sqrt(3*EI/(m + 0.24*mb))/(2*pi));
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);  s.plotMode([], V(:,1), Amplitude = 0.1, Title = sprintf(<span class="string">'Mode 1: %.1f Hz'</span>, f(1)));
 </pre>
-<pre class="codeoutput">f1: FE 24.62 Hz, point-mass estimate 25.72 Hz
+<pre class="codeoutput">f1: 24.62 Hz, point-mass estimate 25.72 Hz
 </pre>
-<img vspace="5" hspace="5" src="tut04_rigidBodies_01.png" alt=""> <h2 id="5">4. Supporting a rigid body</h2>
-<p>Rigid bodies are supported through their reference dofs: a.fix(body, [], dirs) with dirs a subset of 1:6. Fixing only the rotations gives a guided end: the block can translate but not rotate.</p>
-<pre class="codeinput">a.fix(<span class="string">'block'</span>, [], 4:6);
-[K, M] = a.system();  [~, fg] = fembd.modes(K, M, 2);
-fprintf(<span class="string">'guided tip: f1 = %.2f Hz\n'</span>, fg(1));
+<img vspace="5" hspace="5" src="tut04_rigidBodies_01.png" alt=""> <h2 id="4">3. Supporting a rigid body</h2>
+<p>fix(body, dirs) holds a rigid body in the directions dirs (1:6 = [ux uy uz rx ry rz], world axes). Fixing only the rotations gives a guided end: the block can translate but not rotate.</p>
+<pre class="codeinput">s.fix(<span class="string">'block'</span>, 4:6);
+fprintf(<span class="string">'guided tip: f1 = %.2f Hz\n'</span>, s.modes([], 1));
 </pre>
 <pre class="codeoutput">guided tip: f1 = 46.72 Hz
 </pre>
-<h2 id="6">5. Choosing the reference point</h2>
-<p>RefPoint puts the 6 dofs somewhere else, for instance at a sensor or at the point where a load acts. The dynamics are the same, only the coordinates change.</p>
-<pre class="codeinput">block2 = fembd.Body(fullfile(out, <span class="string">'block.stl'</span>), struct(<span class="string">'rho'</span>, 7850), Size = 50, <span class="keyword">...</span>
-                  Order = 1, Scale = 1e-3, Rigid = true, RefPoint = [1.1 0.025 0.025]);
-a = fembd.Assembly();  a.add(beam);  a.add(block2);
-a.tie(<span class="string">'beam'</span>, <span class="string">'block'</span>);
-a.fix(<span class="string">'beam'</span>, @(X) X(:,1) &lt; 1e-9);
-[K, M] = a.system();  [~, f2] = fembd.modes(K, M, 4);
-fprintf(<span class="string">'same frequencies with RefPoint at the tip face: %d\n'</span>, norm(f2 - f)/norm(f) &lt; 1e-8);
+<h2 id="5">4. The reference point</h2>
+<p>A rigid body is a reference point for joints, supports and signals; by default it is the centre of mass (Body.rigid) or the mesh centroid. RefPoint moves it, e.g. to a sensor or to where a load acts. The dynamics stay the same; the reference-point outputs change.</p>
+<pre class="codeinput">blockR = fmbd.Body.rigid(fullfile(out, <span class="string">'block.stl'</span>), 7850, Scale = 1e-3, Name = <span class="string">'block'</span>, <span class="keyword">...</span>
+                         RefPoint = [1.1 0.025 0.025]);
+s = fmbd.System();  s.add(beam());  s.add(blockR);
+s.tie(<span class="string">'block'</span>, <span class="string">'beam'</span>);  s.fix(<span class="string">'beam'</span>, clamp);
+fprintf(<span class="string">'same frequencies with RefPoint at the far face: %d\n'</span>, norm(s.modes([], 4) - f)/norm(f) &lt; 1e-8);
 </pre>
-<pre class="codeoutput">same frequencies with RefPoint at the tip face: 1
+<pre class="codeoutput">same frequencies with RefPoint at the far face: 1
 </pre>
-<h2 id="7">6. Rigid bodies without a mesh: STL surface only</h2>
-<p>A rigid body only needs its surface (for ties and plots) and its mass properties, so meshing it is optional. <tt>fembd.Body.rigidSurface</tt> reads the STL triangles directly and computes mass, centre of mass and inertia exactly from the closed surface. No Gmsh is needed, which helps for complex CAD parts that are hard to mesh.</p>
-<pre class="codeinput">blockS = fembd.Body.rigidSurface(fullfile(out, <span class="string">'block.stl'</span>), 7850, Scale = 1e-3);
-fprintf(<span class="string">'surface-only block: %d vertices, m = %.3f kg, c = %s m\n'</span>, <span class="keyword">...</span>
-        blockS.nNode, blockS.MassProps.m, mat2str(blockS.MassProps.c, 3));
-a = fembd.Assembly();  a.add(beam);  a.add(blockS);
-a.tie(<span class="string">'beam'</span>, <span class="string">'block'</span>);
-a.fix(<span class="string">'beam'</span>, @(X) X(:,1) &lt; 1e-9);
-[K, M] = a.system();  [~, fs] = fembd.modes(K, M, 4);
-fprintf(<span class="string">'same frequencies as the meshed block: %d\n'</span>, norm(fs - f)/norm(f) &lt; 1e-8);
-</pre>
-<pre class="codeoutput">surface-only block: 8 vertices, m = 7.850 kg, c = [1.05 0.025 0.025] m
-same frequencies as the meshed block: 1
-</pre>
-<h2 id="8">7. Point masses: mass properties only</h2>
-<p>
-<tt>fembd.Body.pointMass(m, c, J)</tt> is a rigid body with mass m, centre of mass c and inertia tensor J (about c), e.g. a motor taken from a CAD mass-property report. It has no surface, so it is attached with a joint, here a fixed joint to a coupling on the beam's tip face.</p>
+<h2 id="6">5. Point masses</h2>
+<p>A point mass with the block's mass properties, attached by a fixed joint to a coupling on the beam's tip face. The coupling makes the face rigid, which the tie above also does, so the result is the same.</p>
 <pre class="codeinput">J = m*(2*0.1^2)/12*eye(3);                      <span class="comment">% cube: Jxx = Jyy = Jzz</span>
-motor = fembd.Body.pointMass(m, [1.05 0.025 0.025], J, Name = <span class="string">'motor'</span>);
-a = fembd.Assembly();  a.add(beam);  a.add(motor);
-tipFace = a.couple(<span class="string">'beam'</span>, @(X) X(:,1) &gt; 1 - 1e-9);
-a.joint(tipFace, <span class="string">'motor'</span>, <span class="string">'fixed'</span>);
-a.fix(<span class="string">'beam'</span>, @(X) X(:,1) &lt; 1e-9);
-[K, M, T] = a.system();  [V, fp] = fembd.modes(K, M, 4);
-fprintf(<span class="string">'point mass: f1 = %.2f Hz (meshed block %.2f Hz)\n'</span>, fp(1), f(1));
-u = T*V(:,1);
-figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);  a.plot(u, 0.1/max(abs(u(1:3*size(a.X, 1)))));
-title(<span class="string">'Beam with a point mass (marker)'</span>);
+s = fmbd.System();  s.add(beam());
+s.add(fmbd.Body.pointMass(m, [1.05 0.025 0.025], J, Name = <span class="string">'motor'</span>));
+tipFace = s.couple(<span class="string">'beam'</span>, @(X) X(:,1) &gt; 1 - 1e-6);
+s.joint(tipFace, <span class="string">'motor'</span>, <span class="string">'fixed'</span>);
+s.fix(<span class="string">'beam'</span>, clamp);
+fprintf(<span class="string">'point mass: f1 = %.2f Hz (block %.2f Hz)\n'</span>, s.modes([], 1), f(1));
 </pre>
-<pre class="codeoutput">point mass: f1 = 24.62 Hz (meshed block 24.62 Hz)
+<pre class="codeoutput">point mass: f1 = 24.62 Hz (block 24.62 Hz)
 </pre>
-<img vspace="5" hspace="5" src="tut04_rigidBodies_02.png" alt=""> <p class="footer">
+<h2 id="7">6. Mass properties from CAD</h2>
+<p>
+<tt>setMass</tt> overrides the mass properties of a rigid body, e.g. with the values of a CAD mass-property report (which includes holes, inserts and other materials). The inertia can be given about another point and in other axes; LengthScale converts mm and kg mm^2.</p>
+<pre class="codeinput">cad = fmbd.Body.rigid(fullfile(out, <span class="string">'block.stl'</span>), 7850, Scale = 1e-3);
+cad.setMass(8.2, CenterOfMass = [1050 25 25], Inertia = [1.4e4 1.4e4 1.3e4], LengthScale = 1e-3);
+[mc, cc, Jc] = cad.massProperties();
+fprintf(<span class="string">'CAD values: m = %.2f kg, c = %s m, J = %s kg m^2\n'</span>, mc, mat2str(cc, 3), mat2str(diag(Jc)', 3));
+</pre>
+<pre class="codeoutput">CAD values: m = 8.20 kg, c = [1.05 0.025 0.025] m, J = [0.014 0.014 0.013] kg m^2
+</pre>
+<p class="footer">
 <br>
 <a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2024a</a>
 <br>
@@ -227,115 +203,92 @@ title(<span class="string">'Beam with a point mass (marker)'</span>);
 <!--
 ##### SOURCE BEGIN #####
 %% Tutorial 4 - Rigid bodies
-% Parts that are much stiffer than the rest of a structure (a payload, a
-% frame, a tool) can be modelled as rigid. A rigid body has 6 dofs at its
-% reference point and no stiffness; its mesh only provides its mass,
-% inertia and surface. This tutorial covers:
+% Parts that are much stiffer than the rest of a structure (a link, a
+% payload, a frame) can be modelled as rigid. A rigid body has a frame at
+% its centre of mass that moves with 6 dofs; its geometry only provides
+% its mass, inertia and surface. This tutorial covers:
 %
-% * creating rigid bodies, their reference dofs and mass properties
-% * tying elastic bodies to rigid ones
-% * supporting rigid bodies, and choosing the reference point
-% * rigid bodies without a volume mesh: STL surface or mass properties only
+% * rigid bodies from a mesh, from an STL surface, or from mass properties
+% * a rigid tip mass on an elastic beam (tie, or coupling + joint)
+% * supporting rigid bodies, and the reference point
+% * mass properties from CAD (|setMass|)
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
-out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
-fembd.boxSTL(fullfile(out, 'beam.stl'),  [0 0 0],       [1000 50 50]);
-fembd.boxSTL(fullfile(out, 'block.stl'), [1000 -25 -25], [1100 75 75]);
-steel = fembd.material(210e9, 0.3, 7850);
+out = fullfile(tempdir, 'fmbdTutorials');  if ~isfolder(out), mkdir(out); end
+fmbd.boxSTL(fullfile(out, 'beam.stl'),  [0 0 0],       [1000 50 50]);
+fmbd.boxSTL(fullfile(out, 'block.stl'), [1000 -25 -25], [1100 75 75]);
+steel = fmbd.material(210e9, 0.3, 7850);
+clamp = @(X) X(:,1) < 1e-6;
+m = 7850*0.1^3;                                % block mass
 
-%% 1. A rigid body
-% Rigid = true; only the density of the material is used. A coarse Tet4
-% mesh is enough: the mass and inertia come out exact anyway.
-block = fembd.Body(fullfile(out, 'block.stl'), struct('rho', 7850), ...
-                 Size = 50, Order = 1, Scale = 1e-3, Rigid = true);
-fprintf('reference point (centroid): %s m\n', mat2str(block.Ref, 3));
+%% 1. Three ways to make a rigid body
+% * |fmbd.Body(file, mat, Rigid = true)|: meshed with Gmsh; a coarse Tet4
+%   mesh is enough, the mass properties come out exact anyway.
+% * |fmbd.Body.rigid(file, rho)|: the STL surface only (no Gmsh); mass,
+%   centre of mass and inertia are computed exactly from the closed surface.
+%   This is the easiest for complex CAD parts.
+% * |fmbd.Body.pointMass(m, c, J)|: mass properties only, e.g. from a CAD
+%   report; it has no surface, so it is attached with a joint.
+blockM = fmbd.Body(fullfile(out, 'block.stl'), struct('rho', 7850), Size = 50, Order = 1, ...
+                   Scale = 1e-3, Rigid = true, Name = 'block');
+blockS = fmbd.Body.rigid(fullfile(out, 'block.stl'), 7850, Scale = 1e-3, Name = 'block');
+[mM, cM, JM] = blockM.massProperties();  [mS, ~, JS] = blockS.massProperties();
+fprintf('meshed: m = %.4f kg, Jxx = %.6f; surface: m = %.4f kg, Jxx = %.6f (exact %.4f, %.6f)\n', ...
+        mM, JM(1,1), mS, JS(1,1), m, m*2*0.1^2/12);
 
-%% 2. Reference dofs and mass properties
-% In an assembly, a rigid body has 6 dofs [ux uy uz rx ry rz] (small
-% rotations) at its reference point. All its nodes follow:
-%   u = u_ref + r x (x - x_ref)
-% For a free rigid body, the reduced M is its 6x6 mass/inertia matrix.
-a = fembd.Assembly();  a.add(block);
-[K, M] = a.system();  M = full(M);
-m = 7850*0.1^3;
-fprintf('reduced size %d, K = 0: %d\n', size(K, 1), nnz(K) == 0);
-fprintf('mass %.3f kg (exact %.3f), Ixx %.5f kg m^2 (exact %.5f)\n', ...
-        M(1,1), m, M(4,4), m*(2*0.1^2)/12);
-disp(a.dof('block')');                  % its 6 global dofs (after node dofs)
-
-%% 3. An elastic beam with a rigid tip mass
-% A tie between an elastic and a rigid body always uses the rigid body as
-% master, whatever order you give.
-beam = fembd.Body(fullfile(out, 'beam.stl'), steel, Size = 25, Scale = 1e-3);
-a = fembd.Assembly();  a.add(beam);  a.add(block);
-a.tie('beam', 'block');
-a.fix('beam', @(X) X(:,1) < 1e-9);
-[K, M, T] = a.system();  [V, f] = fembd.modes(K, M, 4);
-
+%% 2. An elastic beam with a rigid tip mass
+% A tie between an elastic and a rigid body makes the tied nodes of the
+% elastic body a coupling, fixed to the rigid body.
+beam = @() fmbd.Body.elastic(fullfile(out, 'beam.stl'), steel, Size = 25, Scale = 1e-3, Name = 'beam');
+s = fmbd.System();  s.add(beam());  s.add(blockS);
+s.tie('block', 'beam');  s.fix('beam', clamp);
+[f, V] = s.modes([], 4);
 % Estimate: cantilever with a point mass at the tip (Rayleigh, plus 0.24 of
-% the beam mass). The block's centre of mass actually lies 50 mm beyond the
-% tip, and the block has rotary inertia; both lower the FE value.
+% the beam mass). The block's centre of mass lies 50 mm beyond the tip, and
+% the block has rotary inertia; both lower the FE value.
 EI = 210e9*0.05^4/12;  mb = 7850*0.05^2;
-fEst = sqrt(3*EI/(m + 0.24*mb))/(2*pi);
-fprintf('f1: FE %.2f Hz, point-mass estimate %.2f Hz\n', f(1), fEst);
+fprintf('f1: %.2f Hz, point-mass estimate %.2f Hz\n', f(1), sqrt(3*EI/(m + 0.24*mb))/(2*pi));
+figure('Color', 'w');  s.plotMode([], V(:,1), Amplitude = 0.1, Title = sprintf('Mode 1: %.1f Hz', f(1)));
 
-u = T*V(:,1);
-figure('Color', 'w');  a.plot(u, 0.1/max(abs(u(1:3*size(a.X, 1)))));
-title(sprintf('Mode 1 with rigid tip mass: %.1f Hz', f(1)));
-% Note: u also holds the rotation dofs of the reference point (radians),
-% so the plot scale uses only the node dofs.
+%% 3. Supporting a rigid body
+% fix(body, dirs) holds a rigid body in the directions dirs (1:6 =
+% [ux uy uz rx ry rz], world axes). Fixing only the rotations gives a
+% guided end: the block can translate but not rotate.
+s.fix('block', 4:6);
+fprintf('guided tip: f1 = %.2f Hz\n', s.modes([], 1));
 
-%% 4. Supporting a rigid body
-% Rigid bodies are supported through their reference dofs:
-% a.fix(body, [], dirs) with dirs a subset of 1:6. Fixing only the
-% rotations gives a guided end: the block can translate but not rotate.
-a.fix('block', [], 4:6);
-[K, M] = a.system();  [~, fg] = fembd.modes(K, M, 2);
-fprintf('guided tip: f1 = %.2f Hz\n', fg(1));
+%% 4. The reference point
+% A rigid body is a reference point for joints, supports and signals; by
+% default it is the centre of mass (Body.rigid) or the mesh centroid.
+% RefPoint moves it, e.g. to a sensor or to where a load acts. The
+% dynamics stay the same; the reference-point outputs change.
+blockR = fmbd.Body.rigid(fullfile(out, 'block.stl'), 7850, Scale = 1e-3, Name = 'block', ...
+                         RefPoint = [1.1 0.025 0.025]);
+s = fmbd.System();  s.add(beam());  s.add(blockR);
+s.tie('block', 'beam');  s.fix('beam', clamp);
+fprintf('same frequencies with RefPoint at the far face: %d\n', norm(s.modes([], 4) - f)/norm(f) < 1e-8);
 
-%% 5. Choosing the reference point
-% RefPoint puts the 6 dofs somewhere else, for instance at a sensor or at
-% the point where a load acts. The dynamics are the same, only the
-% coordinates change.
-block2 = fembd.Body(fullfile(out, 'block.stl'), struct('rho', 7850), Size = 50, ...
-                  Order = 1, Scale = 1e-3, Rigid = true, RefPoint = [1.1 0.025 0.025]);
-a = fembd.Assembly();  a.add(beam);  a.add(block2);
-a.tie('beam', 'block');
-a.fix('beam', @(X) X(:,1) < 1e-9);
-[K, M] = a.system();  [~, f2] = fembd.modes(K, M, 4);
-fprintf('same frequencies with RefPoint at the tip face: %d\n', norm(f2 - f)/norm(f) < 1e-8);
-
-%% 6. Rigid bodies without a mesh: STL surface only
-% A rigid body only needs its surface (for ties and plots) and its mass
-% properties, so meshing it is optional. |fembd.Body.rigidSurface| reads the
-% STL triangles directly and computes mass, centre of mass and inertia
-% exactly from the closed surface. No Gmsh is needed, which helps for
-% complex CAD parts that are hard to mesh.
-blockS = fembd.Body.rigidSurface(fullfile(out, 'block.stl'), 7850, Scale = 1e-3);
-fprintf('surface-only block: %d vertices, m = %.3f kg, c = %s m\n', ...
-        blockS.nNode, blockS.MassProps.m, mat2str(blockS.MassProps.c, 3));
-a = fembd.Assembly();  a.add(beam);  a.add(blockS);
-a.tie('beam', 'block');
-a.fix('beam', @(X) X(:,1) < 1e-9);
-[K, M] = a.system();  [~, fs] = fembd.modes(K, M, 4);
-fprintf('same frequencies as the meshed block: %d\n', norm(fs - f)/norm(f) < 1e-8);
-
-%% 7. Point masses: mass properties only
-% |fembd.Body.pointMass(m, c, J)| is a rigid body with mass m, centre of
-% mass c and inertia tensor J (about c), e.g. a motor taken from a CAD
-% mass-property report. It has no surface, so it is attached with a joint,
-% here a fixed joint to a coupling on the beam's tip face.
+%% 5. Point masses
+% A point mass with the block's mass properties, attached by a fixed joint
+% to a coupling on the beam's tip face. The coupling makes the face rigid,
+% which the tie above also does, so the result is the same.
 J = m*(2*0.1^2)/12*eye(3);                      % cube: Jxx = Jyy = Jzz
-motor = fembd.Body.pointMass(m, [1.05 0.025 0.025], J, Name = 'motor');
-a = fembd.Assembly();  a.add(beam);  a.add(motor);
-tipFace = a.couple('beam', @(X) X(:,1) > 1 - 1e-9);
-a.joint(tipFace, 'motor', 'fixed');
-a.fix('beam', @(X) X(:,1) < 1e-9);
-[K, M, T] = a.system();  [V, fp] = fembd.modes(K, M, 4);
-fprintf('point mass: f1 = %.2f Hz (meshed block %.2f Hz)\n', fp(1), f(1));
-u = T*V(:,1);
-figure('Color', 'w');  a.plot(u, 0.1/max(abs(u(1:3*size(a.X, 1)))));
-title('Beam with a point mass (marker)');
+s = fmbd.System();  s.add(beam());
+s.add(fmbd.Body.pointMass(m, [1.05 0.025 0.025], J, Name = 'motor'));
+tipFace = s.couple('beam', @(X) X(:,1) > 1 - 1e-6);
+s.joint(tipFace, 'motor', 'fixed');
+s.fix('beam', clamp);
+fprintf('point mass: f1 = %.2f Hz (block %.2f Hz)\n', s.modes([], 1), f(1));
+
+%% 6. Mass properties from CAD
+% |setMass| overrides the mass properties of a rigid body, e.g. with the
+% values of a CAD mass-property report (which includes holes, inserts and
+% other materials). The inertia can be given about another point and in
+% other axes; LengthScale converts mm and kg mm^2.
+cad = fmbd.Body.rigid(fullfile(out, 'block.stl'), 7850, Scale = 1e-3);
+cad.setMass(8.2, CenterOfMass = [1050 25 25], Inertia = [1.4e4 1.4e4 1.3e4], LengthScale = 1e-3);
+[mc, cc, Jc] = cad.massProperties();
+fprintf('CAD values: m = %.2f kg, c = %s m, J = %s kg m^2\n', mc, mat2str(cc, 3), mat2str(diag(Jc)', 3));
 
 ##### SOURCE END #####
 -->

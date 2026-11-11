@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>tut01_firstModel</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-10">
+<meta name="DC.date" content="2026-11-11">
 <meta name="DC.source" content="tut01_firstModel.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -86,10 +86,10 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <a href="#2">1. Geometry and bodies</a>
 </li>
 <li>
-<a href="#3">2. Assembly: joints, couplings, inputs and outputs</a>
+<a href="#3">2. The system: joints, couplings, inputs and outputs</a>
 </li>
 <li>
-<a href="#4">3. Nonlinear simulation with a controller in the loop</a>
+<a href="#4">3. Simulation with a controller in the loop</a>
 </li>
 <li>
 <a href="#5">4. Energy and animation</a>
@@ -103,12 +103,12 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <p>This tutorial goes through the basic workflow:</p>
 <div>
 <ol>
-<li>geometry (STL) -&gt; <tt>fembd.Body</tt>: rigid, or elastic (Gmsh mesh + material)</li>
-<li>bodies -&gt; <tt>fembd.Assembly</tt>: joints, couplings, inputs and outputs</li>
+<li>geometry (STL) -&gt; <tt>fmbd.Body</tt>: rigid, or elastic (Gmsh mesh + material)</li>
+<li>bodies -&gt; <tt>fmbd.System</tt>: joints, couplings, inputs and outputs</li>
 <li>
-<tt>a.nonlinear()</tt> -&gt; <tt>simulate</tt>: large motion with a controller in the loop</li>
+<tt>simulate</tt>: large motion with a controller in the loop</li>
 <li>
-<tt>a.system()</tt>, <tt>a.statespace()</tt>: linear analysis about a pose</li>
+<tt>equilibrium</tt>, <tt>modes</tt>, <tt>statespace</tt>: linear analysis about a pose</li>
 </ol>
 </div>
 <p>The arm moves in the horizontal plane (a SCARA arm): a rigid upper arm on a shoulder joint, and an elastic aluminium forearm on an elbow joint, both driven by a motor torque under PD control. Gravity bends the forearm. Run it section by section (Ctrl+Enter), or render it with <tt>publish('tut01_firstModel')</tt>.</p>
@@ -116,44 +116,43 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 tmp = tempname;  mkdir(tmp);
 </pre>
 <h2 id="2">1. Geometry and bodies</h2>
-<p>Two boxes as STL files (in m). The upper arm is rigid: its mesh only gives its mass, inertia and surface. The forearm is elastic: Gmsh meshes it with quadratic Tet10 elements.</p>
-<pre class="codeinput">fembd.boxSTL(fullfile(tmp, <span class="string">'upper.stl'</span>),   [0 -0.02 -0.01],     [0.3 0.02 0.01]);
-fembd.boxSTL(fullfile(tmp, <span class="string">'forearm.stl'</span>), [0.3 -0.015 -0.005], [0.6 0.015 0.005]);
-steel = fembd.material(210e9, 0.30, 7850);
-alu   = fembd.material(70e9,  0.33, 2700);
+<p>Two boxes as STL files (in m). The upper arm is rigid: its mesh only gives its mass, inertia and surface. The forearm is elastic: Gmsh meshes it with quadratic Tet10 elements, and in the system its deformation is described by <tt>Modes</tt> vibration modes.</p>
+<pre class="codeinput">fmbd.boxSTL(fullfile(tmp, <span class="string">'upper.stl'</span>),   [0 -0.02 -0.01],     [0.3 0.02 0.01]);
+fmbd.boxSTL(fullfile(tmp, <span class="string">'forearm.stl'</span>), [0.3 -0.015 -0.005], [0.6 0.015 0.005]);
+steel = fmbd.material(210e9, 0.30, 7850);
+alu   = fmbd.material(70e9,  0.33, 2700);
 
-upper   = fembd.Body(fullfile(tmp, <span class="string">'upper.stl'</span>),   steel, Size = 0.02, Rigid = true, Name = <span class="string">'upper'</span>);
-forearm = fembd.Body(fullfile(tmp, <span class="string">'forearm.stl'</span>), alu,   Size = 0.006, Name = <span class="string">'forearm'</span>);
+upper   = fmbd.Body(fullfile(tmp, <span class="string">'upper.stl'</span>), steel, Size = 0.02, Rigid = true, Name = <span class="string">'upper'</span>);
+forearm = fmbd.Body.elastic(fullfile(tmp, <span class="string">'forearm.stl'</span>), alu, Size = 0.006, Modes = 6, <span class="keyword">...</span>
+                            Name = <span class="string">'forearm'</span>);
 fprintf(<span class="string">'upper arm: %.2f kg (rigid); forearm: %.3f kg, %d nodes\n'</span>, <span class="keyword">...</span>
         upper.massProperties(), forearm.massProperties(), forearm.nNode);
 </pre>
 <pre class="codeoutput">upper arm: 1.88 kg (rigid); forearm: 0.243 kg, 5155 nodes
 </pre>
-<h2 id="3">2. Assembly: joints, couplings, inputs and outputs</h2>
-<p>Joints connect reference points: a rigid body, or a patch of an elastic body made rigid by a coupling. The forearm gets couplings at its root (the elbow) and at its tip (the payload point).</p>
-<pre class="codeinput">a = fembd.Assembly();
-a.add(upper);  a.add(forearm);
-a.couple(<span class="string">'forearm'</span>, @(X) X(:,1) &lt; 0.3 + 1e-6, Name = <span class="string">'root'</span>, Point = [0.3 0 0]);
-a.couple(<span class="string">'forearm'</span>, @(X) X(:,1) &gt; 0.6 - 1e-6, Name = <span class="string">'tip'</span>);
-a.joint(<span class="string">'ground'</span>, <span class="string">'upper'</span>, <span class="string">'revolute'</span>, Point = [0 0 0],   Name = <span class="string">'shoulder'</span>);   <span class="comment">% about z</span>
-a.joint(<span class="string">'upper'</span>,  <span class="string">'root'</span>,  <span class="string">'revolute'</span>, Point = [0.3 0 0], Name = <span class="string">'elbow'</span>);
+<h2 id="3">2. The system: joints, couplings, inputs and outputs</h2>
+<p>Joints connect reference points: a rigid body, or a patch of an elastic body made rigid by a coupling. The forearm gets couplings at its root (the elbow; the first coupling also carries the forearm's moving frame) and at its tip (the payload point).</p>
+<pre class="codeinput">s = fmbd.System(Gravity = [0 0 -9.81]);
+s.add(upper);  s.add(forearm);
+s.couple(<span class="string">'forearm'</span>, @(X) X(:,1) &lt; 0.3 + 1e-6, Name = <span class="string">'root'</span>, Point = [0.3 0 0]);
+s.couple(<span class="string">'forearm'</span>, @(X) X(:,1) &gt; 0.6 - 1e-6, Name = <span class="string">'tip'</span>);
+s.joint(<span class="string">'ground'</span>, <span class="string">'upper'</span>, <span class="string">'revolute'</span>, Point = [0 0 0],   Name = <span class="string">'shoulder'</span>);   <span class="comment">% about z</span>
+s.joint(<span class="string">'upper'</span>,  <span class="string">'root'</span>,  <span class="string">'revolute'</span>, Point = [0.3 0 0], Name = <span class="string">'elbow'</span>);
 
 <span class="comment">% motor torques on the joints, and sensors: joint angles and rates, and the</span>
 <span class="comment">% vertical tip motion (the forearm's bending)</span>
-a.input(<span class="string">'tau1'</span>, <span class="string">'shoulder'</span>);  a.input(<span class="string">'tau2'</span>, <span class="string">'elbow'</span>);
-a.output(<span class="string">'th1'</span>, <span class="string">'shoulder'</span>);  a.output(<span class="string">'w1'</span>, <span class="string">'shoulder'</span>, Type = <span class="string">'velocity'</span>);
-a.output(<span class="string">'th2'</span>, <span class="string">'elbow'</span>);     a.output(<span class="string">'w2'</span>, <span class="string">'elbow'</span>,    Type = <span class="string">'velocity'</span>);
-a.output(<span class="string">'tipz'</span>, <span class="string">'tip'</span>, [], 3);
+s.input(<span class="string">'tau1'</span>, <span class="string">'shoulder'</span>);  s.input(<span class="string">'tau2'</span>, <span class="string">'elbow'</span>);
+s.output(<span class="string">'th1'</span>, <span class="string">'shoulder'</span>);  s.output(<span class="string">'w1'</span>, <span class="string">'shoulder'</span>, Type = <span class="string">'velocity'</span>);
+s.output(<span class="string">'th2'</span>, <span class="string">'elbow'</span>);     s.output(<span class="string">'w2'</span>, <span class="string">'elbow'</span>,    Type = <span class="string">'velocity'</span>);
+s.output(<span class="string">'tipz'</span>, <span class="string">'tip'</span>, [], 3);
 </pre>
-<h2 id="4">3. Nonlinear simulation with a controller in the loop</h2>
+<h2 id="4">3. Simulation with a controller in the loop</h2>
 <p>
-<tt>a.nonlinear</tt> builds the nonlinear model: exact joint kinematics for large angles, and the forearm's deformation by a few Craig-Bampton modes in a frame that moves with it. <tt>simulate</tt> integrates in time; the controller <tt>Input = @(t, y)</tt> gets the outputs of the previous step.</p>
-<pre class="codeinput">m = a.nonlinear(Gravity = [0 0 -9.81], Modes = 6);
-
-ref = [1.0; -1.5];                                     <span class="comment">% target angles (rad)</span>
+<tt>simulate</tt> integrates the nonlinear equations in time: exact joint kinematics for large angles, and the forearm's modes in its moving frame. The controller <tt>Input = @(t, y)</tt> gets the outputs of the previous step.</p>
+<pre class="codeinput">ref = [1.0; -1.5];                                     <span class="comment">% target angles (rad)</span>
 kp  = [16; 1.5];  kd = [1.8; 0.15];                    <span class="comment">% PD gains (about 2 Hz bandwidth)</span>
 pd  = @(t, y) kp.*(ref - [y.th1; y.th2]) - kd.*[y.w1; y.w2];
-[t, y, x] = m.simulate([0 1.5], Step = 5e-4, Input = pd);
+[t, y, x] = s.simulate([0 1.5], Step = 5e-4, Input = pd);
 
 figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
 subplot(2, 1, 1);  plot(t, [y.th1 y.th2], <span class="string">'LineWidth'</span>, 1.5);  grid <span class="string">on</span>
@@ -167,38 +166,40 @@ fprintf(<span class="string">'final angles %.3f, %.3f rad (targets %.1f, %.1f)\n
 <img vspace="5" hspace="5" src="tut01_firstModel_01.png" alt=""> <h2 id="5">4. Energy and animation</h2>
 <p>
 <tt>energy</tt> splits the energy into kinetic, gravity, strain and spring parts. <tt>animate</tt> plays the motion in real time (<tt>Rate</tt>); <tt>Scale</tt> magnifies the deformation.</p>
-<pre class="codeinput">E = m.energy(x);
+<pre class="codeinput">E = s.energy(x);
 fprintf(<span class="string">'largest strain energy in the forearm: %.2e J\n'</span>, max(E.strain));
 figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
-m.animate(t, x, Rate = 1, Scale = 200, Title = <span class="string">'SCARA arm'</span>);
+s.animate(t, x, Rate = 1, Scale = 200, Title = <span class="string">'SCARA arm'</span>);
 </pre>
 <pre class="codeoutput">largest strain energy in the forearm: 4.33e-04 J
 </pre>
 <img vspace="5" hspace="5" src="tut01_firstModel_02.png" alt=""> <h2 id="6">5. Linear analysis about a pose</h2>
-<p>The same assembly gives the linear finite-element model about its current pose: all constraints are eliminated with u = T*q, and K and M are the stiffness and mass in the independent dofs q. The two joint angles are free, so the first two modes are rigid-body (mechanism) modes at 0 Hz.</p>
-<pre class="codeinput">[K, M, T] = a.system();
-[V, f] = fembd.modes(K, M, 6);
+<p>The final state of the simulation is (nearly) at rest. <tt>equilibrium</tt> settles it statically (gravity sag of the forearm, joint angles kept), and <tt>modes</tt> and <tt>statespace</tt> linearise about it. The two joint angles are free, so the first two modes are mechanism modes at 0 Hz.</p>
+<pre class="codeinput">xe = s.equilibrium(Initial = x);
+[f, V] = s.modes(xe, 6);
 disp(table((1:6)', f, <span class="string">'VariableNames'</span>, {<span class="string">'mode'</span>, <span class="string">'f_Hz'</span>}));
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
+s.plotMode(xe, V(:,3), Amplitude = 0.03, Title = sprintf(<span class="string">'Mode 3: %.1f Hz'</span>, f(3)));
 
 <span class="comment">% the state-space model from the motor torques to the sensors (for control</span>
-<span class="comment">% design, see Tutorial 9 and the manual)</span>
-sys = a.statespace(Modes = 10, Damping = 0.01);
+<span class="comment">% design, see Tutorial 7)</span>
+sys = s.statespace(xe, Modes = 10, Damping = 0.01);
 fprintf(<span class="string">'state-space model: %d states, inputs %s, outputs %s\n'</span>, size(sys.A, 1), <span class="keyword">...</span>
         strjoin(sys.InputName, <span class="string">', '</span>), strjoin(sys.OutputName, <span class="string">', '</span>));
 </pre>
-<pre class="codeoutput">    mode      f_Hz   
-    ____    _________
+<pre class="codeoutput">    mode     f_Hz 
+    ____    ______
 
-     1      0.0008352
-     2      0.0017954
-     3         91.941
-     4         573.39
-     5         1201.6
-     6         1499.1
+     1           0
+     2           0
+     3      91.942
+     4      573.62
+     5      1173.7
+     6      1505.5
 
 state-space model: 24 states, inputs tau1, tau2, outputs th1, w1, th2, w2, tipz
 </pre>
-<p class="footer">
+<img vspace="5" hspace="5" src="tut01_firstModel_03.png" alt=""> <p class="footer">
 <br>
 <a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2024a</a>
 <br>
@@ -209,10 +210,10 @@ state-space model: 24 states, inputs tau1, tau2, outputs th1, w1, th2, w2, tipz
 %% Tutorial 1 - Your first model: a two-link arm with an elastic forearm
 % This tutorial goes through the basic workflow:
 %
-% # geometry (STL) -> |fembd.Body|: rigid, or elastic (Gmsh mesh + material)
-% # bodies -> |fembd.Assembly|: joints, couplings, inputs and outputs
-% # |a.nonlinear()| -> |simulate|: large motion with a controller in the loop
-% # |a.system()|, |a.statespace()|: linear analysis about a pose
+% # geometry (STL) -> |fmbd.Body|: rigid, or elastic (Gmsh mesh + material)
+% # bodies -> |fmbd.System|: joints, couplings, inputs and outputs
+% # |simulate|: large motion with a controller in the loop
+% # |equilibrium|, |modes|, |statespace|: linear analysis about a pose
 %
 % The arm moves in the horizontal plane (a SCARA arm): a rigid upper arm on
 % a shoulder joint, and an elastic aluminium forearm on an elbow joint, both
@@ -226,46 +227,46 @@ tmp = tempname;  mkdir(tmp);
 %% 1. Geometry and bodies
 % Two boxes as STL files (in m). The upper arm is rigid: its mesh only gives
 % its mass, inertia and surface. The forearm is elastic: Gmsh meshes it with
-% quadratic Tet10 elements.
-fembd.boxSTL(fullfile(tmp, 'upper.stl'),   [0 -0.02 -0.01],     [0.3 0.02 0.01]);
-fembd.boxSTL(fullfile(tmp, 'forearm.stl'), [0.3 -0.015 -0.005], [0.6 0.015 0.005]);
-steel = fembd.material(210e9, 0.30, 7850);
-alu   = fembd.material(70e9,  0.33, 2700);
+% quadratic Tet10 elements, and in the system its deformation is described
+% by |Modes| vibration modes.
+fmbd.boxSTL(fullfile(tmp, 'upper.stl'),   [0 -0.02 -0.01],     [0.3 0.02 0.01]);
+fmbd.boxSTL(fullfile(tmp, 'forearm.stl'), [0.3 -0.015 -0.005], [0.6 0.015 0.005]);
+steel = fmbd.material(210e9, 0.30, 7850);
+alu   = fmbd.material(70e9,  0.33, 2700);
 
-upper   = fembd.Body(fullfile(tmp, 'upper.stl'),   steel, Size = 0.02, Rigid = true, Name = 'upper');
-forearm = fembd.Body(fullfile(tmp, 'forearm.stl'), alu,   Size = 0.006, Name = 'forearm');
+upper   = fmbd.Body(fullfile(tmp, 'upper.stl'), steel, Size = 0.02, Rigid = true, Name = 'upper');
+forearm = fmbd.Body.elastic(fullfile(tmp, 'forearm.stl'), alu, Size = 0.006, Modes = 6, ...
+                            Name = 'forearm');
 fprintf('upper arm: %.2f kg (rigid); forearm: %.3f kg, %d nodes\n', ...
         upper.massProperties(), forearm.massProperties(), forearm.nNode);
 
-%% 2. Assembly: joints, couplings, inputs and outputs
+%% 2. The system: joints, couplings, inputs and outputs
 % Joints connect reference points: a rigid body, or a patch of an elastic
 % body made rigid by a coupling. The forearm gets couplings at its root
-% (the elbow) and at its tip (the payload point).
-a = fembd.Assembly();
-a.add(upper);  a.add(forearm);
-a.couple('forearm', @(X) X(:,1) < 0.3 + 1e-6, Name = 'root', Point = [0.3 0 0]);
-a.couple('forearm', @(X) X(:,1) > 0.6 - 1e-6, Name = 'tip');
-a.joint('ground', 'upper', 'revolute', Point = [0 0 0],   Name = 'shoulder');   % about z
-a.joint('upper',  'root',  'revolute', Point = [0.3 0 0], Name = 'elbow');
+% (the elbow; the first coupling also carries the forearm's moving frame)
+% and at its tip (the payload point).
+s = fmbd.System(Gravity = [0 0 -9.81]);
+s.add(upper);  s.add(forearm);
+s.couple('forearm', @(X) X(:,1) < 0.3 + 1e-6, Name = 'root', Point = [0.3 0 0]);
+s.couple('forearm', @(X) X(:,1) > 0.6 - 1e-6, Name = 'tip');
+s.joint('ground', 'upper', 'revolute', Point = [0 0 0],   Name = 'shoulder');   % about z
+s.joint('upper',  'root',  'revolute', Point = [0.3 0 0], Name = 'elbow');
 
 % motor torques on the joints, and sensors: joint angles and rates, and the
 % vertical tip motion (the forearm's bending)
-a.input('tau1', 'shoulder');  a.input('tau2', 'elbow');
-a.output('th1', 'shoulder');  a.output('w1', 'shoulder', Type = 'velocity');
-a.output('th2', 'elbow');     a.output('w2', 'elbow',    Type = 'velocity');
-a.output('tipz', 'tip', [], 3);
+s.input('tau1', 'shoulder');  s.input('tau2', 'elbow');
+s.output('th1', 'shoulder');  s.output('w1', 'shoulder', Type = 'velocity');
+s.output('th2', 'elbow');     s.output('w2', 'elbow',    Type = 'velocity');
+s.output('tipz', 'tip', [], 3);
 
-%% 3. Nonlinear simulation with a controller in the loop
-% |a.nonlinear| builds the nonlinear model: exact joint kinematics for large
-% angles, and the forearm's deformation by a few Craig-Bampton modes in a
-% frame that moves with it. |simulate| integrates in time; the controller
-% |Input = @(t, y)| gets the outputs of the previous step.
-m = a.nonlinear(Gravity = [0 0 -9.81], Modes = 6);
-
+%% 3. Simulation with a controller in the loop
+% |simulate| integrates the nonlinear equations in time: exact joint
+% kinematics for large angles, and the forearm's modes in its moving frame.
+% The controller |Input = @(t, y)| gets the outputs of the previous step.
 ref = [1.0; -1.5];                                     % target angles (rad)
 kp  = [16; 1.5];  kd = [1.8; 0.15];                    % PD gains (about 2 Hz bandwidth)
 pd  = @(t, y) kp.*(ref - [y.th1; y.th2]) - kd.*[y.w1; y.w2];
-[t, y, x] = m.simulate([0 1.5], Step = 5e-4, Input = pd);
+[t, y, x] = s.simulate([0 1.5], Step = 5e-4, Input = pd);
 
 figure('Color', 'w');
 subplot(2, 1, 1);  plot(t, [y.th1 y.th2], 'LineWidth', 1.5);  grid on
@@ -278,23 +279,25 @@ fprintf('final angles %.3f, %.3f rad (targets %.1f, %.1f)\n', y.th1(end), y.th2(
 % |energy| splits the energy into kinetic, gravity, strain and spring
 % parts. |animate| plays the motion in real time (|Rate|); |Scale|
 % magnifies the deformation.
-E = m.energy(x);
+E = s.energy(x);
 fprintf('largest strain energy in the forearm: %.2e J\n', max(E.strain));
 figure('Color', 'w');
-m.animate(t, x, Rate = 1, Scale = 200, Title = 'SCARA arm');
+s.animate(t, x, Rate = 1, Scale = 200, Title = 'SCARA arm');
 
 %% 5. Linear analysis about a pose
-% The same assembly gives the linear finite-element model about its current
-% pose: all constraints are eliminated with u = T*q, and K and M are the
-% stiffness and mass in the independent dofs q. The two joint angles are
-% free, so the first two modes are rigid-body (mechanism) modes at 0 Hz.
-[K, M, T] = a.system();
-[V, f] = fembd.modes(K, M, 6);
+% The final state of the simulation is (nearly) at rest. |equilibrium|
+% settles it statically (gravity sag of the forearm, joint angles kept), and
+% |modes| and |statespace| linearise about it. The two joint angles are
+% free, so the first two modes are mechanism modes at 0 Hz.
+xe = s.equilibrium(Initial = x);
+[f, V] = s.modes(xe, 6);
 disp(table((1:6)', f, 'VariableNames', {'mode', 'f_Hz'}));
+figure('Color', 'w');
+s.plotMode(xe, V(:,3), Amplitude = 0.03, Title = sprintf('Mode 3: %.1f Hz', f(3)));
 
 % the state-space model from the motor torques to the sensors (for control
-% design, see Tutorial 9 and the manual)
-sys = a.statespace(Modes = 10, Damping = 0.01);
+% design, see Tutorial 7)
+sys = s.statespace(xe, Modes = 10, Damping = 0.01);
 fprintf('state-space model: %d states, inputs %s, outputs %s\n', size(sys.A, 1), ...
         strjoin(sys.InputName, ', '), strjoin(sys.OutputName, ', '));
 

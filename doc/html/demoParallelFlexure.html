@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>demoParallelFlexure</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-10">
+<meta name="DC.date" content="2026-11-11">
 <meta name="DC.source" content="demoParallelFlexure.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -90,57 +90,48 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <span class="comment">%   ====+================+====  base (rigid, fixed)</span>
 
 addpath(fileparts(fileparts(mfilename(<span class="string">'fullpath'</span>))));
-out = fullfile(tempdir, <span class="string">'femFlexure'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
+out = fullfile(tempdir, <span class="string">'fmbdFlexure'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
 
 <span class="comment">% geometry (mm)</span>
-L = 40;  b = 10;  t = 0.1;  s = 20;            <span class="comment">% leaf length, width, thickness; half spacing</span>
-fembd.boxSTL(fullfile(out, <span class="string">'base.stl'</span>),    [-s-5 -b/2 -10],   [s+5 b/2 0]);
-fembd.boxSTL(fullfile(out, <span class="string">'shuttle.stl'</span>), [-s-5 -b/2 L],     [s+5 b/2 L+10]);
-fembd.boxSTL(fullfile(out, <span class="string">'leaf1.stl'</span>),   [-s-t/2 -b/2 0],   [-s+t/2 b/2 L]);
-fembd.boxSTL(fullfile(out, <span class="string">'leaf2.stl'</span>),   [ s-t/2 -b/2 0],   [ s+t/2 b/2 L]);
+L = 40;  b = 10;  t = 0.1;  h = 20;            <span class="comment">% leaf length, width, thickness; half spacing</span>
+fmbd.boxSTL(fullfile(out, <span class="string">'base.stl'</span>),    [-h-5 -b/2 -10],   [h+5 b/2 0]);
+fmbd.boxSTL(fullfile(out, <span class="string">'shuttle.stl'</span>), [-h-5 -b/2 L],     [h+5 b/2 L+10]);
+fmbd.boxSTL(fullfile(out, <span class="string">'leaf1.stl'</span>),   [-h-t/2 -b/2 0],   [-h+t/2 b/2 L]);
+fmbd.boxSTL(fullfile(out, <span class="string">'leaf2.stl'</span>),   [ h-t/2 -b/2 0],   [ h+t/2 b/2 L]);
 
-<span class="comment">% bodies: rigid parts need only a coarse mesh and a density</span>
-steel = fembd.material(210e9, 0.3, 7850);
-mesh  = {<span class="string">'Scale'</span>, 1e-3};
-base    = fembd.Body(fullfile(out, <span class="string">'base.stl'</span>),    steel, mesh{:}, Size = 5, Order = 1, Rigid = true);
-shuttle = fembd.Body(fullfile(out, <span class="string">'shuttle.stl'</span>), steel, mesh{:}, Size = 5, Order = 1, Rigid = true);
-leaf1   = fembd.Body(fullfile(out, <span class="string">'leaf1.stl'</span>),   steel, mesh{:}, Size = 0.8);
-leaf2   = fembd.Body(fullfile(out, <span class="string">'leaf2.stl'</span>),   steel, mesh{:}, Size = 0.8);
-
-a = fembd.Assembly();
-cellfun(@(x) a.add(x), {base, shuttle, leaf1, leaf2});
+<span class="comment">% bodies: the rigid parts from their STL surfaces, the leaves meshed</span>
+steel = fmbd.material(210e9, 0.3, 7850);
+s = fmbd.System();
+s.add(fmbd.Body.rigid(fullfile(out, <span class="string">'base.stl'</span>),    steel.rho, Scale = 1e-3, Name = <span class="string">'base'</span>));
+s.add(fmbd.Body.rigid(fullfile(out, <span class="string">'shuttle.stl'</span>), steel.rho, Scale = 1e-3, Name = <span class="string">'shuttle'</span>));
 <span class="keyword">for</span> leaf = {<span class="string">'leaf1'</span>, <span class="string">'leaf2'</span>}
-    a.tie(<span class="string">'base'</span>, leaf{1});                  <span class="comment">% leaves clamped into the rigid parts</span>
-    a.tie(<span class="string">'shuttle'</span>, leaf{1});
+    s.add(fmbd.Body.elastic(fullfile(out, [leaf{1} <span class="string">'.stl'</span>]), steel, Scale = 1e-3, Size = 0.8, <span class="keyword">...</span>
+                            Modes = 6, Name = leaf{1}));
+    s.tie(<span class="string">'base'</span>, leaf{1});                    <span class="comment">% leaves clamped into the rigid parts</span>
+    s.tie(<span class="string">'shuttle'</span>, leaf{1});
 <span class="keyword">end</span>
-a.fix(<span class="string">'base'</span>, [], 1:6);                      <span class="comment">% ground the base</span>
+s.fix(<span class="string">'base'</span>);                                 <span class="comment">% ground the base</span>
 
-[K, M, T] = a.system();
-fprintf(<span class="string">'%d dofs, %d after constraints\n'</span>, a.nDof, size(K, 1));
-
-<span class="comment">% 6x6 stiffness at the shuttle centroid: static condensation (Guyan) onto</span>
-<span class="comment">% its reference dofs [ux uy uz rx ry rz]</span>
-ib = a.qdof(a.dof(<span class="string">'shuttle'</span>));
-Ks = fembd.craigBampton(K, M, ib, 0);
+<span class="comment">% 6x6 stiffness at the shuttle: the static gain from forces and moments on</span>
+<span class="comment">% the shuttle to its displacements and rotations (exact with the static</span>
+<span class="comment">% correction), inverted</span>
+s.input(<span class="string">'F'</span>, <span class="string">'shuttle'</span>);  s.output(<span class="string">'u'</span>, <span class="string">'shuttle'</span>);
+S = s.statespace();
+Ks = inv(-S.C*(S.A\S.B));
 disp(array2table(diag(Ks)', <span class="string">'VariableNames'</span>, <span class="keyword">...</span>
      {<span class="string">'kx_N_m'</span>, <span class="string">'ky_N_m'</span>, <span class="string">'kz_N_m'</span>, <span class="string">'krx_Nm'</span>, <span class="string">'kry_Nm'</span>, <span class="string">'krz_Nm'</span>}));
 
-<span class="comment">% first modes</span>
-[V, f] = fembd.modes(K, M, 4);
-
-<span class="comment">% clamped-guided beam theory (plate value E/(1-nu^2) as upper bound)</span>
+<span class="comment">% first modes vs clamped-guided beam theory (plate value E/(1-nu^2) as upper bound)</span>
+[f, V] = s.modes([], 4);
 I  = b*t^3/12*1e-12;  Lm = L*1e-3;
 kx = 2*12*steel.E*I/Lm^3*[1, 1/(1 - steel.nu^2)];
-m  = steel.rho*(2*s + 10)*b*10*1e-9 + 2*13/35*steel.rho*L*b*t*1e-9;  <span class="comment">% shuttle + leaves</span>
-fprintf(<span class="string">'kx: FE %.0f N/m, beam theory %.0f - %.0f N/m\n'</span>, Ks(1,1), kx);
-fprintf(<span class="string">'f1: FE %.1f Hz, beam theory %.1f - %.1f Hz\n'</span>, f(1), sqrt(kx/m)/(2*pi));
+m  = steel.rho*(2*h + 10)*b*10*1e-9 + 2*13/35*steel.rho*L*b*t*1e-9;  <span class="comment">% shuttle + leaves</span>
+fprintf(<span class="string">'kx: %.0f N/m, beam theory %.0f - %.0f N/m\n'</span>, Ks(1,1), kx);
+fprintf(<span class="string">'f1: %.1f Hz, beam theory %.1f - %.1f Hz\n'</span>, f(1), sqrt(kx/m)/(2*pi));
 fprintf(<span class="string">'support stiffness ratio kz/kx = %.0f, ky/kx = %.0f\n'</span>, Ks(3,3)/Ks(1,1), Ks(2,2)/Ks(1,1));
-
 figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
 <span class="keyword">for</span> k = 1:4
-    subplot(1, 4, k);
-    u = T*V(:,k);
-    a.plot(u, 0.005/max(abs(u(1:3*size(a.X, 1)))));
+    subplot(1, 4, k);  s.plotMode([], V(:,k), Amplitude = 0.005);
     title(sprintf(<span class="string">'Mode %d: %.0f Hz'</span>, k, f(k)));  axis <span class="string">off</span>
 <span class="keyword">end</span>
 </pre>
@@ -165,57 +156,48 @@ figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
 %   ====+================+====  base (rigid, fixed)
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
-out = fullfile(tempdir, 'femFlexure');  if ~isfolder(out), mkdir(out); end
+out = fullfile(tempdir, 'fmbdFlexure');  if ~isfolder(out), mkdir(out); end
 
 % geometry (mm)
-L = 40;  b = 10;  t = 0.1;  s = 20;            % leaf length, width, thickness; half spacing
-fembd.boxSTL(fullfile(out, 'base.stl'),    [-s-5 -b/2 -10],   [s+5 b/2 0]);
-fembd.boxSTL(fullfile(out, 'shuttle.stl'), [-s-5 -b/2 L],     [s+5 b/2 L+10]);
-fembd.boxSTL(fullfile(out, 'leaf1.stl'),   [-s-t/2 -b/2 0],   [-s+t/2 b/2 L]);
-fembd.boxSTL(fullfile(out, 'leaf2.stl'),   [ s-t/2 -b/2 0],   [ s+t/2 b/2 L]);
+L = 40;  b = 10;  t = 0.1;  h = 20;            % leaf length, width, thickness; half spacing
+fmbd.boxSTL(fullfile(out, 'base.stl'),    [-h-5 -b/2 -10],   [h+5 b/2 0]);
+fmbd.boxSTL(fullfile(out, 'shuttle.stl'), [-h-5 -b/2 L],     [h+5 b/2 L+10]);
+fmbd.boxSTL(fullfile(out, 'leaf1.stl'),   [-h-t/2 -b/2 0],   [-h+t/2 b/2 L]);
+fmbd.boxSTL(fullfile(out, 'leaf2.stl'),   [ h-t/2 -b/2 0],   [ h+t/2 b/2 L]);
 
-% bodies: rigid parts need only a coarse mesh and a density
-steel = fembd.material(210e9, 0.3, 7850);
-mesh  = {'Scale', 1e-3};
-base    = fembd.Body(fullfile(out, 'base.stl'),    steel, mesh{:}, Size = 5, Order = 1, Rigid = true);
-shuttle = fembd.Body(fullfile(out, 'shuttle.stl'), steel, mesh{:}, Size = 5, Order = 1, Rigid = true);
-leaf1   = fembd.Body(fullfile(out, 'leaf1.stl'),   steel, mesh{:}, Size = 0.8);
-leaf2   = fembd.Body(fullfile(out, 'leaf2.stl'),   steel, mesh{:}, Size = 0.8);
-
-a = fembd.Assembly();
-cellfun(@(x) a.add(x), {base, shuttle, leaf1, leaf2});
+% bodies: the rigid parts from their STL surfaces, the leaves meshed
+steel = fmbd.material(210e9, 0.3, 7850);
+s = fmbd.System();
+s.add(fmbd.Body.rigid(fullfile(out, 'base.stl'),    steel.rho, Scale = 1e-3, Name = 'base'));
+s.add(fmbd.Body.rigid(fullfile(out, 'shuttle.stl'), steel.rho, Scale = 1e-3, Name = 'shuttle'));
 for leaf = {'leaf1', 'leaf2'}
-    a.tie('base', leaf{1});                  % leaves clamped into the rigid parts
-    a.tie('shuttle', leaf{1});
+    s.add(fmbd.Body.elastic(fullfile(out, [leaf{1} '.stl']), steel, Scale = 1e-3, Size = 0.8, ...
+                            Modes = 6, Name = leaf{1}));
+    s.tie('base', leaf{1});                    % leaves clamped into the rigid parts
+    s.tie('shuttle', leaf{1});
 end
-a.fix('base', [], 1:6);                      % ground the base
+s.fix('base');                                 % ground the base
 
-[K, M, T] = a.system();
-fprintf('%d dofs, %d after constraints\n', a.nDof, size(K, 1));
-
-% 6x6 stiffness at the shuttle centroid: static condensation (Guyan) onto
-% its reference dofs [ux uy uz rx ry rz]
-ib = a.qdof(a.dof('shuttle'));
-Ks = fembd.craigBampton(K, M, ib, 0);
+% 6x6 stiffness at the shuttle: the static gain from forces and moments on
+% the shuttle to its displacements and rotations (exact with the static
+% correction), inverted
+s.input('F', 'shuttle');  s.output('u', 'shuttle');
+S = s.statespace();
+Ks = inv(-S.C*(S.A\S.B));
 disp(array2table(diag(Ks)', 'VariableNames', ...
      {'kx_N_m', 'ky_N_m', 'kz_N_m', 'krx_Nm', 'kry_Nm', 'krz_Nm'}));
 
-% first modes
-[V, f] = fembd.modes(K, M, 4);
-
-% clamped-guided beam theory (plate value E/(1-nu^2) as upper bound)
+% first modes vs clamped-guided beam theory (plate value E/(1-nu^2) as upper bound)
+[f, V] = s.modes([], 4);
 I  = b*t^3/12*1e-12;  Lm = L*1e-3;
 kx = 2*12*steel.E*I/Lm^3*[1, 1/(1 - steel.nu^2)];
-m  = steel.rho*(2*s + 10)*b*10*1e-9 + 2*13/35*steel.rho*L*b*t*1e-9;  % shuttle + leaves
-fprintf('kx: FE %.0f N/m, beam theory %.0f - %.0f N/m\n', Ks(1,1), kx);
-fprintf('f1: FE %.1f Hz, beam theory %.1f - %.1f Hz\n', f(1), sqrt(kx/m)/(2*pi));
+m  = steel.rho*(2*h + 10)*b*10*1e-9 + 2*13/35*steel.rho*L*b*t*1e-9;  % shuttle + leaves
+fprintf('kx: %.0f N/m, beam theory %.0f - %.0f N/m\n', Ks(1,1), kx);
+fprintf('f1: %.1f Hz, beam theory %.1f - %.1f Hz\n', f(1), sqrt(kx/m)/(2*pi));
 fprintf('support stiffness ratio kz/kx = %.0f, ky/kx = %.0f\n', Ks(3,3)/Ks(1,1), Ks(2,2)/Ks(1,1));
-
 figure('Color', 'w');
 for k = 1:4
-    subplot(1, 4, k);
-    u = T*V(:,k);
-    a.plot(u, 0.005/max(abs(u(1:3*size(a.X, 1)))));
+    subplot(1, 4, k);  s.plotMode([], V(:,k), Amplitude = 0.005);
     title(sprintf('Mode %d: %.0f Hz', k, f(k)));  axis off
 end
 

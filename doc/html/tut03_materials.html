@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>tut03_materials</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-10">
+<meta name="DC.date" content="2026-11-11">
 <meta name="DC.source" content="tut03_materials.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -80,7 +80,7 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <div>
 <ul>
 <li>
-<a href="#1">Tutorial 3 - Materials, mass matrices and mass properties</a>
+<a href="#1">Tutorial 3 - Materials, body matrices and mass properties</a>
 </li>
 <li>
 <a href="#2">1. Isotropic material</a>
@@ -92,28 +92,32 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <a href="#4">3. Body matrices</a>
 </li>
 <li>
-<a href="#5">4. Consistent vs lumped mass</a>
+<a href="#5">4. Mass properties</a>
+</li>
+<li>
+<a href="#6">5. Material damping</a>
 </li>
 </ul>
 </div>
-<h2 id="1">Tutorial 3 - Materials, mass matrices and mass properties</h2>
+<h2 id="1">Tutorial 3 - Materials, body matrices and mass properties</h2>
 <p>This tutorial covers:</p>
 <div>
 <ul>
 <li>isotropic and anisotropic (orthotropic) materials</li>
-<li>body matrices, and mass and inertia from the mass matrix</li>
-<li>consistent vs lumped mass</li>
+<li>body matrices: stiffness K and consistent mass M of a meshed body</li>
+<li>mass, centre of mass and inertia (<tt>massProperties</tt>)</li>
+<li>material damping (<tt>Damping</tt>, Rayleigh)</li>
 </ul>
 </div>
 <pre class="codeinput">addpath(fileparts(fileparts(mfilename(<span class="string">'fullpath'</span>))));
-out = fullfile(tempdir, <span class="string">'femTutorials'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
+out = fullfile(tempdir, <span class="string">'fmbdTutorials'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
 file = fullfile(out, <span class="string">'beam.stl'</span>);
-fembd.boxSTL(file, [0 0 0], [1000 50 50]);
-clampX0 = @(X) X(:,1) &lt; 1e-9;
+fmbd.boxSTL(file, [0 0 0], [1000 50 50]);
+clamp = @(X) X(:,1) &lt; 1e-6;
 </pre>
 <h2 id="2">1. Isotropic material</h2>
 <p>A material is a struct with a 6x6 stiffness D in Voigt notation, order [xx yy zz yz xz xy] with engineering shear strains, and a density rho.</p>
-<pre class="codeinput">steel = fembd.material(210e9, 0.3, 7850);
+<pre class="codeinput">steel = fmbd.material(210e9, 0.3, 7850);
 disp(<span class="string">'D of steel (GPa):'</span>);  disp(steel.D/1e9);
 </pre>
 <pre class="codeoutput">D of steel (GPa):
@@ -140,12 +144,11 @@ cfrp = struct(<span class="string">'D'</span>, inv(blkdiag(S, diag(1./G))), <spa
 <span class="comment">% CFRP beam is faster; its low shear moduli make it slightly softer than</span>
 <span class="comment">% beam theory predicts.</span>
 <span class="keyword">for</span> mat = {steel, cfrp}
-    b = fembd.Body(file, mat{1}, Size = 25, Scale = 1e-3);
-    a = fembd.Assembly();  a.add(b);  a.fix(1, clampX0);
-    [K, M] = a.system();  [~, f] = fembd.modes(K, M, 1);
+    b = fmbd.Body.elastic(file, mat{1}, Size = 25, Scale = 1e-3, Modes = 1);
+    s = fmbd.System();  s.add(b);  s.fix(b, clamp);
     C = inv(mat{1}.D);  Ex = 1/C(1,1);            <span class="comment">% Young's modulus along x</span>
     fEB = 1.875104^2/(2*pi)*sqrt(Ex*0.05^4/12/(mat{1}.rho*0.05^2));
-    fprintf(<span class="string">'f1 = %6.2f Hz (Euler-Bernoulli %6.2f Hz)\n'</span>, f, fEB);
+    fprintf(<span class="string">'f1 = %6.2f Hz (Euler-Bernoulli %6.2f Hz)\n'</span>, s.modes([], 1), fEB);
 <span class="keyword">end</span>
 </pre>
 <pre class="codeoutput">f1 =  41.83 Hz (Euler-Bernoulli  41.78 Hz)
@@ -153,48 +156,40 @@ f1 =  74.38 Hz (Euler-Bernoulli  75.55 Hz)
 </pre>
 <h2 id="4">3. Body matrices</h2>
 <p>
-<tt>body.matrices()</tt> returns the body's own K and M (3 dofs per node, unconstrained). A body that is not supported can move rigidly without deforming: K*phi = 0 for the six rigid-body modes, and phi'*M*phi gives its mass and inertia.</p>
-<pre class="codeinput">b = fembd.Body(file, steel, Size = 25, Scale = 1e-3);
+<tt>body.matrices()</tt> returns the body's own K and M (3 dofs per node, interleaved [ux1 uy1 uz1 ux2 ...], unconstrained). A free body can move rigidly without deforming: K*phi = 0 for its six rigid-body modes.</p>
+<pre class="codeinput">b = fmbd.Body.elastic(file, steel, Size = 25, Scale = 1e-3);
 [Kb, Mb] = b.matrices();
-c = b.Ref;                                     <span class="comment">% centroid</span>
-r = b.X - c;  n = b.nNode;  Phi = zeros(3*n, 6);
+r = b.X - b.Ref;  n = b.nNode;  Phi = zeros(3*n, 6);
 <span class="keyword">for</span> d = 1:3, Phi(d:3:end, d) = 1; <span class="keyword">end</span>          <span class="comment">% translations</span>
 Phi(2:3:end, 4) = -r(:,3);  Phi(3:3:end, 4) =  r(:,2);   <span class="comment">% rotation about x</span>
 Phi(1:3:end, 5) =  r(:,3);  Phi(3:3:end, 5) = -r(:,1);   <span class="comment">% rotation about y</span>
 Phi(1:3:end, 6) = -r(:,2);  Phi(2:3:end, 6) =  r(:,1);   <span class="comment">% rotation about z</span>
-
-m = 7850*1*0.05*0.05;
-Iref = m*[2*0.05^2, 1 + 0.05^2, 1 + 0.05^2]/12;
 fprintf(<span class="string">'rigid-body strain energy: %.1e (relative)\n'</span>, norm(Phi'*Kb*Phi)/norm(Kb, 1));
-fprintf(<span class="string">'mass    %.4f kg (exact %.4f)\n'</span>, Phi(:,1)'*Mb*Phi(:,1), m);
-fprintf(<span class="string">'inertia %s kg m^2 (exact %s)\n'</span>, mat2str(diag(Phi(:,4:6)'*Mb*Phi(:,4:6))', 4), mat2str(Iref, 4));
 </pre>
 <pre class="codeoutput">rigid-body strain energy: 5.9e-16 (relative)
-mass    19.6250 kg (exact 19.6250)
+</pre>
+<h2 id="5">4. Mass properties</h2>
+<p>
+<tt>massProperties</tt> gives the mass, centre of mass and inertia (about the centre of mass) from the consistent mass matrix; they are exact for the mesh. In a system, an elastic body's inertia (and how it changes as the body deforms) follows from the same mass matrix.</p>
+<pre class="codeinput">[m, c, J] = b.massProperties();
+mx = 7850*1*0.05*0.05;
+fprintf(<span class="string">'mass    %.4f kg (exact %.4f), centre %s m\n'</span>, m, mx, mat2str(c, 3));
+fprintf(<span class="string">'inertia %s kg m^2 (exact %s)\n'</span>, mat2str(diag(J)', 4), <span class="keyword">...</span>
+        mat2str(mx*[2*0.05^2, 1 + 0.05^2, 1 + 0.05^2]/12, 4));
+</pre>
+<pre class="codeoutput">mass    19.6250 kg (exact 19.6250), centre [0.5 0.025 0.025] m
 inertia [0.008177 1.64 1.64] kg m^2 (exact [0.008177 1.64 1.64])
 </pre>
-<h2 id="5">4. Consistent vs lumped mass</h2>
-<p>The default mass matrix is consistent. With Lumped = true it is diagonal, using HRZ lumping: each element's mass diagonal is scaled to keep the element mass. This is useful for explicit time integration. Note: rigid ties spread slave masses onto master nodes, so the reduced M is then no longer diagonal.</p>
-<pre class="codeinput">[~, Ml] = b.matrices(Lumped = true);
-ml = full(diag(Ml));
-fprintf(<span class="string">'lumped M diagonal: %d, min entry %.2e kg, total %.4f kg\n'</span>, isdiag(Ml), min(ml), sum(ml)/3);
-
-a = fembd.Assembly();  a.add(b);  a.fix(1, clampX0);
-[K, M]  = a.system();               [~, fc] = fembd.modes(K, M, 6);
-[K, Ml] = a.system(Lumped = true);  [~, fl] = fembd.modes(K, Ml, 6);
-disp(table(fc, fl, 100*(fl./fc - 1), <span class="string">'VariableNames'</span>, {<span class="string">'consistent_Hz'</span>, <span class="string">'lumped_Hz'</span>, <span class="string">'diff_pct'</span>}));
+<h2 id="6">5. Material damping</h2>
+<p>Damping = [alpha beta] adds Rayleigh damping D = alpha*M + beta*K to an elastic body. beta = 2*zeta/omega gives the damping ratio zeta at omega, rising linearly with frequency; alpha also damps rigid motion (like a drag), so it is usually 0. The modal damping ratio of mode k is then beta*omega_k/2, here 1% at the first mode.</p>
+<pre class="codeinput">w1 = 1.875104^2*sqrt(210e9*0.05^4/12/(7850*0.05^2));  beta = 2*0.01/w1;   <span class="comment">% steel, mode 1</span>
+b = fmbd.Body.elastic(file, steel, Size = 25, Scale = 1e-3, Modes = 4, Damping = [0 beta]);
+s = fmbd.System();  s.add(b);  s.fix(b, clamp);
+sys = s.statespace();  p = eig(sys.A);  p = p(imag(p) &gt; 0);  [~, i] = sort(abs(p));
+fprintf(<span class="string">'damping ratios of the first modes: %s (beta*w/2: %s)\n'</span>, <span class="keyword">...</span>
+        mat2str(-real(p(i(1:2)))'./abs(p(i(1:2)))', 3), mat2str(beta*abs(p(i(1:2)))'/2, 3));
 </pre>
-<pre class="codeoutput">lumped M diagonal: 1, min entry 8.54e-05 kg, total 19.6250 kg
-    consistent_Hz    lumped_Hz    diff_pct 
-    _____________    _________    _________
-
-       41.826         41.821      -0.012466
-        41.83         41.824      -0.014172
-       259.16         259.01      -0.059675
-       259.24         259.04      -0.078913
-        713.2         701.68        -1.6153
-       713.58         712.18       -0.19579
-
+<pre class="codeoutput">damping ratios of the first modes: [0.01 0.01] (beta*w/2: [0.01 0.01])
 </pre>
 <p class="footer">
 <br>
@@ -204,23 +199,24 @@ disp(table(fc, fl, 100*(fl./fc - 1), <span class="string">'VariableNames'</span>
 </div>
 <!--
 ##### SOURCE BEGIN #####
-%% Tutorial 3 - Materials, mass matrices and mass properties
+%% Tutorial 3 - Materials, body matrices and mass properties
 % This tutorial covers:
 %
 % * isotropic and anisotropic (orthotropic) materials
-% * body matrices, and mass and inertia from the mass matrix
-% * consistent vs lumped mass
+% * body matrices: stiffness K and consistent mass M of a meshed body
+% * mass, centre of mass and inertia (|massProperties|)
+% * material damping (|Damping|, Rayleigh)
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
-out = fullfile(tempdir, 'femTutorials');  if ~isfolder(out), mkdir(out); end
+out = fullfile(tempdir, 'fmbdTutorials');  if ~isfolder(out), mkdir(out); end
 file = fullfile(out, 'beam.stl');
-fembd.boxSTL(file, [0 0 0], [1000 50 50]);
-clampX0 = @(X) X(:,1) < 1e-9;
+fmbd.boxSTL(file, [0 0 0], [1000 50 50]);
+clamp = @(X) X(:,1) < 1e-6;
 
 %% 1. Isotropic material
 % A material is a struct with a 6x6 stiffness D in Voigt notation, order
 % [xx yy zz yz xz xy] with engineering shear strains, and a density rho.
-steel = fembd.material(210e9, 0.3, 7850);
+steel = fmbd.material(210e9, 0.3, 7850);
 disp('D of steel (GPa):');  disp(steel.D/1e9);
 
 %% 2. Orthotropic material
@@ -240,48 +236,49 @@ cfrp = struct('D', inv(blkdiag(S, diag(1./G))), 'rho', 1600);
 % CFRP beam is faster; its low shear moduli make it slightly softer than
 % beam theory predicts.
 for mat = {steel, cfrp}
-    b = fembd.Body(file, mat{1}, Size = 25, Scale = 1e-3);
-    a = fembd.Assembly();  a.add(b);  a.fix(1, clampX0);
-    [K, M] = a.system();  [~, f] = fembd.modes(K, M, 1);
+    b = fmbd.Body.elastic(file, mat{1}, Size = 25, Scale = 1e-3, Modes = 1);
+    s = fmbd.System();  s.add(b);  s.fix(b, clamp);
     C = inv(mat{1}.D);  Ex = 1/C(1,1);            % Young's modulus along x
     fEB = 1.875104^2/(2*pi)*sqrt(Ex*0.05^4/12/(mat{1}.rho*0.05^2));
-    fprintf('f1 = %6.2f Hz (Euler-Bernoulli %6.2f Hz)\n', f, fEB);
+    fprintf('f1 = %6.2f Hz (Euler-Bernoulli %6.2f Hz)\n', s.modes([], 1), fEB);
 end
 
 %% 3. Body matrices
 % |body.matrices()| returns the body's own K and M (3 dofs per node,
-% unconstrained). A body that is not supported can move rigidly without
-% deforming: K*phi = 0 for the six rigid-body modes, and phi'*M*phi gives
-% its mass and inertia.
-b = fembd.Body(file, steel, Size = 25, Scale = 1e-3);
+% interleaved [ux1 uy1 uz1 ux2 ...], unconstrained). A free body can move
+% rigidly without deforming: K*phi = 0 for its six rigid-body modes.
+b = fmbd.Body.elastic(file, steel, Size = 25, Scale = 1e-3);
 [Kb, Mb] = b.matrices();
-c = b.Ref;                                     % centroid
-r = b.X - c;  n = b.nNode;  Phi = zeros(3*n, 6);
+r = b.X - b.Ref;  n = b.nNode;  Phi = zeros(3*n, 6);
 for d = 1:3, Phi(d:3:end, d) = 1; end          % translations
 Phi(2:3:end, 4) = -r(:,3);  Phi(3:3:end, 4) =  r(:,2);   % rotation about x
 Phi(1:3:end, 5) =  r(:,3);  Phi(3:3:end, 5) = -r(:,1);   % rotation about y
 Phi(1:3:end, 6) = -r(:,2);  Phi(2:3:end, 6) =  r(:,1);   % rotation about z
-
-m = 7850*1*0.05*0.05;
-Iref = m*[2*0.05^2, 1 + 0.05^2, 1 + 0.05^2]/12;
 fprintf('rigid-body strain energy: %.1e (relative)\n', norm(Phi'*Kb*Phi)/norm(Kb, 1));
-fprintf('mass    %.4f kg (exact %.4f)\n', Phi(:,1)'*Mb*Phi(:,1), m);
-fprintf('inertia %s kg m^2 (exact %s)\n', mat2str(diag(Phi(:,4:6)'*Mb*Phi(:,4:6))', 4), mat2str(Iref, 4));
 
-%% 4. Consistent vs lumped mass
-% The default mass matrix is consistent. With Lumped = true it is
-% diagonal, using HRZ lumping: each element's mass diagonal is scaled to
-% keep the element mass. This is useful for explicit time integration.
-% Note: rigid ties spread slave masses onto master nodes, so the reduced M
-% is then no longer diagonal.
-[~, Ml] = b.matrices(Lumped = true);
-ml = full(diag(Ml));
-fprintf('lumped M diagonal: %d, min entry %.2e kg, total %.4f kg\n', isdiag(Ml), min(ml), sum(ml)/3);
+%% 4. Mass properties
+% |massProperties| gives the mass, centre of mass and inertia (about the
+% centre of mass) from the consistent mass matrix; they are exact for the
+% mesh. In a system, an elastic body's inertia (and how it changes as the
+% body deforms) follows from the same mass matrix.
+[m, c, J] = b.massProperties();
+mx = 7850*1*0.05*0.05;
+fprintf('mass    %.4f kg (exact %.4f), centre %s m\n', m, mx, mat2str(c, 3));
+fprintf('inertia %s kg m^2 (exact %s)\n', mat2str(diag(J)', 4), ...
+        mat2str(mx*[2*0.05^2, 1 + 0.05^2, 1 + 0.05^2]/12, 4));
 
-a = fembd.Assembly();  a.add(b);  a.fix(1, clampX0);
-[K, M]  = a.system();               [~, fc] = fembd.modes(K, M, 6);
-[K, Ml] = a.system(Lumped = true);  [~, fl] = fembd.modes(K, Ml, 6);
-disp(table(fc, fl, 100*(fl./fc - 1), 'VariableNames', {'consistent_Hz', 'lumped_Hz', 'diff_pct'}));
+%% 5. Material damping
+% Damping = [alpha beta] adds Rayleigh damping D = alpha*M + beta*K to an
+% elastic body. beta = 2*zeta/omega gives the damping ratio zeta at omega,
+% rising linearly with frequency; alpha also damps rigid motion (like a
+% drag), so it is usually 0. The modal damping ratio of mode k is then
+% beta*omega_k/2, here 1% at the first mode.
+w1 = 1.875104^2*sqrt(210e9*0.05^4/12/(7850*0.05^2));  beta = 2*0.01/w1;   % steel, mode 1
+b = fmbd.Body.elastic(file, steel, Size = 25, Scale = 1e-3, Modes = 4, Damping = [0 beta]);
+s = fmbd.System();  s.add(b);  s.fix(b, clamp);
+sys = s.statespace();  p = eig(sys.A);  p = p(imag(p) > 0);  [~, i] = sort(abs(p));
+fprintf('damping ratios of the first modes: %s (beta*w/2: %s)\n', ...
+        mat2str(-real(p(i(1:2)))'./abs(p(i(1:2)))', 3), mat2str(beta*abs(p(i(1:2)))'/2, 3));
 
 ##### SOURCE END #####
 -->

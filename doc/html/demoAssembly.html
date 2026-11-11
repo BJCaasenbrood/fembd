@@ -9,7 +9,7 @@ To make changes, update the MATLAB code and republish this document.
 <title>demoAssembly</title>
 <meta name="generator" content="MATLAB 24.1">
 <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/">
-<meta name="DC.date" content="2026-11-10">
+<meta name="DC.date" content="2026-11-11">
 <meta name="DC.source" content="demoAssembly.m">
 <style type="text/css">
 html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
@@ -77,78 +77,65 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 <body>
 <div class="content">
 <pre class="codeinput">
-<span class="comment">%DEMOASSEMBLY Modal analysis of a three-part STL assembly.</span>
-<span class="comment">%   An elastic base plate and pillar, meshed separately (non-conforming), and</span>
-<span class="comment">%   a rigid top plate (payload) are connected, clamped at the bottom, and</span>
-<span class="comment">%   reduced to K, M for dynamic analysis. Requires Gmsh (set GMSH if needed).</span>
+<span class="comment">%DEMOASSEMBLY Three-part STL assembly: modes and a state-space model.</span>
+<span class="comment">%   An elastic base plate and pillar, meshed separately (non-conforming) and</span>
+<span class="comment">%   tied together, carry a rigid top plate (payload). The base is clamped at</span>
+<span class="comment">%   its bottom face. Requires Gmsh (set GMSH if needed).</span>
 
 addpath(fileparts(fileparts(mfilename(<span class="string">'fullpath'</span>))));
-out = fullfile(tempdir, <span class="string">'femDemo'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
+out = fullfile(tempdir, <span class="string">'fmbdDemo'</span>);  <span class="keyword">if</span> ~isfolder(out), mkdir(out); <span class="keyword">end</span>
 
 <span class="comment">% geometry in mm, written as STL files (stand-in for a CAD export)</span>
-fembd.boxSTL(fullfile(out, <span class="string">'base.stl'</span>), [-40 -40 0], [40 40 10]);
-fembd.cylinderSTL(fullfile(out, <span class="string">'pillar.stl'</span>), [0 0], 8, 10, 110);
-fembd.boxSTL(fullfile(out, <span class="string">'top.stl'</span>),  [-25 -25 110], [25 25 116]);
+fmbd.boxSTL(fullfile(out, <span class="string">'base.stl'</span>), [-40 -40 0], [40 40 10]);
+fmbd.cylinderSTL(fullfile(out, <span class="string">'pillar.stl'</span>), [0 0], 8, 10, 110);
+fmbd.boxSTL(fullfile(out, <span class="string">'top.stl'</span>),  [-25 -25 110], [25 25 116]);
 
 <span class="comment">% bodies: mesh with Gmsh, mm -&gt; m, assign materials</span>
-steel = fembd.material(210e9, 0.30, 7850);
-alu   = fembd.material(70e9,  0.33, 2700);
-base   = fembd.Body(fullfile(out, <span class="string">'base.stl'</span>),   steel, Size = 8, Scale = 1e-3);
-pillar = fembd.Body(fullfile(out, <span class="string">'pillar.stl'</span>), alu,   Size = 3, Scale = 1e-3);
-top    = fembd.Body(fullfile(out, <span class="string">'top.stl'</span>),    steel, Size = 6, Scale = 1e-3, Rigid = true);
+steel = fmbd.material(210e9, 0.30, 7850);
+alu   = fmbd.material(70e9,  0.33, 2700);
+base   = fmbd.Body.elastic(fullfile(out, <span class="string">'base.stl'</span>),   steel, Size = 8, Scale = 1e-3, Modes = 10);
+pillar = fmbd.Body.elastic(fullfile(out, <span class="string">'pillar.stl'</span>), alu,   Size = 3, Scale = 1e-3, Modes = 10);
+top    = fmbd.Body.rigid(fullfile(out, <span class="string">'top.stl'</span>), 7850, Scale = 1e-3);
 
-<span class="comment">% assembly: connections and boundary conditions</span>
-a = fembd.Assembly();
-a.add(base);  a.add(pillar);  a.add(top);
-a.tie(<span class="string">'base'</span>, <span class="string">'pillar'</span>);                    <span class="comment">% bonded (finer mesh as slave)</span>
-a.tie(<span class="string">'pillar'</span>, <span class="string">'top'</span>, Stiffness = 1e13);   <span class="comment">% elastic joint to the rigid plate, N/m^3</span>
-a.fix(<span class="string">'base'</span>, @(X) X(:,3) &lt; 1e-9);          <span class="comment">% clamp bottom face</span>
-
-tic;  [K, M, T] = a.system();  t = toc;
-fprintf(<span class="string">'%d dofs (%d after constraints), assembled in %.1f s\n'</span>, a.nDof, size(K, 1), t);
+<span class="comment">% system: connections and supports</span>
+s = fmbd.System();
+s.add(base);  s.add(pillar);  s.add(top);
+s.tie(<span class="string">'base'</span>, <span class="string">'pillar'</span>);                    <span class="comment">% bonded (finer mesh as slave): one elastic group</span>
+s.tie(<span class="string">'top'</span>, <span class="string">'pillar'</span>);                     <span class="comment">% the pillar's top face is fixed to the rigid plate</span>
+s.fix(<span class="string">'base'</span>, @(X) X(:,3) &lt; 1e-6);          <span class="comment">% clamp the bottom face</span>
 
 <span class="comment">% natural frequencies and modes</span>
-[V, f] = fembd.modes(K, M, 6);
-
+tic;  [f, V] = s.modes([], 6);
+fprintf(<span class="string">'%d mesh dofs, %d model dofs, built in %.1f s\n'</span>, base.nDof + pillar.nDof, s.nDof, toc);
 figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);
 <span class="keyword">for</span> k = 1:4
-    subplot(1, 4, k);
-    u = T*V(:,k);                            <span class="comment">% node dofs, then rigid-body dofs</span>
-    a.plot(u, 0.03/max(abs(u(1:3*size(a.X, 1)))));
+    subplot(1, 4, k);  s.plotMode([], V(:,k), Amplitude = 0.02);
     title(sprintf(<span class="string">'Mode %d: %.0f Hz'</span>, k, f(k)));  axis <span class="string">off</span>
 <span class="keyword">end</span>
 
-<span class="comment">% Craig-Bampton model: the 6 dofs of the rigid top plate (at its centroid)</span>
-<span class="comment">% are kept as boundary, plus 20 fixed-interface modes</span>
-ib = a.qdof(a.dof(<span class="string">'top'</span>));                   <span class="comment">% [ux uy uz rx ry rz], indices into q</span>
-[Kc, Mc, Vc] = fembd.craigBampton(K, M, ib, 20);
-[~, fc] = fembd.modes(Kc, Mc, 6);
-
-<span class="comment">% lumped-mass model, e.g. for explicit time integration</span>
-[Kl, Ml] = a.system(Lumped = true);
-[~, fl] = fembd.modes(Kl, Ml, 6);
-disp(table((1:6)', f, fc, fl, <span class="string">'VariableNames'</span>, {<span class="string">'mode'</span>, <span class="string">'full_Hz'</span>, <span class="string">'CB_Hz'</span>, <span class="string">'lumped_Hz'</span>}));
-
-<span class="comment">% state space of the 26-dof CB model: vertical force in, vertical displacement out.</span>
-<span class="comment">% The full displacement field is u = T*Vc*x(1:nr).</span>
-nr = size(Kc, 1);  Dc = 1e-5*Kc + 1*Mc;      <span class="comment">% Rayleigh damping</span>
-A  = [zeros(nr), eye(nr); -Mc\Kc, -Mc\Dc];
-Bu = [zeros(nr, 1); Mc\((1:nr)' == 3)];      <span class="comment">% x(3) is the plate's uz</span>
-Cy = [(1:nr) == 3, zeros(1, nr)];
+<span class="comment">% state space: a vertical force on the plate in, its displacement and</span>
+<span class="comment">% acceleration out. A small model (Modes = 6) keeps the exact static gain.</span>
+s.input(<span class="string">'Fz'</span>, <span class="string">'top'</span>, [], 3);
+s.output(<span class="string">'uz'</span>, <span class="string">'top'</span>, [], 3);  s.output(<span class="string">'az'</span>, <span class="string">'top'</span>, [], 3, Type = <span class="string">'acceleration'</span>);
+full  = s.statespace(Damping = 0.01);
+small = s.statespace(Modes = 6, Damping = 0.01);
+dc = @(S) -S.C(1,:)*(S.A\S.B);
+fprintf(<span class="string">'static compliance: %.4e m/N (%d states), %.4e m/N (%d states)\n'</span>, <span class="keyword">...</span>
+        dc(full), size(full.A, 1), dc(small), size(small.A, 1));
+fHz = logspace(1, 4, 400);  H = zeros(2, numel(fHz));
+<span class="keyword">for</span> k = 1:numel(fHz)
+    <span class="keyword">for</span> m = 1:2
+        S = {full, small};  S = S{m};
+        H(m,k) = S.C(1,:)*((2i*pi*fHz(k)*eye(size(S.A)) - S.A)\S.B);
+    <span class="keyword">end</span>
+<span class="keyword">end</span>
+figure(<span class="string">'Color'</span>, <span class="string">'w'</span>);  loglog(fHz, abs(H));  grid <span class="string">on</span>
+xlabel(<span class="string">'frequency (Hz)'</span>);  ylabel(<span class="string">'|u_z/F_z| (m/N)'</span>);  legend(<span class="string">'all modes'</span>, <span class="string">'6 modes + static correction'</span>);
 </pre>
-<pre class="codeoutput">31863 dofs (25104 after constraints), assembled in 0.7 s
-    mode    full_Hz    CB_Hz     lumped_Hz
-    ____    _______    ______    _________
-
-     1      335.24     335.24     335.16  
-     2      335.45     335.45     335.37  
-     3      909.41     909.41     907.13  
-     4      2474.7     2474.7     2464.2  
-     5      2477.9     2477.9     2467.6  
-     6      4942.3     4942.3     4942.2  
-
+<pre class="codeoutput">27294 mesh dofs, 38 model dofs, built in 3.0 s
+static compliance: 7.1567e-09 m/N (52 states), 7.1567e-09 m/N (14 states)
 </pre>
-<img vspace="5" hspace="5" src="demoAssembly_01.png" alt=""> <p class="footer">
+<img vspace="5" hspace="5" src="demoAssembly_01.png" alt=""> <img vspace="5" hspace="5" src="demoAssembly_02.png" alt=""> <p class="footer">
 <br>
 <a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2024a</a>
 <br>
@@ -156,64 +143,60 @@ Cy = [(1:nr) == 3, zeros(1, nr)];
 </div>
 <!--
 ##### SOURCE BEGIN #####
-%DEMOASSEMBLY Modal analysis of a three-part STL assembly.
-%   An elastic base plate and pillar, meshed separately (non-conforming), and
-%   a rigid top plate (payload) are connected, clamped at the bottom, and
-%   reduced to K, M for dynamic analysis. Requires Gmsh (set GMSH if needed).
+%DEMOASSEMBLY Three-part STL assembly: modes and a state-space model.
+%   An elastic base plate and pillar, meshed separately (non-conforming) and
+%   tied together, carry a rigid top plate (payload). The base is clamped at
+%   its bottom face. Requires Gmsh (set GMSH if needed).
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
-out = fullfile(tempdir, 'femDemo');  if ~isfolder(out), mkdir(out); end
+out = fullfile(tempdir, 'fmbdDemo');  if ~isfolder(out), mkdir(out); end
 
 % geometry in mm, written as STL files (stand-in for a CAD export)
-fembd.boxSTL(fullfile(out, 'base.stl'), [-40 -40 0], [40 40 10]);
-fembd.cylinderSTL(fullfile(out, 'pillar.stl'), [0 0], 8, 10, 110);
-fembd.boxSTL(fullfile(out, 'top.stl'),  [-25 -25 110], [25 25 116]);
+fmbd.boxSTL(fullfile(out, 'base.stl'), [-40 -40 0], [40 40 10]);
+fmbd.cylinderSTL(fullfile(out, 'pillar.stl'), [0 0], 8, 10, 110);
+fmbd.boxSTL(fullfile(out, 'top.stl'),  [-25 -25 110], [25 25 116]);
 
 % bodies: mesh with Gmsh, mm -> m, assign materials
-steel = fembd.material(210e9, 0.30, 7850);
-alu   = fembd.material(70e9,  0.33, 2700);
-base   = fembd.Body(fullfile(out, 'base.stl'),   steel, Size = 8, Scale = 1e-3);
-pillar = fembd.Body(fullfile(out, 'pillar.stl'), alu,   Size = 3, Scale = 1e-3);
-top    = fembd.Body(fullfile(out, 'top.stl'),    steel, Size = 6, Scale = 1e-3, Rigid = true);
+steel = fmbd.material(210e9, 0.30, 7850);
+alu   = fmbd.material(70e9,  0.33, 2700);
+base   = fmbd.Body.elastic(fullfile(out, 'base.stl'),   steel, Size = 8, Scale = 1e-3, Modes = 10);
+pillar = fmbd.Body.elastic(fullfile(out, 'pillar.stl'), alu,   Size = 3, Scale = 1e-3, Modes = 10);
+top    = fmbd.Body.rigid(fullfile(out, 'top.stl'), 7850, Scale = 1e-3);
 
-% assembly: connections and boundary conditions
-a = fembd.Assembly();
-a.add(base);  a.add(pillar);  a.add(top);
-a.tie('base', 'pillar');                    % bonded (finer mesh as slave)
-a.tie('pillar', 'top', Stiffness = 1e13);   % elastic joint to the rigid plate, N/m^3
-a.fix('base', @(X) X(:,3) < 1e-9);          % clamp bottom face
-
-tic;  [K, M, T] = a.system();  t = toc;
-fprintf('%d dofs (%d after constraints), assembled in %.1f s\n', a.nDof, size(K, 1), t);
+% system: connections and supports
+s = fmbd.System();
+s.add(base);  s.add(pillar);  s.add(top);
+s.tie('base', 'pillar');                    % bonded (finer mesh as slave): one elastic group
+s.tie('top', 'pillar');                     % the pillar's top face is fixed to the rigid plate
+s.fix('base', @(X) X(:,3) < 1e-6);          % clamp the bottom face
 
 % natural frequencies and modes
-[V, f] = fembd.modes(K, M, 6);
-
+tic;  [f, V] = s.modes([], 6);
+fprintf('%d mesh dofs, %d model dofs, built in %.1f s\n', base.nDof + pillar.nDof, s.nDof, toc);
 figure('Color', 'w');
 for k = 1:4
-    subplot(1, 4, k);
-    u = T*V(:,k);                            % node dofs, then rigid-body dofs
-    a.plot(u, 0.03/max(abs(u(1:3*size(a.X, 1)))));
+    subplot(1, 4, k);  s.plotMode([], V(:,k), Amplitude = 0.02);
     title(sprintf('Mode %d: %.0f Hz', k, f(k)));  axis off
 end
 
-% Craig-Bampton model: the 6 dofs of the rigid top plate (at its centroid)
-% are kept as boundary, plus 20 fixed-interface modes
-ib = a.qdof(a.dof('top'));                   % [ux uy uz rx ry rz], indices into q
-[Kc, Mc, Vc] = fembd.craigBampton(K, M, ib, 20);
-[~, fc] = fembd.modes(Kc, Mc, 6);
-
-% lumped-mass model, e.g. for explicit time integration
-[Kl, Ml] = a.system(Lumped = true);
-[~, fl] = fembd.modes(Kl, Ml, 6);
-disp(table((1:6)', f, fc, fl, 'VariableNames', {'mode', 'full_Hz', 'CB_Hz', 'lumped_Hz'}));
-
-% state space of the 26-dof CB model: vertical force in, vertical displacement out.
-% The full displacement field is u = T*Vc*x(1:nr).
-nr = size(Kc, 1);  Dc = 1e-5*Kc + 1*Mc;      % Rayleigh damping
-A  = [zeros(nr), eye(nr); -Mc\Kc, -Mc\Dc];
-Bu = [zeros(nr, 1); Mc\((1:nr)' == 3)];      % x(3) is the plate's uz
-Cy = [(1:nr) == 3, zeros(1, nr)];
+% state space: a vertical force on the plate in, its displacement and
+% acceleration out. A small model (Modes = 6) keeps the exact static gain.
+s.input('Fz', 'top', [], 3);
+s.output('uz', 'top', [], 3);  s.output('az', 'top', [], 3, Type = 'acceleration');
+full  = s.statespace(Damping = 0.01);
+small = s.statespace(Modes = 6, Damping = 0.01);
+dc = @(S) -S.C(1,:)*(S.A\S.B);
+fprintf('static compliance: %.4e m/N (%d states), %.4e m/N (%d states)\n', ...
+        dc(full), size(full.A, 1), dc(small), size(small.A, 1));
+fHz = logspace(1, 4, 400);  H = zeros(2, numel(fHz));
+for k = 1:numel(fHz)
+    for m = 1:2
+        S = {full, small};  S = S{m};
+        H(m,k) = S.C(1,:)*((2i*pi*fHz(k)*eye(size(S.A)) - S.A)\S.B);
+    end
+end
+figure('Color', 'w');  loglog(fHz, abs(H));  grid on
+xlabel('frequency (Hz)');  ylabel('|u_z/F_z| (m/N)');  legend('all modes', '6 modes + static correction');
 
 ##### SOURCE END #####
 -->

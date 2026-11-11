@@ -1,4 +1,4 @@
-% FEMBD  Finite elements and multibody dynamics for STL assemblies
+% FEMBD  (legacy, superseded by fmbd) Finite elements and multibody dynamics
 %   Manual: docs/fembd.md    Tutorials: tutorials/README.md
 %
 % Model
