@@ -212,10 +212,16 @@ iterations. Positions satisfy the constraints at every step; velocities are proj
 high frequencies.
 
 ### 4.7 Equilibrium and linearisation
-`equilibrium` solves `F(q, 0, u₀) = Gᵀλ`, `g(q) = 0` by Newton with minimum-norm steps and a
-backtracking line search. It converges when the force residual (relative to the forces) and the
-constraint residual (relative to the model size) are below `Tol`; when the residual stops
-decreasing, it accepts a round-off-level residual and otherwise stops with a warning.
+`equilibrium` solves `F(q, 0, u₀) = Gᵀλ`, `g(q) = 0` by a modified Newton method. Each step first
+corrects the constraints (minimum-norm `−G⁺g`), then balances the forces in the directions they
+allow (the null space of `G`; free mechanisms without stiffness stay where they are), then updates
+λ by least squares; separating the two keeps the constraints converging when stiffnesses and
+constraint rows differ by many orders of magnitude. The tangent stiffness is differenced only
+over the frame coordinates (6 per unit), with the modal stiffness `K_c` of elastic units added
+exactly, and is reused until progress slows; a backtracking line search guards each step. It
+converges when the force residual (relative to the forces) and the constraint residual (relative
+to the model size) are below `Tol`; when the residual stops decreasing even with a fresh
+tangent, it accepts a round-off-level residual and otherwise stops with a warning.
 `linearize` differentiates the same forces: `K = −∂(F − Gᵀλ)/∂q` (central differences on the
 tangent space, with the dynamic multipliers λ), `C = −∂F/∂ν` (exact: the forces are at most
 quadratic in ν), `B = ∂F/∂u`, and eliminates the constraints with an orthonormal null-space basis

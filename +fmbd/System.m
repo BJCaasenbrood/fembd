@@ -416,7 +416,11 @@ methods
                 an = ((1 - af)*w + af*wd - am*acc)/(1 - am);
                 q1 = s.retract(q, h*(nu + h*(0.5 - be)*acc + h*be*an));
                 nu1 = nu + h*(1 - gm)*acc + h*gm*an;
-                [F, Kt, Ct, Mq] = s.forces(q1, nu1, u);
+                if it == 1                       % tangents once per step (modified Newton)
+                    [F, Kt, Ct, Mq] = s.forces(q1, nu1, u);
+                else
+                    [F, ~, ~, Mq] = s.forces(q1, nu1, u, false);
+                end
                 [g, G] = s.constraints(q1);
                 res = [Mq*w - F + G'*lam; g/(h^2*be*ca)];
                 S = [Mq + h*gm*ca*Ct + h^2*be*ca*Kt, G'; G, zeros(nc)];
@@ -507,31 +511,48 @@ methods
         [q, ~] = s.startState(opts.Initial);  n = s.N;  nu = zeros(n, 1);
         u = s.inputVector(opts.Input);
         L = max([1; abs(q.r(:))]);                 % model size, for the constraint tolerance
-        F = s.forces(q, nu, u);  [g, G] = s.constraints(q);  nc = size(G, 1);
+        F = s.forces(q, nu, u, false);  [g, G] = s.constraints(q);
         lam = lsqminnorm(G', F);
-        res = @(F, G, g, lam) [F - G'*lam; g];      % force balance, constraints
-        r = res(F, G, g, lam);
+        r = [F - G'*lam; g];                        % force balance, constraints
         err = @(r, F) [norm(r(1:n))/max(norm(F), 1), max(abs([r(n+1:end); 0]))/L];
-        best = inf;  stall = 0;  conv = false;
+        merit = @(e) e(1) + e(2);
+        best = inf;  stall = 0;  conv = false;  Kt = [];  age = 0;
         for it = 1:opts.MaxIter
             e = err(r, F);
             if all(e < opts.Tol), conv = true;  break, end
             m = max(e/opts.Tol);                    % progress measure
-            if m < 0.5*best, best = m;  stall = 0; else, stall = stall + 1; end
-            if stall >= 4                           % plateau: round-off floor, or no equilibrium
+            if m < 0.5*best
+                best = m;  stall = 0;
+            elseif age > 1
+                Kt = [];                            % slow with an old tangent: refresh it first
+            else
+                stall = stall + 1;                  % slow even with a fresh tangent
+            end
+            if stall >= 3                           % plateau: round-off floor, or no equilibrium
                 conv = all(e < 1e3*opts.Tol);
                 break
             end
-            Kt = s.stiffness(q, u, lam);            % -d(F - G'*lam)/dq
-            dx = lsqminnorm([Kt, G'; G, zeros(nc)], [r(1:n); -g]);   % minimum norm: free mechanisms stay
-            a = 1;  r0 = norm(r);
-            for ls = 1:6                            % backtracking line search on |res|
-                q1 = s.retract(q, a*dx(1:n));  lam1 = lam + a*dx(n+1:end);
-                F1 = s.forces(q1, nu, u);  [g1, G1] = s.constraints(q1);  r1 = res(F1, G1, g1, lam1);
-                if norm(r1) < r0 || ls == 6, break, end
+            if isempty(Kt) || age >= 10             % modified Newton: reuse the tangent
+                Kt = s.frameStiffness(q, u, lam);  age = 0;
+            end
+            % Newton step split by the constraints: correct them exactly, then
+            % balance the forces in the directions they allow (null space of G)
+            r1 = r(1:n);
+            dqc = -lsqminnorm(G, g);
+            Nn = null(G);  if isempty(G), Nn = eye(n); end
+            z  = lsqminnorm(Nn'*Kt*Nn, Nn'*(r1 - Kt*dqc));      % free mechanisms stay
+            dq = dqc + Nn*z;
+            dlam = lsqminnorm(G', r1 - Kt*dq);
+            a = 1;  m0 = merit(e);
+            for ls = 1:6                            % backtracking line search
+                q1 = s.retract(q, a*dq);  lam1 = lam + a*dlam;
+                F1 = s.forces(q1, nu, u, false);  [g1, G1] = s.constraints(q1);
+                r1n = [F1 - G1'*lam1; g1];
+                if merit(err(r1n, F1)) < m0 || ls == 6, break, end
                 a = a/2;
             end
-            [q, lam, F, G, g, r] = deal(q1, lam1, F1, G1, g1, r1);
+            [q, lam, F, G, g, r] = deal(q1, lam1, F1, G1, g1, r1n);
+            age = age + 1;
         end
         e = err(r, F);
         info = struct('converged', conv, 'iterations', it, 'force', e(1), 'constraint', e(2)*L);
@@ -872,7 +893,7 @@ methods (Access = private)
                 B = struct('elastic', false, 'm', mb, 'J', J, 'c0', c(:), 'Xl', b.X - c(:)', ...
                            'ne', 0, 'Phi', zeros(3*b.nNode, 0), 'Q', [], 's', [], 'CR', [], ...
                            'Kc', [], 'Dc', [], 'Mee', [], 'Psi', zeros(6, 0, 0), 'cpl', [], ...
-                           'grounded', false);
+                           'grounded', false, 'Q9', [], 'CRx', [], 'Qaz', [], 'Qju', [], 'Qjz', []);
             else
                 noff = cumsum([0, cellfun(@(b) b.nNode, s.Bodies(members))]);
                 s.Uo(members) = noff(1:end-1);
@@ -904,7 +925,8 @@ methods (Access = private)
 
         % joints (zero at the defining configuration), supports of reference
         % points as joints to ground, supports of joints as locks
-        s.Jn = struct('A', {}, 'B', {}, 'a', {}, 'b', {}, 'QA', {}, 'QB', {}, 'free', {}, 'k', {}, 'c', {});
+        s.Jn = struct('A', {}, 'B', {}, 'a', {}, 'b', {}, 'QA', {}, 'QB', {}, 'free', {}, 'k', {}, ...
+                      'c', {}, 'pairs', {});
         for J = s.Joints
             s.addJoint(J.A, J.B, J.p(:), J.R, J.free, J.k, J.damp);
         end
@@ -926,7 +948,8 @@ methods (Access = private)
         end
         for u = find([s.Bd.grounded])             % elastic groups clamped on nodes
             s.Jn(end+1) = struct('A', 0, 'B', u, 'a', s.Bd(u).c0, 'b', zeros(3, 1), 'QA', eye(3), ...
-                                 'QB', eye(3), 'free', false(1, 6), 'k', zeros(6, 1), 'c', zeros(6, 1));
+                                 'QB', eye(3), 'free', false(1, 6), 'k', zeros(6, 1), 'c', zeros(6, 1), ...
+                                 'pairs', rotationPairs(false(1, 6)));
         end
         s.Tr = struct('terms', {}, 'coef', {}, 'k', {}, 'c', {});
         for T = s.Transmissions
@@ -962,7 +985,7 @@ methods (Access = private)
         kk = zeros(6, 1);  cc = zeros(6, 1);
         kk(free) = k(:).*ones(nnz(free), 1);  cc(free) = c(:).*ones(nnz(free), 1);
         s.Jn(end+1) = struct('A', aA, 'B', aB, 'a', a, 'b', b, 'QA', R, 'QB', R, ...
-                             'free', logical(free), 'k', kk, 'c', cc);
+                             'free', logical(free), 'k', kk, 'c', cc, 'pairs', rotationPairs(free));
     end
 
     function sig = compileSignals(s, list)
@@ -1065,16 +1088,30 @@ methods (Access = private)
         assert(numel(u) == numel(s.In), 'fmbd:System', '%d input value(s) expected.', numel(s.In));
     end
 
-    function K = stiffness(s, q, u, lam, nu)
+    function K = stiffness(s, q, u, lam, nu, cols)
     % Tangent stiffness K = -d(F - G'*lam)/dq by central differences on the
-    % tangent space (gravity, springs, elastic and constraint-force terms).
-        if nargin < 5, nu = zeros(s.N, 1); end
+    % tangent space (gravity, springs, elastic and constraint-force terms),
+    % for the columns cols (default all).
+        if nargin < 5 || isempty(nu), nu = zeros(s.N, 1); end
+        if nargin < 6, cols = 1:s.N; end
         n = s.N;  K = zeros(n);  e = 1e-5;          % ~ eps^(1/3): truncation vs round-off
-        for j = 1:n
+        for j = cols(:)'
             d = zeros(n, 1);  d(j) = e;
             qp = s.retract(q, d);  qm = s.retract(q, -d);
             [~, Gp] = s.constraints(qp);  [~, Gm] = s.constraints(qm);
-            K(:, j) = -((s.forces(qp, nu, u) - Gp'*lam) - (s.forces(qm, nu, u) - Gm'*lam))/(2*e);
+            K(:, j) = -((s.forces(qp, nu, u, false) - Gp'*lam) - (s.forces(qm, nu, u, false) - Gm'*lam))/(2*e);
+        end
+    end
+
+    function K = frameStiffness(s, q, u, lam)
+    % Approximate tangent stiffness for equilibrium: differences only over
+    % the frame coordinates (6 per unit), and the modal stiffness Kc of the
+    % elastic units exactly. It leaves out how gravity and constraint
+    % forces change with the modes, which only slows Newton slightly.
+        frames = arrayfun(@(B) B.cols(1:6), s.Bd, 'UniformOutput', false);
+        K = s.stiffness(q, u, lam, [], [frames{:}]);
+        for B = s.Bd(logical([s.Bd.elastic]))
+            c = B.cols(7:end);  K(c, c) = K(c, c) + B.Kc;
         end
     end
 
@@ -1170,13 +1207,7 @@ methods (Access = private)
         phi = logso3(Rrel);
         c = [J.QA'*RA'*D; phi];
         Jc = [J.QA'*(hat(RA'*D)*JwA + RA'*JD); dexpInv(phi)*(J.QB'*JwB - Rrel'*J.QA'*JwA)];
-        fr = J.free(4:6);
-        switch nnz(fr)
-            case 0, pairs = [2 3; 3 1; 1 2];
-            case 1, k = find(fr);  i = setdiff(1:3, k);  pairs = [i(:), [k; k]];
-            case 2, k = find(~fr);  pairs = circshift([1 2 3], -k);  pairs = pairs(1:2);
-            otherwise, pairs = zeros(0, 2);
-        end
+        pairs = J.pairs;
         g = zeros(size(pairs, 1), 1);  Gr = zeros(size(pairs, 1), s.N);
         for p = 1:size(pairs, 1)
             ua = J.QA(:, pairs(p,1));  wb = J.QB(:, pairs(p,2));
@@ -1249,9 +1280,11 @@ methods (Access = private)
         end
     end
 
-    function [F, Kt, Ct, Mq] = forces(s, q, nu, u)
+    function [F, Kt, Ct, Mq] = forces(s, q, nu, u, tangents)
     % Generalised forces F (gravity, inertia, elastic, springs, dampers,
-    % inputs), approximate tangents Kt = -dF/dq, Ct = -dF/dnu, and M(q).
+    % inputs), approximate tangents Kt = -dF/dq, Ct = -dF/dnu (only when
+    % tangents is true, the default), and M(q).
+        if nargin < 5, tangents = true; end
         n = s.N;  F = zeros(n, 1);  Kt = zeros(n);  Ct = zeros(n);  Mq = zeros(n);
         g = s.Gravity(:);
         for i = 1:numel(s.Bd)
@@ -1260,14 +1293,17 @@ methods (Access = private)
                 eta = q.e(B.ecols);
                 [Mb, Fb] = elasticTerms(B, R, eta, nu(c), g);
                 Mq(c, c) = Mb;  F(c) = Fb;
-                Cb = zeros(numel(c), numel(c));  e = 1e-7*max(1, norm(nu(c)));   % velocity tangent
-                for k = 1:numel(c)
-                    dv = nu(c);  dv(k) = dv(k) + e;
-                    [~, Fp] = elasticTerms(B, R, eta, dv, g);
-                    Cb(:, k) = (Fb - Fp)/e;
+                if tangents                      % velocity tangent: exact (quadratic in nu)
+                    Cb = zeros(numel(c), numel(c));
+                    for k = 1:numel(c)
+                        dv = zeros(numel(c), 1);  dv(k) = 1;
+                        [~, Fp] = elasticTerms(B, R, eta, nu(c) + dv, g);
+                        [~, Fm] = elasticTerms(B, R, eta, nu(c) - dv, g);
+                        Cb(:, k) = (Fm - Fp)/2;
+                    end
+                    Ct(c, c) = Cb;
+                    Kt(c(7:end), c(7:end)) = B.Kc;
                 end
-                Ct(c, c) = Cb;
-                Kt(c(7:end), c(7:end)) = B.Kc;
             else
                 Mq(c, c) = blkdiag(B.m*eye(3), B.J);
                 F(c(1:3)) = B.m*g;
@@ -1442,6 +1478,7 @@ end
 B = struct('elastic', true, 'm', full(sum(Ms(:))), 'J', [], 'c0', x0, 'Xl', Xl, 'ne', ne, ...
            'Phi', Phi, 'Q', Q, 's', s, 'CR', CR, 'Kc', (Kc + Kc')/2, 'Dc', (Dc + Dc')/2, ...
            'Mee', (Mc + Mc')/2, 'Psi', Psi, 'cpl', [], 'grounded', grounded);
+B = addReshapes(B);
 end
 
 function G = gapOperator(t, nn, masterOnly)
@@ -1504,24 +1541,45 @@ function [Mb, Fb] = elasticTerms(B, R, eta, nu, g)
 % elastic and damping) of an elastic body in its floating frame.
 % Velocities nu = [v (world); omega (body); deta].
 ne = B.ne;  xi = [1; eta];  S = B.s*xi;  S1 = B.s(:, 2:end);
-Quu = reshape(reshape(B.Q, 9, []) * kron(xi, xi), 3, 3);
+Quu = reshape(B.Q9*kron(xi, xi), 3, 3);
 J = trace(Quu)*eye(3) - Quu;  J = (J + J')/2;
-Mwe = reshape(reshape(permute(B.CR, [1 3 2]), 3*ne, 1 + ne)*xi, 3, ne);
+Mwe = reshape(B.CRx*xi, 3, ne);
 Mb = [B.m*eye(3), -R*hat(S), R*S1; (-R*hat(S))', J, Mwe; (R*S1)', Mwe', B.Mee];
 Mb = (Mb + Mb')/2;
 if nargout < 2, return, end
 w = nu(4:6);  de = nu(7:end);  gb = R'*g;
-Quz = reshape(reshape(B.Q(:,:,:,2:end), 9, []) * kron(de, xi), 3, 3);
+Quz = reshape(B.Qaz*kron(de, xi), 3, 3);
 W1 = -Quu*hat(w);  W2 = Quz;                     % u x (w x y) = w (u.y) - y (u.w)
 hv = R*(cross(w, cross(w, S)) + 2*cross(w, S1*de));
 hw = w*trace(W1) - W1'*w + 2*(w*trace(W2) - W2'*w);
-Qju = reshape(reshape(B.Q(:,:,2:end,:), 9*ne, 1 + ne)*xi, 3, 3, ne);
-Qjz = reshape(reshape(B.Q(:,:,2:end,2:end), 9*ne, ne)*de, 3, 3, ne);
-he = zeros(ne, 1);
-for j = 1:ne
-    he(j) = w'*Qju(:,:,j)*w - (w'*w)*trace(Qju(:,:,j)) - 2*w'*cr(Qjz(:,:,j));
-end
+Qju = reshape(B.Qju*xi, 9, ne);                  % columns: vec of sum_b xi_b Q_{j+1,b}
+Qjz = reshape(B.Qjz*de, 9, ne);                  % columns: vec of sum_k de_k Q_{j+1,k+1}
+crz = Qjz([8 3 4], :) - Qjz([6 7 2], :);         % cr(Q) = [Q23-Q32; Q31-Q13; Q12-Q21]
+he = (kron(w, w)'*Qju)' - (w'*w)*(Qju(1,:) + Qju(5,:) + Qju(9,:))' - 2*(w'*crz)';
 Fb = [B.m*g - hv; cross(S, gb) - hw; S1'*gb - he - B.Kc*eta - B.Dc*de];
+end
+
+function pairs = rotationPairs(free)
+% Axis pairs (i on A, j on B) of the rotation constraints e_i^A . e_j^B = 0:
+% none free: all three; one free axis k: k on B against the other two on
+% A (axis aligned); two free: the Cardan pair before the locked axis.
+fr = free(4:6);
+switch nnz(fr)
+    case 0, pairs = [2 3; 3 1; 1 2];
+    case 1, k = find(fr);  i = setdiff(1:3, k);  pairs = [i(:), [k; k]];
+    case 2, k = find(~fr);  pairs = circshift([1 2 3], -k);  pairs = pairs(1:2);
+    otherwise, pairs = zeros(0, 2);
+end
+end
+
+function B = addReshapes(B)
+% Reshaped inertia invariants for elasticTerms (computed once).
+ne = B.ne;
+B.Q9  = reshape(B.Q, 9, []);                           % Q_ab, (a,b) pairs
+B.CRx = reshape(permute(B.CR, [1 3 2]), 3*ne, 1 + ne);
+B.Qaz = reshape(B.Q(:,:,:,2:end), 9, []);              % Q_{a,j+1}
+B.Qju = reshape(B.Q(:,:,2:end,:), 9*ne, 1 + ne);       % Q_{j+1,b}
+B.Qjz = reshape(B.Q(:,:,2:end,2:end), 9*ne, ne);       % Q_{j+1,k+1}
 end
 
 function v = cr(Q)

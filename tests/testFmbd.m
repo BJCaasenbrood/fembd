@@ -157,6 +157,28 @@ s.joint('ground', 'p', 'revolute', Point = [0 0 0], Axis = [0 1 0]);
 w = warning('off', 'fmbd:equilibrium');  [~, info] = s.equilibrium();  warning(w);
 check('No equilibrium: stops early and reports it', [info.converged, info.iterations <= 10], [0 1], 0);
 
+% equilibrium with stiff elements and a free mechanism: an elastic plate
+% bolted at two couplings to a link on a free joint, driven by a stiff belt,
+% under gravity (constraints converge; the free angles stay at zero)
+plate = fullfile(tmp, 'plate.stl');  fmbd.boxSTL(plate, [0.2 -0.05 -0.003], [0.3 0.05 0.003]);
+s = fmbd.System(Gravity = [0 0 -g]);
+s.add(fmbd.Body.pointMass(1, [0.1 0 0], 1e-3*eye(3), Name = 'link'));
+s.add(fmbd.Body.pointMass(0.1, [0 0.1 0], 0.1*eye(3), Name = 'rotor'));
+s.add(fmbd.Body.elastic(plate, fmbd.material(70e9, 0.33, 2700), Size = 0.01, Order = 1, ...
+                        Modes = 10, Name = 'plate'));
+s.joint('ground', 'link', 'revolute', Point = [0 0 0], Stiffness = [1e5 1e5 0], ...
+        Free = [0 0 0 1 1 1], Name = 'shoulder');
+s.joint('ground', 'rotor', 'revolute', Point = [0 0.1 0], Name = 'motor');
+s.transmission({'motor', 'link'}, [1 -1], Dirs = {1, 6}, Stiffness = 1.7e5);
+for k = 1:2
+    h = s.couple('plate', @(X) X(:,1) < 0.21 & (2*k - 3)*X(:,2) > 0.03, Name = sprintf('bolt%d', k));
+    s.joint('link', h, 'fixed');
+end
+s.output('m', 'motor');  s.output('rz', 'link', [], 6);
+[x, info] = s.equilibrium();  [~, y] = s.simulate([0 1e-4], Initial = x, Step = 1e-4);
+check('Equilibrium: stiff belt, bolted plate, free mechanism (converged, angles 0)', ...
+      [~info.converged, info.constraint, y.m(1), y.rz(1)], 0, 1e-9);
+
 % state space of the belt drive == the exact frequency response, and the DC gain
 % with one mode plus static correction
 s = belt(false);  s.input('tau', 'motor');  s.output('wa', 'axis', Type = 'velocity');
