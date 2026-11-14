@@ -70,7 +70,7 @@ methods
 
     function names = get.InputName(s),  names = {s.Inputs.Name}; end
     function names = get.OutputName(s), names = {s.Outputs.Name}; end
-    function n = get.nDof(s),  s.build();  n = s.nv; end
+    function n = get.nDof(s),  build(s);  n = s.nv; end
 end
 
 methods
@@ -97,33 +97,4 @@ methods
     animate(s, t, x, opts)
 end
 
-methods (Access = private)
-    n = names(s)
-    [kind, k] = lookup(s, id, whole)
-    k = refIndex(s, id)
-    sig = signalSpec(s, name, id, sel, dirs, type)
-    build(s)
-    addJoint(s, iA, iB, p, R, free, k, c)
-    sig = compileSignals(s, list)
-    q = initialConfiguration(s, q)
-    nu = initialVelocities(s, q)
-    [q, nu] = startState(s, x)
-    u = inputVector(s, u)
-    K = stiffness(s, q, u, lam, nu, cols)
-    K = frameStiffness(s, q, u, lam)
-    [x, a, V0] = modeScale(s, x, v, amplitude)
-    x = state(s, q, nu, u)
-    V = vertices(s, i, x, k, scale)
-    B = elasticGroup(s, members)
-    [ra, Ra, Jv, Jw] = anchorKin(s, k, q)
-    [c, Jc, g, Gr] = jointKin(s, j, q)
-    [v, Jv] = coord(s, kind, idx, q)
-    [d, Jd] = stretch(s, T, q)
-    [g, G] = constraints(s, q, reduce)
-    Mq = massMatrix(s, q)
-    [F, Kt, Ct, Mq] = forces(s, q, nu, u, tangents)
-    y = outputs(s, q, nu, a)
-    gd = convective(s, q, nu)
-    q = retract(s, q, dq)
-end
 end

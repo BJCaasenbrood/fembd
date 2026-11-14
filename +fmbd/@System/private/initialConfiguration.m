@@ -18,19 +18,19 @@ function q = initialConfiguration(s, q)
     ns = max(1, ceil(max([abs(tgt(:,3)); 0])/0.3));
     for step = 1:ns
         for it = 1:50
-            [g, G] = s.constraints(q, false);
+            [g, G] = constraints(s, q, false);
             for i = 1:size(tgt, 1)
-                [v, Jv] = s.coord('joint', tgt(i,1), q);
+                [v, Jv] = coord(s, 'joint', tgt(i,1), q);
                 g = [g; v(tgt(i,2)) - step/ns*tgt(i,3)];  G = [G; Jv(tgt(i,2), :)]; %#ok<AGROW>
             end
             for T = relax
-                [d, Jd] = s.stretch(T, q);
+                [d, Jd] = stretch(s, T, q);
                 g = [g; d]; %#ok<AGROW>
                 G = [G; Jd]; %#ok<AGROW>
             end
             gs = zeros(size(soft, 1), 1);  Gs = zeros(size(soft, 1), s.nv);
             for i = 1:size(soft, 1)
-                [v, Jv] = s.coord('joint', soft(i,1), q);
+                [v, Jv] = coord(s, 'joint', soft(i,1), q);
                 gs(i) = v(soft(i,2));
                 Gs(i,:) = Jv(soft(i,2), :);
             end
@@ -41,7 +41,7 @@ function q = initialConfiguration(s, q)
             end
             if max(abs([g; 0])) < 1e-12 && norm(dh) < 1e-12, break, end
             dq = zeros(s.nv, 1);  dq(rigid) = dh;
-            q = s.retract(q, dq);
+            q = retract(s, q, dq);
         end
     end
     assert(isempty(g) || max(abs(g)) < 1e-9, 'fmbd:System', ['The initial configuration ' ...

@@ -1,8 +1,8 @@
 function [c, Jc, g, Gr] = jointKin(s, j, q)
 % Joint coordinates [d; phi] and rotation constraints, with Jacobians.
     J = s.jointFrames(j);
-    [rA, RA, JvA, JwA] = s.anchorKin(J.A, q);
-    [rB, RB, JvB, JwB] = s.anchorKin(J.B, q);
+    [rA, RA, JvA, JwA] = anchorKin(s, J.A, q);
+    [rB, RB, JvB, JwB] = anchorKin(s, J.B, q);
     D = rB + RB*J.b - rA - RA*J.a;
     JD = (JvB - RB*hat(J.b)*JwB) - (JvA - RA*hat(J.a)*JwA);
     Rrel = J.QA'*RA'*RB*J.QB;

@@ -23,7 +23,7 @@ function [t, y, x] = simulate(s, tspan, opts)
         opts.Tol (1,1) double {mustBePositive} = 1e-8
         opts.Initial struct = struct([])
     end
-    s.build();
+    build(s);
     nt = max(1, round(diff(tspan)/opts.Step));  h = diff(tspan)/nt;
     t = tspan(1) + h*(0:nt)';
     r = opts.Rho;
@@ -34,18 +34,18 @@ function [t, y, x] = simulate(s, tspan, opts)
     ca = (1 - af)/(1 - am);
     nb = numel(s.units);  n = s.nv;
 
-    [q, nu] = s.startState(opts.Initial);  u = zeros(numel(s.inSignals), 1);
-    [F, ~, ~, Mq] = s.forces(q, nu, u);
-    [~, G] = s.constraints(q);  nc = size(G, 1);
-    sol = [Mq, G'; G, zeros(nc)]\[F; -s.convective(q, nu)];
+    [q, nu] = startState(s, opts.Initial);  u = zeros(numel(s.inSignals), 1);
+    [F, ~, ~, Mq] = forces(s, q, nu, u);
+    [~, G] = constraints(s, q);  nc = size(G, 1);
+    sol = [Mq, G'; G, zeros(nc)]\[F; -convective(s, q, nu)];
     wd = sol(1:n);
     lam = sol(n+1:end);
     acc = wd;
-    y0 = s.outputs(q, nu, wd);
+    y0 = outputs(s, q, nu, wd);
     if ~isempty(opts.Input) % first input, then consistent accelerations
-        u = opts.Input(t(1), y0);  F = s.forces(q, nu, u);
-        sol = [Mq, G'; G, zeros(nc)]\[F; -s.convective(q, nu)];
-        wd = sol(1:n);  lam = sol(n+1:end);  acc = wd;  y0 = s.outputs(q, nu, wd);
+        u = opts.Input(t(1), y0);  F = forces(s, q, nu, u);
+        sol = [Mq, G'; G, zeros(nc)]\[F; -convective(s, q, nu)];
+        wd = sol(1:n);  lam = sol(n+1:end);  acc = wd;  y0 = outputs(s, q, nu, wd);
     end
 
     x = struct('r', zeros(3, nb, nt+1), 'R', zeros(3, 3, nb, nt+1), ...
@@ -63,14 +63,14 @@ function [t, y, x] = simulate(s, tspan, opts)
         w = wd;  prev = inf;
         for it = 1:30
             an = ((1 - af)*w + af*wd - am*acc)/(1 - am);
-            q1 = s.retract(q, h*(nu + h*(0.5 - be)*acc + h*be*an));
+            q1 = retract(s, q, h*(nu + h*(0.5 - be)*acc + h*be*an));
             nu1 = nu + h*(1 - gm)*acc + h*gm*an;
             if it == 1 % tangents once per step (modified Newton)
-                [F, Kt, Ct, Mq] = s.forces(q1, nu1, u);
+                [F, Kt, Ct, Mq] = forces(s, q1, nu1, u);
             else
-                [F, ~, ~, Mq] = s.forces(q1, nu1, u, false);
+                [F, ~, ~, Mq] = forces(s, q1, nu1, u, false);
             end
-            [g, G] = s.constraints(q1);
+            [g, G] = constraints(s, q1);
             res = [Mq*w - F + G'*lam; g/(h^2*be*ca)];
             S = [Mq + h*gm*ca*Ct + h^2*be*ca*Kt, G'; G, zeros(nc)];
             dx = -S\res;
@@ -83,14 +83,14 @@ function [t, y, x] = simulate(s, tspan, opts)
             warning('fmbd:simulate', 'Newton did not converge at t = %g s; try a smaller Step.', t(k+1));
         end
         an = ((1 - af)*w + af*wd - am*acc)/(1 - am);
-        q = s.retract(q, h*(nu + h*(0.5 - be)*acc + h*be*an));
+        q = retract(s, q, h*(nu + h*(0.5 - be)*acc + h*be*an));
         nu = nu + h*(1 - gm)*acc + h*gm*an;
         if nc > 0 % project onto G nu = 0 (mass-orthogonal)
-            [~, G] = s.constraints(q);  Mq = s.massMatrix(q);
+            [~, G] = constraints(s, q);  Mq = massMatrix(s, q);
             p = [Mq, G'; G, zeros(nc)]\[zeros(n, 1); -G*nu];  nu = nu + p(1:n);
         end
         acc = an;  wd = w;
-        yk = s.outputs(q, nu, w);
+        yk = outputs(s, q, nu, w);
         x.r(:,:,k+1) = q.r;
         x.R(:,:,:,k+1) = q.R;
         x.e(:,k+1) = q.e;

@@ -3,7 +3,7 @@ function y = outputs(s, q, nu, a)
 % the accelerations a = dnu/dt for acceleration outputs.
     v = zeros(numel(s.outSignals), 1);
     for i = 1:numel(s.outSignals)
-        sg = s.outSignals(i);  [c, Jc] = s.coord(sg.kind, sg.idx, q);
+        sg = s.outSignals(i);  [c, Jc] = coord(s, sg.kind, sg.idx, q);
         switch sg.type
             case 'displacement', v(i) = c(sg.dir);
             case 'velocity',     v(i) = Jc(sg.dir, :)*nu;
@@ -11,8 +11,8 @@ function y = outputs(s, q, nu, a)
                 v(i) = Jc(sg.dir, :)*a;
                 if any(nu)
                     e = 1e-6/norm(nu);
-                    [~, Jp] = s.coord(sg.kind, sg.idx, s.retract(q, e*nu));
-                    [~, Jm] = s.coord(sg.kind, sg.idx, s.retract(q, -e*nu));
+                    [~, Jp] = coord(s, sg.kind, sg.idx, retract(s, q, e*nu));
+                    [~, Jm] = coord(s, sg.kind, sg.idx, retract(s, q, -e*nu));
                     v(i) = v(i) + (Jp(sg.dir, :) - Jm(sg.dir, :))*nu/(2*e);
                 end
         end

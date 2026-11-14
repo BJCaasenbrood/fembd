@@ -37,7 +37,7 @@ function [F, Kt, Ct, Mq] = forces(s, q, nu, u, tangents)
     for j = 1:numel(s.jointFrames)
         J = s.jointFrames(j);  f = J.free & (J.k' ~= 0 | J.c' ~= 0);
         if ~any(f), continue, end
-        [c, Jc] = s.jointKin(j, q);
+        [c, Jc] = jointKin(s, j, q);
         c = c(f);
         Jc = Jc(f, :);
         k = J.k(f);
@@ -46,18 +46,18 @@ function [F, Kt, Ct, Mq] = forces(s, q, nu, u, tangents)
         Kt = Kt + Jc'*(k.*Jc);  Ct = Ct + Jc'*(d.*Jc);
     end
     for T = s.transData(arrayfun(@(T) ~isempty(T.k), s.transData))
-        [d, Jd] = s.stretch(T, q);
+        [d, Jd] = stretch(s, T, q);
         F = F - Jd'*(T.k*d + T.c*(Jd*nu));
         Kt = Kt + T.k*(Jd'*Jd);  Ct = Ct + T.c*(Jd'*Jd);
     end
     for i = 1:numel(s.inSignals)
         sg = s.inSignals(i);
         if strcmp(sg.kind, 'ref') && sg.dir > 3 % moment (world axes) on a reference point
-            [~, Ra, ~, Jw] = s.anchorKin(s.refFrames(sg.idx).anchor, q);
+            [~, Ra, ~, Jw] = anchorKin(s, s.refFrames(sg.idx).anchor, q);
             e = zeros(3, 1);  e(sg.dir - 3) = u(i);
             F = F + Jw'*(Ra'*e);
         else % joint force/torque, force on a point or node set
-            [~, Jv] = s.coord(sg.kind, sg.idx, q);  F = F + Jv(sg.dir, :)'*u(i);
+            [~, Jv] = coord(s, sg.kind, sg.idx, q);  F = F + Jv(sg.dir, :)'*u(i);
         end
     end
 end

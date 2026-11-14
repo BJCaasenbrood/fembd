@@ -8,11 +8,11 @@ function h = plot(s, x, k, opts)
         k = []
         opts.Scale (1,1) double = 1
     end
-    s.build();
-    if isempty(x), x = s.state(s.q0, s.nu0); end
+    build(s);
+    if isempty(x), x = state(s, s.q0, s.nu0); end
     if isempty(k), k = size(x.nu, 2); end
     nb = numel(s.Bodies);
-    V = arrayfun(@(i) s.vertices(i, x, k, opts.Scale), 1:nb, 'UniformOutput', false);
+    V = arrayfun(@(i) vertices(s, i, x, k, opts.Scale), 1:nb, 'UniformOutput', false);
     h = drawBodies(s.Bodies, V, num2cell(lines(nb), 2)');
     if nargout == 0, clear h, end
 end

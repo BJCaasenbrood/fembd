@@ -1,13 +1,13 @@
 function nu = initialVelocities(s, q)
 % Velocities satisfying the constraints with the joint velocities;
 % elastic bodies start without deformation rates.
-    [~, G] = s.constraints(q);
+    [~, G] = constraints(s, q);
     A = G;
     rhs = zeros(size(G, 1), 1);
     for j = 1:numel(s.Joints)
         v = s.Joints(j).velocity;
         if isempty(v), continue, end
-        [~, Jv] = s.coord('joint', j, q);
+        [~, Jv] = coord(s, 'joint', j, q);
         A = [A; Jv];  rhs = [rhs; v(:)]; %#ok<AGROW>
     end
     if all(rhs == 0), nu = zeros(s.nv, 1); return, end

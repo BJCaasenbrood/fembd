@@ -28,7 +28,7 @@ function build(s)
         else
             noff = cumsum([0, cellfun(@(b) b.nNode, s.Bodies(members))]);
             s.bodyOffset(members) = noff(1:end-1);
-            B = s.elasticGroup(members);
+            B = elasticGroup(s, members);
         end
         B.cols = off + (1:6 + B.ne);  B.ecols = eoff + (1:B.ne);
         off = off + 6 + B.ne;  eoff = eoff + B.ne;
@@ -61,7 +61,7 @@ function build(s)
     s.jointFrames = struct('A', {}, 'B', {}, 'a', {}, 'b', {}, 'QA', {}, 'QB', {}, 'free', {}, 'k', {}, ...
                   'c', {}, 'pairs', {});
     for J = s.Joints
-        s.addJoint(J.A, J.B, J.p(:), J.R, J.free, J.k, J.damp);
+        addJoint(s, J.A, J.B, J.p(:), J.R, J.free, J.k, J.damp);
     end
     s.locks = struct('joint', {}, 'dir', {}, 'value', {});
     for f = s.Fixes
@@ -69,7 +69,7 @@ function build(s)
         if strcmp(f.kind, 'nodes'), continue, end % in the elastic group reduction
         if strcmp(f.kind, 'ref')
             if isempty(dirs), dirs = 1:6; end
-            s.addJoint(0, f.idx, s.Refs(f.idx).x(:), eye(3), ~ismember(1:6, dirs), ...
+            addJoint(s, 0, f.idx, s.Refs(f.idx).x(:), eye(3), ~ismember(1:6, dirs), ...
                        zeros(6 - numel(unique(dirs)), 1), 0);
         else
             J = s.Joints(f.idx);  if isempty(dirs), dirs = 1:nnz(J.free); end
@@ -91,19 +91,19 @@ function build(s)
 
     % signals
     s.nodeSets = struct('body', {}, 'u0', {}, 'Phi', {}, 'x0', {});
-    s.inSignals = s.compileSignals(s.Inputs);  s.outSignals = s.compileSignals(s.Outputs);
+    s.inSignals = compileSignals(s, s.Inputs);  s.outSignals = compileSignals(s, s.Outputs);
 
     % initial configuration: joint positions, transmissions unstretched,
     % elastic bodies undeformed; then the independent constraint rows
     s.keepRows = [];
-    q = s.initialConfiguration(q);
-    [~, G] = s.constraints(q, false);
+    q = initialConfiguration(s, q);
+    [~, G] = constraints(s, q, false);
     if ~isempty(G)
         [~, Rq, p] = qr(G', 'vector');
         r = sum(abs(diag(Rq)) > 1e-10*max(abs(diag(Rq))));
         s.keepRows = sort(p(1:r));
     end
     s.q0 = q;
-    s.nu0 = s.initialVelocities(q);
+    s.nu0 = initialVelocities(s, q);
     s.built = true;
 end

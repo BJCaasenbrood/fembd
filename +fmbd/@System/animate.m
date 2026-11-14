@@ -10,9 +10,9 @@ function animate(s, t, x, opts)
         opts.Scale (1,1) double = 1
         opts.Title (1,:) char = ''
     end
-    s.build();
+    build(s);
     nb = numel(s.Bodies);
-    V = @(k) arrayfun(@(i) s.vertices(i, x, k, opts.Scale), 1:nb, 'UniformOutput', false);
+    V = @(k) arrayfun(@(i) vertices(s, i, x, k, opts.Scale), 1:nb, 'UniformOutput', false);
     cla;  h = s.plot(x, 1, Scale = opts.Scale);
     X = reshape(permute(x.r, [1 3 2]), 3, [])'; % all frame positions
     span = max([arrayfun(@(B) max([vecnorm(B.Xl, 2, 2); 0]), s.units), 1e-3]);

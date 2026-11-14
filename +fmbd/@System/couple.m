@@ -11,7 +11,7 @@ function name = couple(s, body, sel, opts)
         opts.Name (1,:) char = ''
         opts.Point double = []
     end
-    [kind, i] = s.lookup(body, false);
+    [kind, i] = lookup(s, body, false);
     assert(strcmp(kind, 'body') && ~s.Bodies{i}.Rigid, 'fmbd:couple', ...
         'Couplings are for elastic bodies; a rigid body is already a reference point.');
     b = s.Bodies{i};  nodes = b.nodes(sel);
@@ -19,7 +19,7 @@ function name = couple(s, body, sel, opts)
     x = opts.Point;  if isempty(x), x = mean(b.X(nodes, :), 1); end
     name = opts.Name;
     if isempty(name), name = sprintf('%s_ref%d', b.Name, numel(s.Refs) + 1); end
-    assert(~ismember(name, s.names()), 'fmbd:couple', 'The name %s is already used.', name);
+    assert(~ismember(name, names(s)), 'fmbd:couple', 'The name %s is already used.', name);
     s.Refs(end+1) = struct('Name', name, 'body', i, 'nodes', nodes, 'x', x(:)');
     s.built = false;
 end

@@ -5,6 +5,6 @@ function input(s, name, id, sel, dirs)
 %   s.input(name, body, sel, dirs)  total force on a node set
     if nargin < 4, sel = []; end
     if nargin < 5, dirs = []; end
-    s.Inputs = [s.Inputs, s.signalSpec(name, id, sel, dirs, 'force')];
+    s.Inputs = [s.Inputs, signalSpec(s, name, id, sel, dirs, 'force')];
     s.built = false;
 end

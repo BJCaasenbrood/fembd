@@ -29,7 +29,7 @@ function name = joint(s, A, B, type, opts)
         opts.Velocity double = []
         opts.Name (1,:) char = ''
     end
-    iA = s.refIndex(A);  iB = s.refIndex(B);
+    iA = refIndex(s, A);  iB = refIndex(s, B);
     assert(iB > 0 && iA ~= iB, 'fmbd:joint', 'B must be a reference point other than A.');
     mask = struct('fixed', [0 0 0 0 0 0], 'revolute', [0 0 0 0 0 1], ...
         'prismatic', [0 0 1 0 0 0], 'cylindrical', [0 0 1 0 0 1], ...
@@ -51,7 +51,7 @@ function name = joint(s, A, B, type, opts)
     end
     name = opts.Name;
     if isempty(name), name = sprintf('joint%d', numel(s.Joints) + 1); end
-    assert(~ismember(name, s.names()), 'fmbd:joint', 'The name %s is already used.', name);
+    assert(~ismember(name, names(s)), 'fmbd:joint', 'The name %s is already used.', name);
     s.Joints(end+1) = struct('Name', name, 'A', iA, 'B', iB, 'p', p(:)', 'R', R, 'free', free, ...
         'k', opts.Stiffness(:).*ones(nf, 1), 'damp', opts.Damping(:).*ones(nf, 1), ...
         'position', opts.Position(:), 'velocity', opts.Velocity(:));

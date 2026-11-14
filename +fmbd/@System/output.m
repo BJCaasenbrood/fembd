@@ -11,6 +11,6 @@ function output(s, name, id, sel, dirs, opts)
         dirs = []
         opts.Type (1,:) char {mustBeMember(opts.Type, {'displacement', 'velocity', 'acceleration'})} = 'displacement'
     end
-    s.Outputs = [s.Outputs, s.signalSpec(name, id, sel, dirs, opts.Type)];
+    s.Outputs = [s.Outputs, signalSpec(s, name, id, sel, dirs, opts.Type)];
     s.built = false;
 end

@@ -23,7 +23,7 @@ function name = transmission(s, ids, coeffs, opts)
     assert(numel(dirs) == nj, 'fmbd:transmission', 'One entry of Dirs per coordinate.');
     terms = struct('kind', {}, 'idx', {}, 'dir', {});
     for i = 1:nj
-        [kind, k] = s.lookup(ids{i}, true);
+        [kind, k] = lookup(s, ids{i}, true);
         assert(ismember(kind, {'joint', 'ref'}), 'fmbd:transmission', ...
             '%s is not a joint, rigid body or coupling.', string(ids{i}));
         nd = 6;  if strcmp(kind, 'joint'), nd = nnz(s.Joints(k).free); end

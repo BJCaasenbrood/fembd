@@ -3,7 +3,7 @@ function sig = signalSpec(s, name, id, sel, dirs, type)
     used = [s.InputName, s.OutputName];
     assert(~any(strcmp(used, name) | startsWith(used, [name '_'])), 'fmbd:io', ...
         'Signal name %s is already used.', name);
-    [kind, k] = s.lookup(id, isempty(sel));
+    [kind, k] = lookup(s, id, isempty(sel));
     nodes = [];
     if strcmp(kind, 'body')
         nodes = s.Bodies{k}.nodes(sel);  if isempty(sel), nodes = (1:s.Bodies{k}.nNode)'; end

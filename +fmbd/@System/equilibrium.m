@@ -12,13 +12,13 @@ function [x, info] = equilibrium(s, opts)
         opts.Tol (1,1) double {mustBePositive} = 1e-10
         opts.MaxIter (1,1) double = 100
     end
-    s.build();
-    [q, ~] = s.startState(opts.Initial);
+    build(s);
+    [q, ~] = startState(s, opts.Initial);
     n = s.nv;
     nu = zeros(n, 1);
-    u = s.inputVector(opts.Input);
+    u = inputVector(s, opts.Input);
     L = max([1; abs(q.r(:))]); % model size, for the constraint tolerance
-    F = s.forces(q, nu, u, false);  [g, G] = s.constraints(q);
+    F = forces(s, q, nu, u, false);  [g, G] = constraints(s, q);
     lam = lsqminnorm(G', F);
     r = [F - G'*lam; g]; % force balance, constraints
     err = @(r, F) [norm(r(1:n))/max(norm(F), 1), max(abs([r(n+1:end); 0]))/L];
@@ -44,7 +44,7 @@ function [x, info] = equilibrium(s, opts)
             break
         end
         if isempty(Kt) || age >= 10 % modified Newton: reuse the tangent
-            Kt = s.frameStiffness(q, u, lam);  age = 0;
+            Kt = frameStiffness(s, q, u, lam);  age = 0;
         end
         % Newton step split by the constraints: correct them exactly, then
         % balance the forces in the directions they allow (null space of G)
@@ -56,8 +56,8 @@ function [x, info] = equilibrium(s, opts)
         dlam = lsqminnorm(G', r1 - Kt*dq);
         a = 1;  m0 = merit(e);
         for ls = 1:6 % backtracking line search
-            q1 = s.retract(q, a*dq);  lam1 = lam + a*dlam;
-            F1 = s.forces(q1, nu, u, false);  [g1, G1] = s.constraints(q1);
+            q1 = retract(s, q, a*dq);  lam1 = lam + a*dlam;
+            F1 = forces(s, q1, nu, u, false);  [g1, G1] = constraints(s, q1);
             r1n = [F1 - G1'*lam1; g1];
             if merit(err(r1n, F1)) < m0 || ls == 6, break, end
             a = a/2;
@@ -72,5 +72,5 @@ function [x, info] = equilibrium(s, opts)
             '%.1e, constraint residual %.1e); a free coordinate may carry a net force.'], ...
             it, e(1), e(2)*L);
     end
-    x = s.state(q, nu, u);
+    x = state(s, q, nu, u);
 end

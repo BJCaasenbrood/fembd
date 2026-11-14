@@ -9,7 +9,7 @@ function h = plotMode(s, x, v, opts)
         opts.Amplitude (1,1) double {mustBePositive} = 0.05
         opts.Title = []
     end
-    [x, a] = s.modeScale(x, v, opts.Amplitude);
+    [x, a] = modeScale(s, x, v, opts.Amplitude);
     h = s.plot(s.perturb(x, a*v));
     if ~isempty(opts.Title), title(opts.Title); end
     if nargout == 0, clear h, end

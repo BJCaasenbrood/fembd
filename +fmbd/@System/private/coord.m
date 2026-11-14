@@ -2,11 +2,11 @@ function [v, Jv] = coord(s, kind, idx, q)
 % Coordinates and Jacobian of a joint, reference point or node set.
     switch kind
         case 'joint'
-            [c, Jc] = s.jointKin(idx, q);  f = s.jointFrames(idx).free;
+            [c, Jc] = jointKin(s, idx, q);  f = s.jointFrames(idx).free;
             v = c(f);  Jv = Jc(f, :);
         case 'ref'
             R = s.refFrames(idx);
-            [ra, Ra, Ja, Jw] = s.anchorKin(R.anchor, q);
+            [ra, Ra, Ja, Jw] = anchorKin(s, R.anchor, q);
             phi = logso3(Ra);
             v = [ra + Ra*R.s - R.x0; phi];
             Jv = [Ja - Ra*hat(R.s)*Jw; dexpInv(phi)*Jw];

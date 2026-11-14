@@ -13,7 +13,7 @@ function animateMode(s, x, v, opts)
         opts.Duration (1,1) double {mustBePositive} = 3
         opts.Title = []
     end
-    [x, a, V0] = s.modeScale(x, v, opts.Amplitude);  nb = numel(s.Bodies);
+    [x, a, V0] = modeScale(s, x, v, opts.Amplitude);  nb = numel(s.Bodies);
     cla;
     h = drawBodies(s.Bodies, V0, num2cell(lines(nb), 2)');
     axis manual
@@ -24,6 +24,6 @@ function animateMode(s, x, v, opts)
         if isempty(ttl), ttl = ft; else, ttl = [ttl ': ' ft]; end
     end
     if ~isempty(ttl), title(ttl); end
-    playback(h, opts.Duration, @(c) setVertices(h, arrayfun(@(i) s.vertices(i, ...
+    playback(h, opts.Duration, @(c) setVertices(h, arrayfun(@(i) vertices(s, i, ...
         s.perturb(x, a*sin(2*pi*opts.Rate*c)*v), 1, 1), 1:nb, 'UniformOutput', false)));
 end

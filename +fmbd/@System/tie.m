@@ -14,7 +14,7 @@ function ns = tie(s, master, slave, opts)
         opts.Stiffness double = []
         opts.Select = []
     end
-    [~, im] = s.lookup(master, false);  [~, is] = s.lookup(slave, false);
+    [~, im] = lookup(s, master, false);  [~, is] = lookup(s, slave, false);
     bm = s.Bodies{im};  bs = s.Bodies{is};
     assert(~isempty(bm.F) && ~isempty(bs.F), 'fmbd:tie', 'A point mass has no surface; use a joint.');
     assert(~(bm.Rigid && bs.Rigid), 'fmbd:tie', 'Two rigid bodies cannot be tied; use a fixed joint.');
