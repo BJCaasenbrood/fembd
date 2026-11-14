@@ -16,3 +16,7 @@ examples/html/
 /doc/
 /docs/
 /tests/
+
+# geometry
+*.stl
+*.STL
