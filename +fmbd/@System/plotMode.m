@@ -1,7 +1,7 @@
 function h = plotMode(s, x, v, opts)
-%PLOTMODE Draw a mode shape: s.plotMode(x0, V(:,k)) with x0 and V from
-%   modes, displaced so that the largest node displacement is Amplitude
-%   (default 0.05 m). Option Title. Returns one handle per body.
+%PLOTMODE Draw a mode shape.
+%   s.plotMode(x0, v) with x0 and v = V(:,k) from modes.
+%   Options: Amplitude (largest node displacement, default 0.05), Title.
     arguments
         s
         x struct

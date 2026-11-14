@@ -1,8 +1,7 @@
 function animate(s, t, x, opts)
-%ANIMATE Animate a simulation: s.animate(t, x) with t, x from simulate.
-%   Options: Rate (default 1) = simulated seconds per wall-clock
-%   second, so 1 is real time and 0.1 slow motion; Scale (default 1)
-%   magnifies the elastic deformation; Title.
+%ANIMATE Play a simulation.
+%   s.animate(t, x) with t, x from simulate.
+%   Options: Rate (simulated seconds per second, default 1), Scale, Title.
     arguments
         s
         t (:,1) double

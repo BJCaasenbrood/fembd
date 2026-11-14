@@ -1,8 +1,6 @@
 function E = energy(s, x)
-%ENERGY Energies along a simulation: E = s.energy(x) with x from
-%   simulate gives a struct of row vectors: kinetic, gravity (potential
-%   of gravity), strain (elastic bodies), springs (joint springs and
-%   elastic transmissions) and total. Dampers dissipate the total.
+%ENERGY Energies along a simulation.
+%   E = s.energy(x) returns kinetic, gravity, strain, springs and total.
     s.build();
     nt = size(x.nu, 2);  z = zeros(1, nt);
     E = struct('kinetic', z, 'gravity', z, 'strain', z, 'springs', z, 'total', z);

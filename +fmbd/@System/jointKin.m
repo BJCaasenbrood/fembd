@@ -1,7 +1,5 @@
 function [c, Jc, g, Gr] = jointKin(s, j, q)
-% Joint coordinates c = [d; phi] (translation in the A frame, rotation
-% vector of B relative to A) with Jacobian Jc, and the rotation
-% constraints g (dot products of frame axes) with Jacobian Gr.
+% Joint coordinates [d; phi] and rotation constraints, with Jacobians.
     J = s.jointFrames(j);
     [rA, RA, JvA, JwA] = s.anchorKin(J.A, q);
     [rB, RB, JvB, JwB] = s.anchorKin(J.B, q);

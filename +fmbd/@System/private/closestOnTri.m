@@ -1,7 +1,5 @@
 function [d, l] = closestOnTri(p, A, B, C)
-%CLOSESTONTRI Distance from point p (1 x 3) to triangles (A,B,C) (m x 3).
-%   Returns distances d (m x 1) and barycentric coordinates l (m x 3) of
-%   the closest point on each triangle.
+% Distance from p to triangles (A, B, C) and the closest-point coordinates.
 
 e1 = B - A;
 e2 = C - A;

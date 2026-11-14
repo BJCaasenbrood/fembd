@@ -1,7 +1,5 @@
 function [v, Jv] = coord(s, kind, idx, q)
-% Coordinates and Jacobian of a joint (its free coordinates), a
-% reference point ([displacement; rotation vector]) or a node set
-% (average displacement), all zero in the defining configuration.
+% Coordinates and Jacobian of a joint, reference point or node set.
     switch kind
         case 'joint'
             [c, Jc] = s.jointKin(idx, q);  f = s.jointFrames(idx).free;

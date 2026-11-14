@@ -1,12 +1,8 @@
 function fix(s, id, varargin)
-%FIX Support:
-%   s.fix(ref, dirs)         holds a reference point (rigid body or
-%                            coupling) in dirs (default 1:6, [ux uy uz
-%                            rx ry rz], world axes)
-%   s.fix(joint, dirs)       holds joint coordinates at their Position
-%   s.fix(body, sel, dirs)   clamps nodes of an elastic body (dirs
-%                            default 1:3); its elastic group is grounded,
-%                            so the supports must hold it (e.g. a face)
+%FIX Support a reference point, joint or nodes.
+%   s.fix(ref, dirs)        hold a reference point (dirs 1:6, world axes)
+%   s.fix(joint, dirs)      hold joint coordinates at their Position
+%   s.fix(body, sel, dirs)  clamp nodes of an elastic body (dirs 1:3)
     if numel(varargin) >= 2 || (isscalar(varargin) && isa(varargin{1}, 'function_handle'))
         sel = varargin{1};  dirs = 1:3;  if numel(varargin) >= 2, dirs = varargin{2}; end
         [kind, k] = s.lookup(id, false);

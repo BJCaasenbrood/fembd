@@ -1,7 +1,5 @@
 function pairs = rotationPairs(free)
-% Axis pairs (i on A, j on B) of the rotation constraints e_i^A . e_j^B = 0:
-% none free: all three; one free axis k: k on B against the other two on
-% A (axis aligned); two free: the Cardan pair before the locked axis.
+% Axis pairs of the rotation constraints e_i(A) . e_j(B) = 0 of a joint.
 fr = free(4:6);
 switch nnz(fr)
     case 0, pairs = [2 3; 3 1; 1 2];

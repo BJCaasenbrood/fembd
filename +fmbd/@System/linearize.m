@@ -1,13 +1,10 @@
 function lin = linearize(s, x, opts)
-%LINEARIZE Linear model about a state at rest (default: the initial
-%   configuration), e.g. from equilibrium:
+%LINEARIZE Linear model about a state at rest.
+%   lin = s.linearize(x) returns M, C, K, B, Cz, Cv, Ca and T of
 %     M z'' + C z' + K z = B u,   y = Cz z + Cv z' + Ca z''
-%   in independent coordinates z (dq = T*z satisfies the linearised
-%   constraints, T orthonormal). K includes the stiffness from gravity,
-%   constraint forces, preloaded springs and the operating-point inputs
-%   (they act through the geometry, e.g. a torque holding a spring).
-%   Returns a struct with M, C, K, B, Cz, Cv, Ca, T, InputName and
-%   OutputName. Option Input = u0 (default: x.u, e.g. from equilibrium).
+%   in independent coordinates z, with dq = T*z. K includes gravity,
+%   constraint forces and preload. Default x: the initial configuration.
+%   Option Input (default: x.u).
     arguments
         s
         x struct = struct([])
@@ -27,8 +24,8 @@ function lin = linearize(s, x, opts)
     sol = lsqminnorm([Mq, G'; G, zeros(nc)], [F; -s.convective(q, nu)]); % constraint forces
     lam = sol(n+1:end); % (dynamic, so also away from equilibrium)
     Kq = s.stiffness(q, u0, lam, nu);
-    Cq = zeros(n);  e = 1; % forces are at most quadratic in nu,
-    for j = 1:n % so central differences are exact
+    Cq = zeros(n);  e = 1; % exact: the forces are quadratic in nu
+    for j = 1:n
         d = zeros(n, 1);  d(j) = e;
         Cq(:, j) = -(s.forces(q, nu + d, u0) - s.forces(q, nu - d, u0))/(2*e);
     end

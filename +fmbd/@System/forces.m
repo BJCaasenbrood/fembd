@@ -1,7 +1,5 @@
 function [F, Kt, Ct, Mq] = forces(s, q, nu, u, tangents)
-% Generalised forces F (gravity, inertia, elastic, springs, dampers,
-% inputs), approximate tangents Kt = -dF/dq, Ct = -dF/dnu (only when
-% tangents is true, the default), and M(q).
+% Generalised forces, tangents Kt and Ct (if tangents) and mass matrix.
     if nargin < 5, tangents = true; end
     n = s.nv;
     F = zeros(n, 1);

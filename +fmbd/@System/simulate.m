@@ -1,27 +1,19 @@
 function [t, y, x] = simulate(s, tspan, opts)
-%SIMULATE Time integration with the generalised-alpha method.
-%   [t, y, x] = s.simulate([t0 t1]) starts in the initial configuration
-%   (joint Position and Velocity) and returns the times t, the outputs y
-%   (struct, one field per output signal) and the states x, a struct with
-%     r   3 x nu x nt     frame positions per unit (a rigid body, at its
-%                         centre of mass, or an elastic group)
-%     R   3 x 3 x nu x nt frame rotations
-%     e   ne x nt         modal coordinates of the elastic groups
-%     nu  nDof x nt       velocities [v (world); omega (body); deta] per unit
-%     u   nIn x nt        input signals (applied from each step to the next)
-%   Positions satisfy the constraints at every step (Newton tolerance),
-%   velocities are projected onto them (mass-orthogonal).
-%
+%SIMULATE Simulate the system in time.
+%   [t, y, x] = s.simulate([t0 t1]) starts in the initial configuration and
+%   returns the time t, the outputs y (struct) and the states x, with
+%   fields r, R (frame positions and rotations per unit), e (modal
+%   coordinates), nu (velocities) and u (inputs).
 %   Options:
-%     Step   time step (default 1e-3)
-%     Input  function u = f(t, y) giving the input signals (column, in
-%            the order of s.InputName) from the outputs y (struct) of
-%            the previous step: a sampled controller (default: zero)
-%     Rho    spectral radius at infinity, 0..1 (default 0.8): 1 has no
-%            numerical damping, lower values damp high frequencies
-%     Tol    Newton tolerance on the accelerations, relative (default 1e-8)
-%     Initial  start state instead of the initial configuration, e.g.
-%            from equilibrium, or a simulation x (its last step)
+%     Step     time step (default 1e-3)
+%     Input    controller u = f(t, y), using the outputs of the previous step
+%     Initial  start state, e.g. from equilibrium
+%     Rho      numerical damping, 0..1 (default 0.8; 1 = none)
+%     Tol      Newton tolerance (default 1e-8)
+%
+%   Generalised-alpha on R3 x SO(3) per unit:
+%   Chung, J. and Hulbert, G. M., J. Appl. Mech. 60(2), 1993, 371-375.
+%   Bruls, O., Cardona, A. and Arnold, M., Mech. Mach. Theory 48, 2012, 121-137.
     arguments
         s
         tspan (1,2) double

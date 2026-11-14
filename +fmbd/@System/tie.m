@@ -1,10 +1,11 @@
 function ns = tie(s, master, slave, opts)
-%TIE Tie slave surface nodes to the master surface within Tol; slave
-%   nodes follow the closest master point (interpolated on the face).
-%   Elastic/elastic: rigid tie or membrane-like interface with
-%   Stiffness = [kn kt] (per unit area); bodies become one elastic group.
-%   Elastic/rigid: tied elastic nodes become a coupling fixed to the rigid
-%   body. Options: Tol, Stiffness, Select.
+%TIE Bond the surface of slave to the surface of master.
+%   n = s.tie(master, slave) ties the slave surface nodes within Tol of the
+%   master surface and returns their number. Use the finer mesh as slave.
+%   Tied elastic bodies are reduced together. A tie to a rigid body makes
+%   the tied nodes a coupling with a fixed joint.
+%   Options: Tol, Stiffness = [kn kt] (elastic interface, per unit area),
+%   Select (selector on the slave nodes).
     arguments
         s
         master

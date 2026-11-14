@@ -1,7 +1,5 @@
 function B = elasticGroup(s, members)
-% Reduced data of the elastic bodies members (tied together): their
-% couplings, ties, node supports and node-set input loads, in group
-% node numbering.
+% Couplings, ties, supports and loads of an elastic group, then reduce it.
     go = zeros(1, numel(s.Bodies));  go(members) = s.bodyOffset(members);
     nn = sum(cellfun(@(b) b.nNode, s.Bodies(members)));
     cpl = find(ismember([s.Refs.body], members) & ~cellfun(@isempty, {s.Refs.nodes}));

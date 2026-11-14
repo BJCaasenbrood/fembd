@@ -1,8 +1,8 @@
 function output(s, name, id, sel, dirs, opts)
-%OUTPUT Named output (sensor), one signal per direction: joint
-%   coordinates, reference-point coordinates or the average displacement
-%   of a node set, selected as in input. Type: 'displacement' (default),
-%   'velocity' or 'acceleration'.
+%OUTPUT Add a named output.
+%   s.output(name, id, sel, dirs) measures joint coordinates, reference-point
+%   coordinates or the mean displacement of a node set, selected as in input.
+%   Option Type: 'displacement' (default), 'velocity' or 'acceleration'.
     arguments
         s
         name (1,:) char

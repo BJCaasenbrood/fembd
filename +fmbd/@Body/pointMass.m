@@ -1,8 +1,7 @@
 function b = pointMass(m, c, J, opts)
-%POINTMASS Rigid body given by its mass properties only: mass m,
-%   centre of mass c (1x3) and inertia tensor J (3x3, about c; default
-%   0). It has no surface; connect it with a joint (System.joint).
-%   Options: Name (default 'mass'), RefPoint (default c).
+%POINTMASS Rigid body from mass properties.
+%   b = fmbd.Body.pointMass(m, c, J) with J about c. It has no surface;
+%   attach it with a joint. Options: Name, RefPoint (default c).
     arguments
         m (1,1) double
         c (1,3) double

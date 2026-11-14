@@ -1,31 +1,14 @@
 classdef Body < handle
-%BODY Rigid or linear-elastic body of a multibody system.
-%   b = fmbd.Body.elastic(file, mat, ...)    elastic, meshed with Gmsh (Tet4/Tet10)
-%   b = fmbd.Body.rigid(file, rho, ...)      rigid, from its STL surface (no meshing)
-%   b = fmbd.Body.pointMass(m, c, J, ...)    rigid, from mass properties only
+%BODY Rigid or linear-elastic body.
+%   b = fmbd.Body.elastic(file, mat, ...)   elastic, meshed with Gmsh
+%   b = fmbd.Body.rigid(file, rho, ...)     rigid, from its STL surface
+%   b = fmbd.Body.pointMass(m, c, J, ...)   rigid, from mass properties
 %
-%   b = fmbd.Body(src, mat) is the general constructor, from
-%     src  an .stl file (meshed with Gmsh), an ASCII .msh file, or a struct
-%          with fields X (n x 3 nodes) and T (ne x 4|10 tets, Gmsh order)
-%     mat  material struct with fields D (6x6 Voigt) and rho, see fmbd.material
-%          (a rigid body only needs rho)
-%
-%   Options (name-value):
-%     Name     body name (default: file name)
-%     Scale    factor applied to the coordinates, e.g. 1e-3 for mm -> m
-%     Size, Order, Remesh, FeatureAngle   passed to fmbd.meshSTL
-%     Rigid    true: non-deformable body; its mesh is only used for mass,
-%              inertia and plotting
-%     RefPoint reference point of a rigid body (default: centroid)
-%     Modes    fixed-interface vibration modes of an elastic body in the
-%              system (default 10); the static modes of its couplings are
-%              always included
-%     Damping  Rayleigh damping [alpha beta] of an elastic body (default
-%              [0 0]): D = alpha*M + beta*K. beta = 2*zeta/omega gives the
-%              damping ratio zeta at omega, rising linearly with frequency;
-%              alpha also damps the body's rigid-body motion (like a drag)
-%
-%   Degrees of freedom are node-wise interleaved: [ux1 uy1 uz1 ux2 ...].
+%   b = fmbd.Body(src, mat) takes an .stl, an ASCII .msh, or a struct with X
+%   (nodes) and T (Tet4/Tet10 in Gmsh order). mat holds D and rho.
+%   Options: Name, Scale (e.g. 1e-3 for mm), Size, Order, Remesh,
+%   FeatureAngle (meshing), Rigid, RefPoint, Modes (default 10) and
+%   Damping = [alpha beta] (D = alpha*M + beta*K).
 
 properties
     Name (1,:) char

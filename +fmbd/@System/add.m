@@ -1,6 +1,7 @@
 function name = add(s, b)
-%ADD Add a body (fmbd.Body); returns its name. A rigid body is also a
-%   reference point with the body's name (for joints and signals).
+%ADD Add a body to the system.
+%   s.add(b) adds fmbd.Body b and returns its name. A rigid body is also a
+%   reference point with the same name.
     arguments
         s
         b (1,1) fmbd.Body

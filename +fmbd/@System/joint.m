@@ -1,23 +1,18 @@
 function name = joint(s, A, B, type, opts)
-%JOINT Kinematic joint between reference points A and B (rigid bodies,
-%   couplings, or 'ground' for A). The released directions are joint
-%   coordinates, zero in the configuration in which the bodies are
-%   defined. Returns the joint name.
-%
-%   type      'fixed' (default), 'revolute', 'prismatic', 'cylindrical',
-%             'spherical', 'planar', 'free' (bushing, use Stiffness)
-%   Point     joint location (default: reference point of B)
-%   Axis      joint axis = local z (default [0 0 1]); revolute and
-%             prismatic act about/along it, planar moves normal to it
-%   Frame     3x3 [ex ey ez] instead of Axis
-%   Free      1x6 logical mask [ux uy uz rx ry rz] in the joint frame,
-%             overrides type
-%   Stiffness spring on the joint coordinates (scalar or per coordinate),
-%             relaxed at zero
-%   Damping   viscous damper on the joint coordinates
-%   Position  initial joint coordinates (default 0)
-%   Velocity  initial joint velocities (default 0)
-%   Name      default 'joint<k>'
+%JOINT Joint between two reference points.
+%   name = s.joint(A, B, type) connects B to A ('ground' for A). The free
+%   directions are joint coordinates, zero where the bodies are defined.
+%   type: 'fixed' (default), 'revolute', 'prismatic', 'cylindrical',
+%   'spherical', 'planar' or 'free'.
+%   Options:
+%     Point      joint location (default: reference point of B)
+%     Axis       local z axis (default [0 0 1]), or Frame = [ex ey ez]
+%     Free       mask [ux uy uz rx ry rz] in the joint frame, overrides type
+%     Stiffness  spring on the joint coordinates, relaxed at zero
+%     Damping    damper on the joint coordinates
+%     Position   initial joint coordinates
+%     Velocity   initial joint velocities
+%     Name       default 'joint<k>'
     arguments
         s
         A

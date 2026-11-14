@@ -1,21 +1,10 @@
 function [x, info] = equilibrium(s, opts)
-%EQUILIBRIUM Static equilibrium under gravity, springs and constant
-%   inputs: x = s.equilibrium(Input = u0) starts from the initial
-%   configuration (or Initial) and returns the state (as from simulate,
-%   one step, at rest, with the inputs in x.u). Coordinates without
-%   stiffness (free mechanisms) stay where they are. Use it with
-%   simulate(Initial = x), linearize, statespace, modes and plot.
-%
-%   Newton iterations with a backtracking line search. Converged when
-%   the force residual is below Tol (relative to the forces) and the
-%   constraint residual below Tol (relative to the model size). If the
-%   residual stops decreasing, it is accepted at round-off level, and
-%   otherwise the iterations stop with a warning (e.g. a free mechanism
-%   with a net force has no equilibrium).
-%   [x, info] = ... also returns info: converged, iterations, force
-%   (relative force residual) and constraint (constraint residual).
-%
-%   Options: Input, Initial, Tol (default 1e-10), MaxIter (default 100)
+%EQUILIBRIUM Static equilibrium.
+%   [x, info] = s.equilibrium() solves for the rest state under gravity,
+%   springs and constant inputs. Free mechanisms keep their position. x
+%   can be used for simulate, linearize, statespace and modes; info has
+%   the fields converged, iterations, force and constraint.
+%   Options: Input, Initial, Tol (default 1e-10), MaxIter (default 100).
     arguments
         s
         opts.Input double = []

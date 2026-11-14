@@ -1,15 +1,13 @@
 function sys = statespace(s, x, opts)
-%STATESPACE State-space model from the inputs to the outputs, about a
-%   state at rest (default: the initial configuration; e.g. from
-%   equilibrium). States are modal, [eta; deta].
-%     Modes            number of modes (default: all); rigid-body and
-%                      mechanism modes are exact double integrators
-%     Damping          modal damping ratio (default 0), added to the
-%                      body, joint and transmission dampers
-%     StaticCorrection add quasi-static shapes for the inputs when modes
-%                      are truncated (default true): exact DC gain
-%     Input            inputs u0 at the operating point (default: x.u)
-%     Format           "struct" (default: A, B, C, D, names, f) or "ss"
+%STATESPACE Modal state-space model.
+%   sys = s.statespace(x) linearises about x and returns A, B, C, D in
+%   modal coordinates [eta; deta], with signal names and frequencies f.
+%   Options:
+%     Modes             number of modes (default: all)
+%     Damping           modal damping ratio, added to the physical dampers
+%     StaticCorrection  keep the static gain when modes are cut (default true)
+%     Input             inputs at the operating point (default: x.u)
+%     Format            "struct" (default) or "ss" (Control System Toolbox)
     arguments
         s
         x struct = struct([])

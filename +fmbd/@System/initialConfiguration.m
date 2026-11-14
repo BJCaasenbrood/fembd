@@ -1,9 +1,6 @@
 function q = initialConfiguration(s, q)
-% Satisfy the constraints and the joint positions exactly (hard), with
-% elastic transmissions unstretched unless all their coordinates are
-% set; the other joint coordinates stay as close to zero as possible
-% (soft, in the null space of the hard equations). Positions are ramped
-% up for large angles; elastic bodies stay undeformed.
+% Solve the constraints and joint positions; other joint coordinates stay
+% as close to zero as possible.
     tgt = zeros(0, 3);  soft = zeros(0, 2); % [joint, coordinate, value], [joint, coordinate]
     for j = 1:numel(s.Joints)
         v = s.Joints(j).position;  nf = nnz(s.Joints(j).free);

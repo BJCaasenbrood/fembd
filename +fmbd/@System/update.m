@@ -1,6 +1,5 @@
 function update(s)
-%UPDATE Rebuild the system on its next use, after changing a body
-%   directly (e.g. b.Modes, b.Damping, b.setMass); changes made through
-%   the System methods are picked up automatically.
+%UPDATE Rebuild the system after changing a body directly.
+%   s.update() is needed after e.g. b.Modes = 20 or b.setMass(...).
     s.built = false;
 end

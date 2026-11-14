@@ -1,6 +1,6 @@
 function boxSTL(file, lo, hi)
-%BOXSTL Write an axis-aligned box [lo, hi] (1x3 corners) as a closed STL.
-%   Handy for quick test geometry, e.g. fmbd.boxSTL('beam.stl', [0 0 0], [1000 50 50]).
+%BOXSTL Write an axis-aligned box with corners lo and hi as STL.
+%   fmbd.boxSTL('beam.stl', [0 0 0], [1000 50 50])
 
 [i, j, k] = ndgrid(0:1);
 V = lo + [i(:) j(:) k(:)].*(hi - lo);

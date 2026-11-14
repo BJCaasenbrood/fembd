@@ -1,10 +1,8 @@
 function animateMode(s, x, v, opts)
-%ANIMATEMODE Animate a mode shape: s.animateMode(x0, V(:,k)) with x0
-%   and V from modes, oscillating about x0 in slow motion (vibration
-%   modes are too fast for real time). The phase follows the wall clock.
-%   Options: Amplitude (largest node displacement, default 0.05 m),
-%   Frequency (Hz, shown with the slow-motion factor), Rate (cycles per
-%   second, default 1), Duration (s, default 3), Title.
+%ANIMATEMODE Animate a mode shape in slow motion.
+%   s.animateMode(x0, v) with x0 and v = V(:,k) from modes.
+%   Options: Amplitude (default 0.05), Frequency (Hz, for the title),
+%   Rate (cycles per second, default 1), Duration (s, default 3), Title.
     arguments
         s
         x struct

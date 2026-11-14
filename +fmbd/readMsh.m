@@ -1,8 +1,6 @@
 function [X, T] = readMsh(file)
-%READMSH Read tetrahedra from an ASCII Gmsh mesh file (format 2.2 or 4.1).
-%   [X, T] = fmbd.readMsh(file) returns nodes X (n x 3) and tetrahedra T
-%   (ne x 4 or ne x 10, Gmsh node ordering). Only the highest-order tet
-%   type present is returned; unused nodes are removed.
+%READMSH Read tetrahedra from an ASCII Gmsh .msh file (v2.2 or v4.1).
+%   [X, T] = fmbd.readMsh(file) returns the highest-order tetrahedra present.
 
 txt = string(fileread(file));
 sec = @(name) sscanf(extractBetween(txt, "$" + name, "$End" + name), '%f'); % read section in .msh

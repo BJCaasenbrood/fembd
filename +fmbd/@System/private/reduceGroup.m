@@ -1,11 +1,8 @@
 function B = reduceGroup(bodies, cpl, ties, sup, loads, nModes, name)
-% Floating-frame data of an elastic group (bodies tied together). The frame
-% is the first coupling (clamped), or, for a group supported on nodes,
-% fixed at the first coupling or the centroid. Coupled nodes follow their
-% coupling rigidly (RBE2), tie slaves the master surface; the other
-% couplings are 6-dof interfaces. Craig-Bampton modes plus static shapes
-% of the node-set loads; inertia invariants Q_ab = U_a' Ms U_b with
-% U = [X0, Phi].
+% Reduce an elastic group (bodies tied together) to Craig-Bampton modes in a
+% floating frame at its first coupling, and compute the inertia invariants.
+%   Shabana, A. A., Dynamics of Multibody Systems, Cambridge University
+%   Press, 4th ed., 2013 (floating frame of reference).
 X = cell2mat(cellfun(@(b) b.X, bodies(:), 'UniformOutput', false));  nn = size(X, 1);
 K = cell(1, numel(bodies));
 M = K;

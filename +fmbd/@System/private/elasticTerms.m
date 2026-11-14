@@ -1,7 +1,5 @@
 function [Mb, Fb] = elasticTerms(B, R, eta, nu, g)
-% Mass matrix and generalised forces (gravity, centrifugal and Coriolis,
-% elastic and damping) of an elastic body in its floating frame.
-% Velocities nu = [v (world); omega (body); deta].
+% Mass matrix and generalised forces of an elastic unit in its floating frame.
 ne = B.ne;  xi = [1; eta];  S = B.s*xi;  S1 = B.s(:, 2:end);
 Quu = reshape(B.Q9*kron(xi, xi), 3, 3);
 J = trace(Quu)*eye(3) - Quu;  J = (J + J')/2;

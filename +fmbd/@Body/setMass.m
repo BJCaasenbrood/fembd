@@ -1,18 +1,8 @@
 function setMass(b, m, opts)
-%SETMASS Set the mass properties of a rigid body (e.g. from CAD).
-%   b.setMass(m) sets the mass and scales the inertia (same distribution).
-%   Options:
-%     CenterOfMass  1x3 centre of mass (default: keep the current one)
-%     Inertia       3x3 inertia tensor, or 1x3 principal moments
-%                   (default: current inertia scaled by the mass ratio)
-%     InertiaPoint  point about which Inertia is given (default: the
-%                   centre of mass), e.g. the CAD part origin
-%     Axes          3x3 axes in which Inertia is given (columns, in the
-%                   assembly frame; default eye(3)), e.g. principal axes
-%     LengthScale   factor for lengths in CenterOfMass, InertiaPoint and
-%                   Inertia, e.g. 1e-3 for mm and kg mm^2 (default 1)
-%   Units otherwise SI, in the assembly frame. A meshed rigid body uses
-%   these values instead of its mesh mass.
+%SETMASS Set the mass properties of a rigid body.
+%   b.setMass(m) keeps the inertia distribution. Options: CenterOfMass,
+%   Inertia (3x3, or principal moments), InertiaPoint, Axes, LengthScale
+%   (e.g. 1e-3 for mm and kg mm^2).
     arguments
         b
         m (1,1) double {mustBePositive}

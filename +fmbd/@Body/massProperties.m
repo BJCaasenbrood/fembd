@@ -1,7 +1,6 @@
 function [m, c, J] = massProperties(b)
-%MASSPROPERTIES Mass m, centre of mass c (1x3) and inertia J (3x3, about
-%   c) of the body: from setMass (or a mesh-free rigid body), otherwise
-%   from the consistent mass matrix of the mesh (exact for the mesh).
+%MASSPROPERTIES Mass, centre of mass and inertia (about the centre of mass).
+%   [m, c, J] = b.massProperties()
     if ~isempty(b.MassProps)
         p = b.MassProps;
         m = p.m;

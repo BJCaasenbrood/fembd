@@ -1,9 +1,10 @@
 function [K, M] = matrices(b, opts)
-%MATRICES Body stiffness K and mass M (sparse, nDof x nDof); K = 0 for
-%   a rigid body (and with MassOnly = true).
-%   M is consistent, or diagonal with Lumped = true (HRZ: element mass
-%   diagonals scaled to preserve the element mass; row-sum lumping
-%   would give negative Tet10 corner masses).
+%MATRICES Stiffness and mass matrices of the mesh.
+%   [K, M] = b.matrices() with 3 dofs per node, [ux1 uy1 uz1 ux2 ...].
+%   Options: Lumped (HRZ), MassOnly, Chunk.
+%
+%   HRZ lumping: Hinton, E., Rock, T. and Zienkiewicz, O. C., Earthquake
+%   Eng. Struct. Dyn. 4(3), 1976, 245-249.
     arguments
         b
         opts.Lumped (1,1) logical = false

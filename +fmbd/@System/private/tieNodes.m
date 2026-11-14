@@ -1,7 +1,6 @@
 function [sn, mn, N, n, A] = tieNodes(bm, bs, tol, select)
-% Slave surface nodes sn within tol of the master surface, their master
-% face nodes mn, shape-function weights N, master normals n and slave
-% nodal areas A.
+% Slave nodes within tol of the master surface, with their master faces,
+% weights, normals and nodal areas.
 Fm = bm.F;
 Am = bm.X(Fm(:,1),:);
 Bm = bm.X(Fm(:,2),:);

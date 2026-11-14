@@ -1,10 +1,7 @@
 function b = rigid(file, rho, opts)
-%RIGID Rigid body from a closed STL surface, without volume mesh.
-%   b = fmbd.Body.rigid(file, rho) reads the STL triangles, which are
-%   used for plotting; mass, centre of mass and inertia are computed
-%   exactly from the surface (divergence theorem). Use setMass to
-%   override them (e.g. with CAD values).
-%   Options: Name, Scale, RefPoint (default: centre of mass).
+%RIGID Rigid body from a closed STL surface.
+%   b = fmbd.Body.rigid(file, rho) computes the mass, centre of mass and
+%   inertia from the surface. Options: Name, Scale, RefPoint.
     arguments
         file (1,:) char
         rho (1,1) double

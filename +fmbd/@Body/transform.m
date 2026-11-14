@@ -1,5 +1,5 @@
 function transform(b, R, t)
-%TRANSFORM Rigidly move the body: x -> R*x + t.
+%TRANSFORM Move the body rigidly: x -> R*x + t.
     b.X = b.X*R' + t(:)';
     b.Ref = b.Ref*R' + t(:)';
     if ~isempty(b.MassProps)

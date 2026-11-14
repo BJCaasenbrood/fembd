@@ -1,8 +1,7 @@
 function h = plot(s, x, k, opts)
-%PLOT Draw the system: s.plot() in its initial configuration, or
-%   s.plot(x, k) at step k of a simulation (default: the last). Option
-%   Scale magnifies the elastic deformation. Returns one graphics handle
-%   per body (patch, or marker for a point mass).
+%PLOT Draw the system.
+%   h = s.plot() draws the initial configuration, s.plot(x, k) step k of a
+%   simulation (default: the last). Option Scale magnifies the deformation.
     arguments
         s
         x = []

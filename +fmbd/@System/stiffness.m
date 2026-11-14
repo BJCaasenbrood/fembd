@@ -1,7 +1,5 @@
 function K = stiffness(s, q, u, lam, nu, cols)
-% Tangent stiffness K = -d(F - G'*lam)/dq by central differences on the
-% tangent space (gravity, springs, elastic and constraint-force terms),
-% for the columns cols (default all).
+% Tangent stiffness -d(F - G'*lam)/dq by central differences (columns cols).
     if nargin < 5 || isempty(nu), nu = zeros(s.nv, 1); end
     if nargin < 6, cols = 1:s.nv; end
     n = s.nv;

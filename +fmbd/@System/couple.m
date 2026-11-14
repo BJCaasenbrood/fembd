@@ -1,7 +1,9 @@
 function name = couple(s, body, sel, opts)
-%COUPLE Rigid coupling (RBE2): selected nodes of an elastic body move
-%   with a new reference point. Returns the coupling name. The first
-%   coupling carries the body's frame. Options: Name, Point.
+%COUPLE Couple nodes of an elastic body to a new reference point (RBE2).
+%   name = s.couple(body, sel) returns the name of the reference point.
+%   sel selects nodes by coordinates, @(X) ..., or by index. The first
+%   coupling of a body carries its frame.
+%   Options: Name, Point (default: centroid of the nodes).
     arguments
         s
         body

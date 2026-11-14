@@ -1,19 +1,18 @@
 % FMBD  Flexible multibody dynamics for STL assemblies
 %
 % Model
-%   System        - Bodies, couplings, joints, transmissions, supports, inputs
-%                   and outputs; simulate, energy, plot, animate
-%   Body          - Rigid or elastic body: Body.rigid, Body.elastic, Body.pointMass
-%   material      - Isotropic linear-elastic material (D, rho)
+%   System        - Multibody system: model, simulation and linear analysis
+%   Body          - Rigid or elastic body
+%   material      - Isotropic linear-elastic material
 %
 % Utilities
-%   modes         - Lowest natural frequencies and mass-normalised modes
-%   craigBampton  - Craig-Bampton (or Guyan) reduction
-%   meshSTL       - Tetrahedral mesh of a closed STL surface with Gmsh
-%   readMsh       - Read tetrahedra from an ASCII Gmsh .msh file (v2.2 / v4.1)
-%   gmsh          - Run the Gmsh executable ($GMSH or gmsh on the PATH)
-%   boxSTL        - Write an axis-aligned box as STL
-%   cylinderSTL   - Write a z-aligned cylinder as STL
+%   modes         - Natural frequencies and mode shapes of K, M
+%   craigBampton  - Craig-Bampton reduction
+%   meshSTL       - Mesh an STL surface with Gmsh
+%   readMsh       - Read a Gmsh .msh file
+%   gmsh          - Run Gmsh
+%   boxSTL        - Write a box as STL
+%   cylinderSTL   - Write a cylinder as STL
 %
 % Example
 %   s = fmbd.System(Gravity = [0 0 -9.81]);

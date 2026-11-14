@@ -1,9 +1,6 @@
 function h = drawBodies(bodies, V, C)
-%DRAWBODIES Draw bodies as boundary patches (point masses as markers).
-%   h = drawBodies(bodies, V, C) with bodies a cell array of fmbd.Body,
-%   V{i} the node positions (or 1x3 position of a point mass) and C{i}
-%   the colour: an RGB triplet, or per-node values for interpolated
-%   colouring. Returns one handle per body; update with setVertices.
+% Draw bodies as patches (point masses as markers) at node positions V{i}
+% with colours C{i}; returns one handle per body.
 h = gobjects(1, numel(bodies));
 held = ishold;  hold on
 for i = 1:numel(bodies)

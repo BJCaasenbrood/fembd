@@ -1,16 +1,8 @@
 function [X, T] = meshSTL(file, opts)
-%MESHSTL Tetrahedral volume mesh of a closed STL surface using Gmsh.
-%   [X, T] = fmbd.meshSTL(file) returns nodes X (n x 3) and quadratic
-%   tetrahedra T (ne x 10, Gmsh ordering).
-%
-%   Options (name-value):
-%     Size          maximum element size in STL units (default: Gmsh default)
-%     Order         1 (Tet4) or 2 (Tet10, default)
-%     Remesh        true: classify the STL into patches and remesh the
-%                   surface (default); false: keep the STL triangles as-is
-%     FeatureAngle  angle (deg) used to split the STL into patches (40)
-%
-%   The Gmsh executable is taken from $GMSH, otherwise 'gmsh' (see fmbd.gmsh).
+%MESHSTL Tetrahedral mesh of a closed STL surface with Gmsh.
+%   [X, T] = fmbd.meshSTL(file) returns nodes X and tetrahedra T (Gmsh order).
+%   Options: Size (STL units), Order (1 = Tet4, 2 = Tet10, default),
+%   Remesh (remesh the surface, default true), FeatureAngle (default 40).
 
 arguments
     file (1,:) char

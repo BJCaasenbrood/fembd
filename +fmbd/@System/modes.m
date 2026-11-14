@@ -1,9 +1,7 @@
 function [f, V] = modes(s, x, n, opts)
-%MODES Natural frequencies f (Hz) and mode shapes about a state at rest
-%   (default: the initial configuration; e.g. from equilibrium):
-%   [f, V] = s.modes(x, n). Unstable directions (e.g. an inverted
-%   pendulum) give negative f. Option Input as in linearize. V (nDof x n) are velocity-like tangent
-%   directions; s.plot(s.perturb(x, V(:,k)*a)) shows mode k.
+%MODES Natural frequencies and mode shapes about a state at rest.
+%   [f, V] = s.modes(x, n) returns n frequencies (Hz) and mode shapes.
+%   Unstable directions have negative f. Option Input as in linearize.
     arguments
         s
         x struct = struct([])

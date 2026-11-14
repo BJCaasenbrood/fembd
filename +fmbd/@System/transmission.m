@@ -1,13 +1,11 @@
 function name = transmission(s, ids, coeffs, opts)
-%TRANSMISSION Belt, gear or cable ratio between coordinates: the stretch
-%   delta = sum_i c_i s_i of joint coordinates or reference-point
-%   coordinates (Dirs 1:6 = [ux uy uz rx ry rz], absolute).
-%     Stiffness = k   elastic: a spring k on delta (with Damping)
-%     (none)          rigid: delta = 0
-%   Dirs gives the coordinate of each entry (default 1). Examples (ratio
-%   N = theta_motor/theta_driven):
-%     s.transmission({'motor', 'shoulder'}, [1/N -1], Stiffness = k)
-%     s.transmission({'motor', 'lower'}, [1/N -1], Dirs = {1, 6})   % absolute rz
+%TRANSMISSION Belt, gear or cable between coordinates.
+%   s.transmission(ids, c) acts on the stretch delta = sum(c_i s_i) of joint
+%   coordinates or reference-point coordinates (Dirs 1:6, absolute).
+%   With Stiffness it is a spring (plus Damping), without it delta = 0.
+%   Example, motor angle N times the link angle:
+%     s.transmission({'motor', 'lower'}, [1/N -1], Dirs = {1, 6}, Stiffness = k)
+%   Options: Dirs, Stiffness, Damping, Name.
     arguments
         s
         ids (1,:) cell
