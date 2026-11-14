@@ -16,6 +16,6 @@ function sig = signalSpec(s, name, id, sel, dirs, type)
     for d = dirs(:)'
         nm = name;  if numel(dirs) > 1, nm = sprintf('%s_%d', name, d); end
         sig(end+1) = struct('Name', nm, 'kind', kind, 'idx', k, 'dir', d, ...
-                            'nodes', nodes, 'type', type);                         %#ok<AGROW>
+                            'nodes', nodes, 'type', type); %#ok<AGROW>
     end
 end

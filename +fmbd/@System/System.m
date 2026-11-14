@@ -19,15 +19,15 @@ classdef System < handle
 %   undeformed.
 
 properties
-    Gravity (1,3) double = [0 0 0]      % gravity vector, e.g. [0 0 -9.81]
+    Gravity (1,3) double = [0 0 0] % gravity vector, e.g. [0 0 -9.81]
 end
 
 properties (SetAccess = private)
-    Bodies = {}  % fmbd.Body handles
-    Refs = struct('Name', {}, 'body', {}, 'nodes', {}, 'x', {})% reference points
+    Bodies = {} % fmbd.Body handles
+    Refs = struct('Name', {}, 'body', {}, 'nodes', {}, 'x', {}) % reference points
     Joints = struct('Name', {}, 'A', {}, 'B', {}, 'p', {}, 'R', {}, 'free', {}, 'k', {}, ...
-                    'damp', {}, 'position', {}, 'velocity', {}) 
-    Transmissions = struct('Name', {}, 'terms', {}, 'coef', {}, 'k', {}, 'damp', {}) 
+                    'damp', {}, 'position', {}, 'velocity', {})
+    Transmissions = struct('Name', {}, 'terms', {}, 'coef', {}, 'k', {}, 'damp', {})
     Ties = struct('master', {}, 'slave', {}, 'snodes', {}, 'mnodes', {}, 'N', {}, 'n', {}, 'A', {}, 'k', {})
     Fixes = struct('kind', {}, 'idx', {}, 'dirs', {}, 'nodes', {})
     Inputs = struct('Name', {}, 'kind', {}, 'idx', {}, 'dir', {}, 'nodes', {}, 'type', {})
@@ -35,29 +35,29 @@ properties (SetAccess = private)
 end
 
 properties (Dependent)
-    InputName               % input signal names, in the order of simulate's Input
-    OutputName              % output signal names
-    nDof                    % number of velocities (6 per body + elastic modes)
+    InputName % input signal names, in the order of simulate's Input
+    OutputName % output signal names
+    nDof % number of velocities (6 per body + elastic modes)
 end
 
 properties (Access = private)
     built = false
-    Bd      % units (rigid bodies, elastic groups): elastic, m, J, c0, Xl, ne, Phi,
+    units % units (rigid bodies, elastic groups): elastic, m, J, c0, Xl, ne, Phi,
             % Q, s, CR, Kc, Dc, Mee, Psi, cpl, cols, ecols
-    Ub      % unit of each body
-    Uo      % node offset of each body in its unit
-    An      % anchors (body frames, couplings): body, frame, x0, Psi
-    Rf      % reference points: anchor, s (offset in the anchor frame), x0
-    Jn      % joints and ground supports: A, B (anchors), a, b, QA, QB, free, k, c
-    Lk      % supported joint coordinates: joint, dir, value
-    Tr      % transmissions: terms (kind, idx, dir), coef, k, c
-    Nd      % node-set signals: body, u0, Phi, x0
-    In      % input signals: kind, idx, dir
-    Out     % output signals: kind, idx, dir, type
-    N = 0   % number of velocities
-    q0      % initial configuration: r (3 x nb), R (3 x 3 x nb), e
-    nu0     % initial velocities
-    keep    % independent constraint rows
+    bodyUnit % unit of each body
+    bodyOffset % node offset of each body in its unit
+    anchors % anchors (body frames, couplings): body, frame, x0, Psi
+    refFrames % reference points: anchor, s (offset in the anchor frame), x0
+    jointFrames % joints and ground supports: A, B (anchors), a, b, QA, QB, free, k, c
+    locks % supported joint coordinates: joint, dir, value
+    transData % transmissions: terms (kind, idx, dir), coef, k, c
+    nodeSets % node-set signals: body, u0, Phi, x0
+    inSignals % input signals: kind, idx, dir
+    outSignals % output signals: kind, idx, dir, type
+    nv = 0 % number of velocities
+    q0 % initial configuration: r (3 x nb), R (3 x 3 x nb), e
+    nu0 % initial velocities
+    keepRows % independent constraint rows
 end
 
 methods
@@ -70,7 +70,7 @@ methods
 
     function names = get.InputName(s),  names = {s.Inputs.Name}; end
     function names = get.OutputName(s), names = {s.Outputs.Name}; end
-    function n = get.nDof(s),  s.build();  n = s.N; end
+    function n = get.nDof(s),  s.build();  n = s.nv; end
 end
 
 methods

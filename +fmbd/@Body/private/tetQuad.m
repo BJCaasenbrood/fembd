@@ -4,13 +4,13 @@ function [xi, w] = tetQuad(p)
 
 if p <= 1
     w = 1/6;
-    xi = [1 1 1]/4;  
+    xi = [1 1 1]/4;
     return
 end
 n = ceil((p + 3)/2);
 
 % Golub-Welsch
-b = (1:n-1)./sqrt(4*(1:n-1).^2 - 1);              
+b = (1:n-1)./sqrt(4*(1:n-1).^2 - 1);
 [V, L] = eig(diag(b, 1) + diag(b, -1));
 x = (diag(L) + 1)/2;  wx = V(1,:)'.^2;
 [u, v, s] = ndgrid(x);

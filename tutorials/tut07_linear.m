@@ -43,13 +43,20 @@ fprintf('gravity sag of the forearm tip: %.1f um\n', 1e6*y.tipz(1));
 % two free joints are mechanism modes at 0 Hz.
 elbow = deg2rad(0:15:150);  f3 = zeros(size(elbow));
 for k = 1:numel(elbow)
-    s = arm(elbow(k));  f = s.modes(s.equilibrium(), 4);  f3(k) = f(3);
+    s = arm(elbow(k));
+    f = s.modes(s.equilibrium(), 4);
+    f3(k) = f(3);
 end
-figure('Color', 'w');  plot(rad2deg(elbow), f3, 'o-');  grid on
+figure('Color', 'w');
+plot(rad2deg(elbow), f3, 'o-');
+grid on
 xlabel('elbow angle (deg)');  ylabel('first elastic mode (Hz)');
 title('Configuration-dependent dynamics');
-s = arm(pi/2);  x0 = s.equilibrium();  [f, V] = s.modes(x0, 4);
-figure('Color', 'w');  s.plotMode(x0, V(:,3), Amplitude = 0.05, Title = sprintf('Elbow 90 deg: %.1f Hz', f(3)));
+s = arm(pi/2);
+x0 = s.equilibrium();
+[f, V] = s.modes(x0, 4);
+figure('Color', 'w');
+s.plotMode(x0, V(:,3), Amplitude = 0.05, Title = sprintf('Elbow 90 deg: %.1f Hz', f(3)));
 
 %% 4. State space
 % |statespace| returns A, B, C, D in modal coordinates [eta; deta] (or an
@@ -68,28 +75,42 @@ for k = 1:numel(fHz)
     Hk = sys.C*((2i*pi*fHz(k)*eye(size(sys.A)) - sys.A)\sys.B) + sys.D;  H(:,k) = Hk(:,2);
 end
 figure('Color', 'w');
-subplot(2, 1, 1);  loglog(fHz, abs(H(strcmp(sys.OutputName, 'th2'),:)));  grid on
-ylabel('|th2/tau2| (rad/N m)');  title('Elbow torque to elbow angle and tip acceleration');
-subplot(2, 1, 2);  loglog(fHz, abs(H(strcmp(sys.OutputName, 'tipa'),:)));  grid on
+subplot(2, 1, 1);
+loglog(fHz, abs(H(strcmp(sys.OutputName, 'th2'),:)));
+grid on
+ylabel('|th2/tau2| (rad/N m)');
+title('Elbow torque to elbow angle and tip acceleration');
+subplot(2, 1, 2);
+loglog(fHz, abs(H(strcmp(sys.OutputName, 'tipa'),:)));
+grid on
 xlabel('frequency (Hz)');  ylabel('|a_{tip}/tau2| (m/s^2/N m)');
 
 %% 5. A controller designed on the linear model
 % A PD controller on both joints, closed around the linear model, predicts
 % the response to a small elbow step. The nonlinear simulation with the
 % same controller in the loop agrees, as long as the motion stays small.
-kp = [16; 1.5];  kd = [1.8; 0.15];  r = [0; 0.02];             % step of 0.02 rad on the elbow
+kp = [16; 1.5];
+kd = [1.8; 0.15];
+r = [0; 0.02]; % step of 0.02 rad on the elbow
 iy = cellfun(@(n) find(strcmp(sys.OutputName, n)), {'th1', 'th2', 'w1', 'w2'});
-Kc = [diag(kp), diag(kd)];                                     % u = Kc*([r; 0] - y)
+Kc = [diag(kp), diag(kd)]; % u = Kc*([r; 0] - y)
 Acl = sys.A - sys.B*Kc*sys.C(iy,:);  Bcl = sys.B*Kc*[r; 0; 0];
-h = 5e-4;  t = (0:h:1)';  Ad = expm(Acl*h);  Bd = Acl\((Ad - eye(size(Ad)))*Bcl);
+h = 5e-4;
+t = (0:h:1)';
+Ad = expm(Acl*h);
+Bd = Acl\((Ad - eye(size(Ad)))*Bcl);
 z = zeros(size(Acl, 1), 1);  thLin = zeros(numel(t), 1);
 for k = 2:numel(t), z = Ad*z + Bd;  thLin(k) = sys.C(iy(2),:)*z; end
 pd = @(t, y) kp.*([0; pi/2 + r(2)] - [y.th1; y.th2]) - kd.*[y.w1; y.w2];
 [t, y] = s.simulate([0 1], Step = h, Input = pd, Initial = x0);
 fprintf('elbow step: linear vs nonlinear max difference %.1e rad (step %.2f rad)\n', ...
         max(abs(thLin - (y.th2 - pi/2))), r(2));
-figure('Color', 'w');  plot(t, thLin, t, y.th2 - pi/2, '--', 'LineWidth', 1.5);  grid on
-xlabel('time (s)');  ylabel('elbow angle - 90 deg (rad)');  legend('linear', 'nonlinear');
+figure('Color', 'w');
+plot(t, thLin, t, y.th2 - pi/2, '--', 'LineWidth', 1.5);
+grid on
+xlabel('time (s)');
+ylabel('elbow angle - 90 deg (rad)');
+legend('linear', 'nonlinear');
 
 function s = scara(upper, forearm, elbow)
 % Horizontal two-link arm at a given elbow angle.
@@ -101,7 +122,8 @@ s.joint('ground', 'upper', 'revolute', Point = [0 0 0],   Name = 'shoulder');
 s.joint('upper',  'root',  'revolute', Point = [0.3 0 0], Name = 'elbow', Position = elbow);
 s.input('tau1', 'shoulder');  s.input('tau2', 'elbow');
 s.output('th1', 'shoulder');  s.output('th2', 'elbow');
-s.output('w1', 'shoulder', Type = 'velocity');  s.output('w2', 'elbow', Type = 'velocity');
+s.output('w1', 'shoulder', Type = 'velocity');
+s.output('w2', 'elbow', Type = 'velocity');
 s.output('tipz', 'forearm', tip, 3);
 s.output('tipa', 'forearm', tip, 3, Type = 'acceleration');
 end

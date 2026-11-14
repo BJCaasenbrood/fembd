@@ -15,7 +15,7 @@ fmbd.boxSTL(fullfile(out, 'beam.stl'),  [0 0 0],       [1000 50 50]);
 fmbd.boxSTL(fullfile(out, 'block.stl'), [1000 -25 -25], [1100 75 75]);
 steel = fmbd.material(210e9, 0.3, 7850);
 clamp = @(X) X(:,1) < 1e-6;
-m = 7850*0.1^3;                                % block mass
+m = 7850*0.1^3; % block mass
 
 %% 1. Three ways to make a rigid body
 % * |fmbd.Body(file, mat, Rigid = true)|: meshed with Gmsh; a coarse Tet4
@@ -36,7 +36,9 @@ fprintf('meshed: m = %.4f kg, Jxx = %.6f; surface: m = %.4f kg, Jxx = %.6f (exac
 % A tie between an elastic and a rigid body makes the tied nodes of the
 % elastic body a coupling, fixed to the rigid body.
 beam = @() fmbd.Body.elastic(fullfile(out, 'beam.stl'), steel, Size = 25, Scale = 1e-3, Name = 'beam');
-s = fmbd.System();  s.add(beam());  s.add(blockS);
+s = fmbd.System();
+s.add(beam());
+s.add(blockS);
 s.tie('block', 'beam');  s.fix('beam', clamp);
 [f, V] = s.modes([], 4);
 % Estimate: cantilever with a point mass at the tip (Rayleigh, plus 0.24 of
@@ -44,7 +46,8 @@ s.tie('block', 'beam');  s.fix('beam', clamp);
 % the block has rotary inertia; both lower the FE value.
 EI = 210e9*0.05^4/12;  mb = 7850*0.05^2;
 fprintf('f1: %.2f Hz, point-mass estimate %.2f Hz\n', f(1), sqrt(3*EI/(m + 0.24*mb))/(2*pi));
-figure('Color', 'w');  s.plotMode([], V(:,1), Amplitude = 0.1, Title = sprintf('Mode 1: %.1f Hz', f(1)));
+figure('Color', 'w');
+s.plotMode([], V(:,1), Amplitude = 0.1, Title = sprintf('Mode 1: %.1f Hz', f(1)));
 
 %% 3. Supporting a rigid body
 % fix(body, dirs) holds a rigid body in the directions dirs (1:6 =
@@ -60,7 +63,9 @@ fprintf('guided tip: f1 = %.2f Hz\n', s.modes([], 1));
 % dynamics stay the same; the reference-point outputs change.
 blockR = fmbd.Body.rigid(fullfile(out, 'block.stl'), 7850, Scale = 1e-3, Name = 'block', ...
                          RefPoint = [1.1 0.025 0.025]);
-s = fmbd.System();  s.add(beam());  s.add(blockR);
+s = fmbd.System();
+s.add(beam());
+s.add(blockR);
 s.tie('block', 'beam');  s.fix('beam', clamp);
 fprintf('same frequencies with RefPoint at the far face: %d\n', norm(s.modes([], 4) - f)/norm(f) < 1e-8);
 
@@ -68,7 +73,7 @@ fprintf('same frequencies with RefPoint at the far face: %d\n', norm(s.modes([],
 % A point mass with the block's mass properties, attached by a fixed joint
 % to a coupling on the beam's tip face. The coupling makes the face rigid,
 % which the tie above also does, so the result is the same.
-J = m*(2*0.1^2)/12*eye(3);                      % cube: Jxx = Jyy = Jzz
+J = m*(2*0.1^2)/12*eye(3); % cube: Jxx = Jyy = Jzz
 s = fmbd.System();  s.add(beam());
 s.add(fmbd.Body.pointMass(m, [1.05 0.025 0.025], J, Name = 'motor'));
 tipFace = s.couple('beam', @(X) X(:,1) > 1 - 1e-6);

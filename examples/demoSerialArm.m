@@ -16,7 +16,7 @@ out = fullfile(tempdir, 'fmbdArm');  if ~isfolder(out), mkdir(out); end
 fmbd.boxSTL(fullfile(out, 'link1.stl'), [0 -10 -5],   [200 10 5]);
 fmbd.boxSTL(fullfile(out, 'link2.stl'), [200 -10 -5], [400 10 5]);
 alu = fmbd.material(70e9, 0.33, 2700);
-kj = 200;                                                 % joint stiffness, Nm/rad
+kj = 200; % joint stiffness, Nm/rad
 
 arm = @(elbow) twoLink(out, alu, rigidLinks, kj, elbow);
 s = arm(0);
@@ -26,11 +26,13 @@ disp(table((1:6)', f, 'VariableNames', {'mode', 'f_Hz'}));
 figure('Color', 'w');
 for k = 1:4
     subplot(2, 2, k);  s.plotMode([], V(:,k), Amplitude = 0.03);
-    title(sprintf('Mode %d: %.1f Hz', k, f(k)));  view(2);  axis off
+    title(sprintf('Mode %d: %.1f Hz', k, f(k)));
+    view(2);
+    axis off
 end
 
 % actuator-level model: joint torques to joint angles, with 4 modes
-s.output('q1', 'shoulder');   s.output('q2', 'elbow');       % (inputs tau1, tau2: see twoLink)
+s.output('q1', 'shoulder');   s.output('q2', 'elbow'); % (inputs tau1, tau2: see twoLink)
 S = s.statespace(Modes = 4);
 disp('Joint-space static stiffness (Nm/rad):');  disp(inv(-S.C*(S.A\S.B)));
 
@@ -55,12 +57,12 @@ s = fmbd.System();
 opt = {'Scale', 1e-3, 'Size', 5, 'Rigid', rigid, 'Modes', 6};
 s.add(fmbd.Body(fullfile(out, 'link1.stl'), mat, opt{:}, Name = 'link1'));
 s.add(fmbd.Body(fullfile(out, 'link2.stl'), mat, opt{:}, Name = 'link2'));
-if rigid                                  % joint attachment: the body, or an end-face coupling
+if rigid % joint attachment: the body, or an end-face coupling
     [p1, p2a, p2b] = deal('link1', 'link1', 'link2');
 else
-    p1  = s.couple('link1', @(X) X(:,1) < 1e-6);           % hub of link 1
-    p2a = s.couple('link1', @(X) X(:,1) > 0.2 - 1e-6);     % elbow, link 1 side
-    p2b = s.couple('link2', @(X) X(:,1) < 0.2 + 1e-6);     % elbow, link 2 side
+    p1  = s.couple('link1', @(X) X(:,1) < 1e-6); % hub of link 1
+    p2a = s.couple('link1', @(X) X(:,1) > 0.2 - 1e-6); % elbow, link 1 side
+    p2b = s.couple('link2', @(X) X(:,1) < 0.2 + 1e-6); % elbow, link 2 side
 end
 s.joint('ground', p1, 'revolute', Point = [0 0 0],   Stiffness = kj, Name = 'shoulder');
 s.joint(p2a, p2b,     'revolute', Point = [0.2 0 0], Stiffness = kj, Name = 'elbow', ...

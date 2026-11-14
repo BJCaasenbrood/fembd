@@ -7,9 +7,9 @@ n = min(n, size(K, 1));
 if size(K, 1) <= 200
     [V, L] = eig(full(K), full(M), 'vector');
 else
-    r = full(diag(K)./diag(M));             % shift below zero, scaled to the softest
-    r = r(r > 0 & isfinite(r));             % dofs (keeps K - sigma*M well conditioned
-    sigma = -1e-4;                          % when there are rigid/mechanism modes)
+    r = full(diag(K)./diag(M)); % shift below zero, scaled to the softest
+    r = r(r > 0 & isfinite(r)); % dofs (keeps K - sigma*M well conditioned for sparse eigs)
+    sigma = -1e-4;
     if ~isempty(r), sigma = -1e-4*min(r); end
     [V, L] = eigs(K, M, n, sigma);  L = diag(L);
 end

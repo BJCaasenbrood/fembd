@@ -34,26 +34,36 @@ function [t, y, x] = simulate(s, tspan, opts)
     s.build();
     nt = max(1, round(diff(tspan)/opts.Step));  h = diff(tspan)/nt;
     t = tspan(1) + h*(0:nt)';
-    r = opts.Rho;  am = (2*r - 1)/(r + 1);  af = r/(r + 1);
-    gm = 0.5 + af - am;  be = 0.25*(gm + 0.5)^2;  ca = (1 - af)/(1 - am);
-    nb = numel(s.Bd);  n = s.N;
+    r = opts.Rho;
+    am = (2*r - 1)/(r + 1);
+    af = r/(r + 1);
+    gm = 0.5 + af - am;
+    be = 0.25*(gm + 0.5)^2;
+    ca = (1 - af)/(1 - am);
+    nb = numel(s.units);  n = s.nv;
 
-    [q, nu] = s.startState(opts.Initial);  u = zeros(numel(s.In), 1);
+    [q, nu] = s.startState(opts.Initial);  u = zeros(numel(s.inSignals), 1);
     [F, ~, ~, Mq] = s.forces(q, nu, u);
     [~, G] = s.constraints(q);  nc = size(G, 1);
     sol = [Mq, G'; G, zeros(nc)]\[F; -s.convective(q, nu)];
-    wd = sol(1:n);  lam = sol(n+1:end);  acc = wd;
+    wd = sol(1:n);
+    lam = sol(n+1:end);
+    acc = wd;
     y0 = s.outputs(q, nu, wd);
-    if ~isempty(opts.Input)                  % first input, then consistent accelerations
+    if ~isempty(opts.Input) % first input, then consistent accelerations
         u = opts.Input(t(1), y0);  F = s.forces(q, nu, u);
         sol = [Mq, G'; G, zeros(nc)]\[F; -s.convective(q, nu)];
         wd = sol(1:n);  lam = sol(n+1:end);  acc = wd;  y0 = s.outputs(q, nu, wd);
     end
 
     x = struct('r', zeros(3, nb, nt+1), 'R', zeros(3, 3, nb, nt+1), ...
-               'e', zeros(numel(q.e), nt+1), 'nu', zeros(n, nt+1), 'u', zeros(numel(s.In), nt+1));
-    Y = zeros(numel(s.Out), nt+1);
-    x.r(:,:,1) = q.r;  x.R(:,:,:,1) = q.R;  x.e(:,1) = q.e;  x.nu(:,1) = nu;  x.u(:,1) = u;
+               'e', zeros(numel(q.e), nt+1), 'nu', zeros(n, nt+1), 'u', zeros(numel(s.inSignals), nt+1));
+    Y = zeros(numel(s.outSignals), nt+1);
+    x.r(:,:,1) = q.r;
+    x.R(:,:,:,1) = q.R;
+    x.e(:,1) = q.e;
+    x.nu(:,1) = nu;
+    x.u(:,1) = u;
     Y(:,1) = cell2mat(struct2cell(y0));
     yk = y0;
     for k = 1:nt
@@ -63,7 +73,7 @@ function [t, y, x] = simulate(s, tspan, opts)
             an = ((1 - af)*w + af*wd - am*acc)/(1 - am);
             q1 = s.retract(q, h*(nu + h*(0.5 - be)*acc + h*be*an));
             nu1 = nu + h*(1 - gm)*acc + h*gm*an;
-            if it == 1                       % tangents once per step (modified Newton)
+            if it == 1 % tangents once per step (modified Newton)
                 [F, Kt, Ct, Mq] = s.forces(q1, nu1, u);
             else
                 [F, ~, ~, Mq] = s.forces(q1, nu1, u, false);
@@ -74,7 +84,7 @@ function [t, y, x] = simulate(s, tspan, opts)
             dx = -S\res;
             w = w + dx(1:n);  lam = lam + dx(n+1:end);
             e = norm(dx(1:n))/(1 + norm(w));
-            if e <= opts.Tol || (e >= prev && e < 1e3*opts.Tol), break, end   % converged, or at round-off
+            if e <= opts.Tol || (e >= prev && e < 1e3*opts.Tol), break, end % converged, or at round-off
             prev = e;
         end
         if it == 30 && e > 1e3*opts.Tol
@@ -83,17 +93,21 @@ function [t, y, x] = simulate(s, tspan, opts)
         an = ((1 - af)*w + af*wd - am*acc)/(1 - am);
         q = s.retract(q, h*(nu + h*(0.5 - be)*acc + h*be*an));
         nu = nu + h*(1 - gm)*acc + h*gm*an;
-        if nc > 0                            % project onto G nu = 0 (mass-orthogonal)
+        if nc > 0 % project onto G nu = 0 (mass-orthogonal)
             [~, G] = s.constraints(q);  Mq = s.massMatrix(q);
             p = [Mq, G'; G, zeros(nc)]\[zeros(n, 1); -G*nu];  nu = nu + p(1:n);
         end
         acc = an;  wd = w;
         yk = s.outputs(q, nu, w);
-        x.r(:,:,k+1) = q.r;  x.R(:,:,:,k+1) = q.R;  x.e(:,k+1) = q.e;  x.nu(:,k+1) = nu;  x.u(:,k+1) = u;
+        x.r(:,:,k+1) = q.r;
+        x.R(:,:,:,k+1) = q.R;
+        x.e(:,k+1) = q.e;
+        x.nu(:,k+1) = nu;
+        x.u(:,k+1) = u;
         Y(:,k+1) = cell2mat(struct2cell(yk));
     end
     y = struct();
-    for i = 1:numel(s.Out)
+    for i = 1:numel(s.outSignals)
         y.(matlab.lang.makeValidName(s.Outputs(i).Name)) = Y(i,:)';
     end
 end

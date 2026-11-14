@@ -5,11 +5,11 @@ function [X, T] = readMsh(file)
 %   type present is returned; unused nodes are removed.
 
 txt = string(fileread(file));
-sec = @(name) sscanf(extractBetween(txt, "$" + name, "$End" + name), '%f');
+sec = @(name) sscanf(extractBetween(txt, "$" + name, "$End" + name), '%f'); % read section in .msh
 fmt = sec('MeshFormat');
 assert(fmt(2) == 0, 'fmbd:readMsh', 'Binary .msh files are not supported.');
 
-if fmt(1) < 3                                   % ---- MSH 2.2
+if fmt(1) < 3 % ---- MSH 2.2
     v = sec('Nodes');
     v = reshape(v(2:end), 4, []);
     tag = v(1,:);  xyz = v(2:4,:)';
@@ -20,7 +20,7 @@ if fmt(1) < 3                                   % ---- MSH 2.2
     assert(~isempty(tet), 'fmbd:readMsh', 'No tetrahedra in %s.', file);
     e = vertcat(e{type == tet});
     T = e(:, end - (tet == 11)*6 - 3 : end);
-else                                            % ---- MSH 4.1
+else % ---- MSH 4.1
     v = sec('Nodes');
     xyz = zeros(v(2), 3);  tag = zeros(v(2), 1);
     p = 5;  k = 0;
@@ -32,7 +32,7 @@ else                                            % ---- MSH 4.1
         xyz(k+1:k+n, :) = c(:, 1:3);  k = k + n;
     end
     e = sec('Elements');
-    nper = [2 3 4 4 8 6 5 3 6 9 10 27 18 14 1 8 20 15 13];  % nodes per type
+    nper = [2 3 4 4 8 6 5 3 6 9 10 27 18 14 1 8 20 15 13]; % nodes per type
     blk = {};  p = 5;
     for b = 1:e(1)
         [type, n] = deal(e(p+2), e(p+3));  p = p + 4;

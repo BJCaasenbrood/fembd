@@ -32,7 +32,7 @@ function setMass(b, m, opts)
         J = opts.Inertia;
         if isvector(J), J = diag(J); end
         J = s^2*opts.Axes*J*opts.Axes';
-        if ~isempty(opts.InertiaPoint)       % parallel-axis theorem to the centre of mass
+        if ~isempty(opts.InertiaPoint) % parallel-axis theorem to the centre of mass
             r = c - s*opts.InertiaPoint(:)';
             J = J - m*(dot(r, r)*eye(3) - r'*r);
         end

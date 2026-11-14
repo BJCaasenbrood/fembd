@@ -6,8 +6,8 @@ function [Phi, X0] = modeShapes(s, body)
 %   with r, R and eta from simulate (x.r, x.R, x.e).
     s.build();
     [kind, i] = s.lookup(body, false);
-    B = s.Bd(s.Ub(i));
+    B = s.units(s.bodyUnit(i));
     assert(strcmp(kind, 'body') && B.elastic, 'fmbd:modeShapes', 'Not an elastic body.');
-    rows = s.Uo(i) + (1:s.Bodies{i}.nNode);  d = 3*rows - [2; 1; 0];
+    rows = s.bodyOffset(i) + (1:s.Bodies{i}.nNode);  d = 3*rows - [2; 1; 0];
     Phi = B.Phi(d(:), :);  X0 = B.Xl(rows, :);
 end

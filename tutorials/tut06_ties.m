@@ -24,7 +24,9 @@ body = @(name, h) fmbd.Body.elastic(fullfile(out, [name '.stl']), steel, Size = 
 % fixed, and its modes are those of the supported structure. The supports
 % must hold the body (e.g. a clamped face); for a sliding or rotating
 % support use a coupling and a joint. A one-piece cantilever as reference:
-s = fmbd.System();  s.add(body('beam', 25));  s.fix('beam', clamp);
+s = fmbd.System();
+s.add(body('beam', 25));
+s.fix('beam', clamp);
 fRef = s.modes([], 6);
 
 %% 2. Bonded tie between non-matching meshes
@@ -35,13 +37,16 @@ fRef = s.modes([], 6);
 % slave, so that every slave node has a master face to follow. Tied elastic
 % bodies become one elastic group: one frame, and modes of the combined
 % structure (the Modes of the bodies add up).
-s = fmbd.System();  s.add(body('left', 25));  s.add(body('right', 15));
+s = fmbd.System();
+s.add(body('left', 25));
+s.add(body('right', 15));
 ns = s.tie('left', 'right');
 s.fix('left', clamp);
 [f, V] = s.modes([], 6);
 fprintf('%d slave nodes tied\n', ns);
 disp(table(fRef, f, 'VariableNames', {'one_piece_Hz', 'tied_Hz'}));
-figure('Color', 'w');  s.plotMode([], V(:,1), Amplitude = 0.1, Title = 'Mode 1 of the tied halves');
+figure('Color', 'w');
+s.plotMode([], V(:,1), Amplitude = 0.1, Title = 'Mode 1 of the tied halves');
 
 %% 3. Tolerance
 % By default Tol is 10% of the median face edge of the finer surface (here
@@ -49,7 +54,9 @@ figure('Color', 'w');  s.plotMode([], V(:,1), Amplitude = 0.1, Title = 'Mode 1 o
 % apart are not tied: a 5 mm gap gives no tied nodes (with a warning)
 % unless Tol is raised. Set Tol explicitly when it matters.
 fmbd.boxSTL(fullfile(out, 'gap.stl'), [505 0 0], [1000 50 50]);
-s2 = fmbd.System();  s2.add(body('left', 25));  s2.add(body('gap', 15));
+s2 = fmbd.System();
+s2.add(body('left', 25));
+s2.add(body('gap', 15));
 fprintf('default Tol: %d nodes\n', s2.tie('left', 'gap'));
 fprintf('Tol = 6 mm: %d nodes\n', s2.tie('left', 'gap', Tol = 6e-3));
 
@@ -57,7 +64,9 @@ fprintf('Tol = 6 mm: %d nodes\n', s2.tie('left', 'gap', Tol = 6e-3));
 % Select restricts the slave nodes, e.g. to model an adhesive layer that
 % covers only part of the interface. Gluing only the lower half (z < 25 mm)
 % makes the joint more flexible, mostly for bending in the xz plane.
-s2 = fmbd.System();  s2.add(body('left', 25));  s2.add(body('right', 15));
+s2 = fmbd.System();
+s2.add(body('left', 25));
+s2.add(body('right', 15));
 s2.tie('left', 'right', Select = @(X) X(:,3) < 0.025);
 s2.fix('left', clamp);
 fprintf('half-bonded joint: f1, f2 = %.2f, %.2f Hz (fully bonded %.2f Hz)\n', s2.modes([], 2), f(1));
@@ -69,8 +78,10 @@ fprintf('half-bonded joint: f1, f2 = %.2f, %.2f Hz (fully bonded %.2f Hz)\n', s2
 % or contact stiffness. A very stiff interface approaches the bonded tie.
 kn = 10.^(10:2:16);  f1 = zeros(size(kn));
 for k = 1:numel(kn)
-    s2 = fmbd.System();  s2.add(body('left', 25));  s2.add(body('right', 15));
-    s2.tie('left', 'right', Stiffness = kn(k));          % kt = kn
+    s2 = fmbd.System();
+    s2.add(body('left', 25));
+    s2.add(body('right', 15));
+    s2.tie('left', 'right', Stiffness = kn(k)); % kt = kn
     s2.fix('left', clamp);
     f1(k) = s2.modes([], 1);
 end

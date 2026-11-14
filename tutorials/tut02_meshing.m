@@ -22,13 +22,19 @@ fmbd.gmsh('--version');
 % Size. This helps with CAD STLs, which are full of long thin triangles.
 % Remesh = false keeps the STL triangles as the boundary of the mesh.
 cyl = fullfile(out, 'cylinder.stl');
-fmbd.cylinderSTL(cyl, [0 0], 10, 0, 60);                % r = 10, height 60 (mm)
+fmbd.cylinderSTL(cyl, [0 0], 10, 0, 60); % r = 10, height 60 (mm)
 [X1, T1] = fmbd.meshSTL(cyl, Size = 4);
 [X2, T2] = fmbd.meshSTL(cyl, Remesh = false);
 fprintf('remeshed: %d tets, STL kept as boundary: %d tets\n', size(T1, 1), size(T2, 1));
 figure('Color', 'w');
-subplot(1, 2, 1);  tetramesh(T1(:,1:4), X1, 'FaceAlpha', 0.1);  axis equal;  title('Remesh = true');
-subplot(1, 2, 2);  tetramesh(T2(:,1:4), X2, 'FaceAlpha', 0.1);  axis equal;  title('Remesh = false');
+subplot(1, 2, 1);
+tetramesh(T1(:,1:4), X1, 'FaceAlpha', 0.1);
+axis equal;
+title('Remesh = true');
+subplot(1, 2, 2);
+tetramesh(T2(:,1:4), X2, 'FaceAlpha', 0.1);
+axis equal;
+title('Remesh = false');
 
 %% 3. Tet4 vs Tet10: a convergence study
 % Linear tetrahedra (Tet4) are too stiff in bending ("locking") and need
@@ -45,7 +51,9 @@ err = zeros(2, numel(sizes));  ndof = err;
 for order = 1:2
     for k = 1:numel(sizes)
         b = fmbd.Body.elastic(beam, steel, Size = sizes(k), Order = order, Scale = 1e-3, Modes = 1);
-        s = fmbd.System();  s.add(b);  s.fix(b, @(X) X(:,1) < 1e-6);
+        s = fmbd.System();
+        s.add(b);
+        s.fix(b, @(X) X(:,1) < 1e-6);
         err(order, k) = s.modes([], 1)/fEB - 1;  ndof(order, k) = b.nDof;
     end
 end
@@ -53,7 +61,9 @@ disp(array2table(100*err, 'VariableNames', compose('h=%g', sizes), ...
      'RowNames', {'Tet4 error %', 'Tet10 error %'}));
 figure('Color', 'w');
 loglog(ndof', abs(err'), 'o-');  grid on
-xlabel('mesh dofs');  ylabel('|f_1/f_{EB} - 1|');  legend('Tet4', 'Tet10');
+xlabel('mesh dofs');
+ylabel('|f_1/f_{EB} - 1|');
+legend('Tet4', 'Tet10');
 title('Convergence of the first bending frequency');
 
 %% 4. Curved surfaces and Tet10
@@ -81,8 +91,12 @@ fprintf('%s.msh: %d nodes, %d elements\n', block.Name, block.nNode, size(block.T
 % the same part twice. Bodies are defined in the configuration in which
 % joint coordinates are zero (see Tutorial 5).
 copy = fmbd.Body.elastic(msh, steel, Scale = 1e-3, Name = 'block2');
-Rz = [0 -1 0; 1 0 0; 0 0 1];                      % 90 degrees about z
+Rz = [0 -1 0; 1 0 0; 0 0 1]; % 90 degrees about z
 copy.transform(Rz, [0.2 0 0]);
-s = fmbd.System();  s.add(block);  s.add(copy);
+s = fmbd.System();
+s.add(block);
+s.add(copy);
 s.fix(block, @(X) X(:,3) < 1e-6);  s.fix(copy, @(X) X(:,3) < 1e-6);
-figure('Color', 'w');  s.plot();  title('Two placed copies of one mesh');
+figure('Color', 'w');
+s.plot();
+title('Two placed copies of one mesh');

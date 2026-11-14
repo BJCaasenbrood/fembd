@@ -30,14 +30,14 @@ classdef Body < handle
 properties
     Name (1,:) char
     Mat  struct
-    X    (:,3) double   % nodes
-    T    double         % tetrahedra (ne x 4 or ne x 10)
-    F    double         % outward boundary faces (nf x 3 or nf x 6)
+    X    (:,3) double % nodes
+    T    double % tetrahedra (ne x 4 or ne x 10)
+    F    double % outward boundary faces (nf x 3 or nf x 6)
     Rigid (1,1) logical = false
-    Ref  (1,3) double   % reference point of a rigid body
-    MassProps = []      % struct(m, c, J) of a mesh-free rigid body (J about c)
-    Damping (1,2) double = [0 0]   % Rayleigh damping [alpha beta]: D = alpha*M + beta*K
-    Modes (1,1) double = 10        % fixed-interface modes of an elastic body
+    Ref  (1,3) double % reference point of a rigid body
+    MassProps = [] % struct(m, c, J) of a mesh-free rigid body (J about c)
+    Damping (1,2) double = [0 0] % Rayleigh damping [alpha beta]: D = alpha*M + beta*K
+    Modes (1,1) double = 10 % fixed-interface modes of an elastic body
 end
 
 properties (Dependent)

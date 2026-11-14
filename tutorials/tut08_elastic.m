@@ -18,7 +18,7 @@
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'fmbdTutorials');  if ~isfolder(out), mkdir(out); end
 fmbd.boxSTL(fullfile(out, 'strip.stl'), [0 -0.01 -0.002], [0.4 0.01 0.002]);
-soft = fmbd.material(2e9, 0.35, 1200);                 % a polymer strip
+soft = fmbd.material(2e9, 0.35, 1200); % a polymer strip
 
 %% 1. A flexible pendulum
 % A thin strip hinged about y at one end, released horizontally under
@@ -30,7 +30,9 @@ s = pend(6, [0 0]);
 [t, y, x] = s.simulate([0 0.6], Step = 2e-3, Rho = 1);
 E = s.energy(x);  dz = tipDeflection(s, x);
 figure('Color', 'w');
-subplot(2, 1, 1);  plot(t, [y.th, 100*dz], 'LineWidth', 1.5);  grid on
+subplot(2, 1, 1);
+plot(t, [y.th, 100*dz], 'LineWidth', 1.5);
+grid on
 legend('hinge angle (rad)', '100 x tip deflection in the strip frame (m)', 'Location', 'best');
 subplot(2, 1, 2);  plot(t, [E.kinetic; E.gravity - E.gravity(1); 1e2*E.strain; E.total - E.total(1)], ...
                         'LineWidth', 1.5);  grid on
@@ -48,8 +50,12 @@ for modes = [1 2 6]
     sm = pend(modes, [0 0]);  [t, ~, xm] = sm.simulate([0 0.6], Step = 2e-3, Rho = 1);
     plot(t, 1e3*tipDeflection(sm, xm), 'DisplayName', sprintf('%d modes', modes));
 end
-hold off;  grid on;  legend('Location', 'best');
-xlabel('time (s)');  ylabel('tip deflection (mm)');  title('Convergence with the number of modes');
+hold off;
+grid on;
+legend('Location', 'best');
+xlabel('time (s)');
+ylabel('tip deflection (mm)');
+title('Convergence with the number of modes');
 
 %% 3. Damping
 % Damping = [alpha beta] on the body is physical (Rayleigh) damping of the
@@ -57,7 +63,9 @@ xlabel('time (s)');  ylabel('tip deflection (mm)');  title('Convergence with the
 % to the time step: it keeps the integration robust without changing the
 % slow motion. Here stiffness-proportional damping of 5% at the first
 % bending mode makes the tip vibration decay.
-sc = pend(1, [0 0]);  sc.fix('root');  f1 = sc.modes([], 1);   % first bending, clamped
+sc = pend(1, [0 0]);
+sc.fix('root');
+f1 = sc.modes([], 1); % first bending, clamped
 beta = 2*0.05/(2*pi*f1);
 sd = pend(6, [0 beta]);  [t, ~, xd] = sd.simulate([0 0.6], Step = 2e-3);
 sn = pend(6, [0 0]);     [~, ~, xn] = sn.simulate([0 0.6], Step = 2e-3, Rho = 0.6);
@@ -71,11 +79,14 @@ xlabel('time (s)');  ylabel('tip deflection (mm)');
 % the body frame: the displacement field at any step is Phi*eta, e.g. for
 % strains or stresses. plot and animate show it with Scale.
 [Phi, X0] = s.modeShapes('strip');
-k = find(abs(dz) == max(abs(dz)), 1);              % the largest deflection
-u = reshape(Phi*x.e(:,k), 3, [])';                 % displacement field (body frame)
+k = find(abs(dz) == max(abs(dz)), 1); % the largest deflection
+u = reshape(Phi*x.e(:,k), 3, [])'; % displacement field (body frame)
 fprintf('largest deformation %.2f mm at node (%.3f, %.3f, %.3f) m\n', 1e3*max(vecnorm(u, 2, 2)), ...
         X0(find(vecnorm(u, 2, 2) == max(vecnorm(u, 2, 2)), 1), :));
-figure('Color', 'w');  s.plot(x, k, Scale = 5);  view(0, 0);  title('Largest deflection, 5x');
+figure('Color', 'w');
+s.plot(x, k, Scale = 5);
+view(0, 0);
+title('Largest deflection, 5x');
 
 %% 5. What is not modelled
 % The deformation is linear in a moving frame. This misses the stiffening

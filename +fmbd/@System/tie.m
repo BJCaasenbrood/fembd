@@ -17,7 +17,7 @@ function ns = tie(s, master, slave, opts)
     bm = s.Bodies{im};  bs = s.Bodies{is};
     assert(~isempty(bm.F) && ~isempty(bs.F), 'fmbd:tie', 'A point mass has no surface; use a joint.');
     assert(~(bm.Rigid && bs.Rigid), 'fmbd:tie', 'Two rigid bodies cannot be tied; use a fixed joint.');
-    if bs.Rigid, [bm, bs, im, is] = deal(bs, bm, is, im); end   % the rigid body is the master
+    if bs.Rigid, [bm, bs, im, is] = deal(bs, bm, is, im); end % the rigid body is the master
     assert(~bm.Rigid || isempty(opts.Stiffness), 'fmbd:tie', ['An elastic interface to a ' ...
         'rigid body is not supported; use a coupling and a joint with Stiffness.']);
     [sn, mn, Nw, nrm, area] = tieNodes(bm, bs, opts.Tol, opts.Select);

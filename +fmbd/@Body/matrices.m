@@ -7,16 +7,18 @@ function [K, M] = matrices(b, opts)
     arguments
         b
         opts.Lumped (1,1) logical = false
-        opts.Chunk (1,1) double = 2e4     % elements per vectorised block
+        opts.Chunk (1,1) double = 2e4 % elements per vectorised block
         opts.MassOnly (1,1) logical = false
     end
     chunk = opts.Chunk;
-    [ne, nn] = size(b.T);  nd = 3*nn;  p = 1 + (nn == 10);
+    [ne, nn] = size(b.T);
+    nd = 3*nn;
+    p = 1 + (nn == 10);
     [xk, wk] = tetQuad(2*p - 2);  [~, dNk] = tetShape(xk, nn);
     [xm, wm] = tetQuad(2*p);      [Nm, dNm] = tetShape(xm, nn);
     D = [];  if ~b.Rigid, D = b.Mat.D; end
     K = sparse(b.nDof, b.nDof);  Ms = sparse(b.nNode, b.nNode);
-    bad = false(1, ne);                     % elements with det(J) <= 0
+    bad = false(1, ne); % elements with det(J) <= 0
     for e0 = 1:chunk:ne
         Te = b.T(e0:min(e0 + chunk - 1, ne), :)';  nc = size(Te, 2);
         Xe = permute(reshape(b.X(Te, :), nn, nc, 3), [1 3 2]);
@@ -51,7 +53,7 @@ function [K, M] = matrices(b, opts)
     end
     K = (K + K')/2;
     M = kron((Ms + Ms')/2*b.Mat.rho, speye(3));
-    if b.Rigid && ~isempty(b.MassProps)      % mass from setMass, not from the mesh
+    if b.Rigid && ~isempty(b.MassProps) % mass from setMass, not from the mesh
         M = sparse(b.nDof, b.nDof);
     end
 end

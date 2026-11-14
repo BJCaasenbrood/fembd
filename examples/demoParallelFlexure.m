@@ -6,15 +6,15 @@
 %
 %         shuttle (rigid)
 %       +================+
-%       ||              ||   leaves: L x b x t, elastic
+%       ||              ||  leafsprings: L-b-t, (elastic)
 %       ||              ||
-%   ====+================+====  base (rigid, fixed)
+%   ====+================+====  base (rigid)
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'fmbdFlexure');  if ~isfolder(out), mkdir(out); end
 
 % geometry (mm)
-L = 40;  b = 10;  t = 0.1;  h = 20;            % leaf length, width, thickness; half spacing
+L = 40;  b = 10;  t = 0.1;  h = 20; % leaf length, width, thickness; half spacing
 fmbd.boxSTL(fullfile(out, 'base.stl'),    [-h-5 -b/2 -10],   [h+5 b/2 0]);
 fmbd.boxSTL(fullfile(out, 'shuttle.stl'), [-h-5 -b/2 L],     [h+5 b/2 L+10]);
 fmbd.boxSTL(fullfile(out, 'leaf1.stl'),   [-h-t/2 -b/2 0],   [-h+t/2 b/2 L]);

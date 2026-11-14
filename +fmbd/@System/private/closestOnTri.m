@@ -3,15 +3,19 @@ function [d, l] = closestOnTri(p, A, B, C)
 %   Returns distances d (m x 1) and barycentric coordinates l (m x 3) of
 %   the closest point on each triangle.
 
-e1 = B - A;  e2 = C - A;  v = p - A;
-a = dot(e1, e1, 2);  b = dot(e1, e2, 2);  c = dot(e2, e2, 2);
+e1 = B - A;
+e2 = C - A;
+v = p - A;
+a = dot(e1, e1, 2);
+b = dot(e1, e2, 2);
+c = dot(e2, e2, 2);
 r1 = dot(e1, v, 2);  r2 = dot(e2, v, 2);
 s = (c.*r1 - b.*r2)./(a.*c - b.^2);
 t = (a.*r2 - b.*r1)./(a.*c - b.^2);
 l = [1 - s - t, s, t];
 
 out = any(l < 0, 2);
-if any(out)                                     % closest point on an edge
+if any(out) % closest point on an edge
     clamp = @(x) min(max(x, 0), 1);
     e3 = C(out,:) - B(out,:);
     u1 = clamp(r1(out)./a(out));

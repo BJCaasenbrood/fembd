@@ -14,7 +14,8 @@ function [kind, k] = lookup(s, id, whole)
         k = find(strcmp({s.Refs.Name}, id));    kind = 'ref';
         if isscalar(k), return, end
     end
-    k = find(strcmp(cellfun(@(b) b.Name, s.Bodies, 'UniformOutput', false), id));  kind = 'body';
+    k = find(strcmp(cellfun(@(b) b.Name, s.Bodies, 'UniformOutput', false), id));
+    kind = 'body';
     assert(isscalar(k), 'fmbd:System', 'Unknown name %s.', string(id));
     if whole && s.Bodies{k}.Rigid, [kind, k] = s.lookup(s.Bodies{k}, true); end
 end

@@ -15,8 +15,8 @@ function animate(s, t, x, opts)
     nb = numel(s.Bodies);
     V = @(k) arrayfun(@(i) s.vertices(i, x, k, opts.Scale), 1:nb, 'UniformOutput', false);
     cla;  h = s.plot(x, 1, Scale = opts.Scale);
-    X = reshape(permute(x.r, [1 3 2]), 3, [])';           % all frame positions
-    span = max([arrayfun(@(B) max([vecnorm(B.Xl, 2, 2); 0]), s.Bd), 1e-3]);
+    X = reshape(permute(x.r, [1 3 2]), 3, [])'; % all frame positions
+    span = max([arrayfun(@(B) max([vecnorm(B.Xl, 2, 2); 0]), s.units), 1e-3]);
     axis(reshape([min(X, [], 1) - span; max(X, [], 1) + span], 1, []));
     playback(h, (t(end) - t(1))/opts.Rate, @(c) frame(c));
     function frame(c)

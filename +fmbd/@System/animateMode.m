@@ -16,7 +16,9 @@ function animateMode(s, x, v, opts)
         opts.Title = []
     end
     [x, a, V0] = s.modeScale(x, v, opts.Amplitude);  nb = numel(s.Bodies);
-    cla;  h = drawBodies(s.Bodies, V0, num2cell(lines(nb), 2)');  axis manual
+    cla;
+    h = drawBodies(s.Bodies, V0, num2cell(lines(nb), 2)');
+    axis manual
     ttl = char(opts.Title);
     if ~isempty(opts.Frequency)
         ft = sprintf('%.1f Hz (%.0fx slow motion)', opts.Frequency, opts.Frequency/opts.Rate);

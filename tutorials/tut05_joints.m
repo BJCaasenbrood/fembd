@@ -51,7 +51,9 @@ end
 % Joint coordinates can be inputs (forces or torques) and outputs. Under a
 % constant 1 N m torque on the lower hinge the door turns to tau/k (plus a
 % little twist of the elastic door): |equilibrium| finds the static state.
-s.input('tau', 'j1');  s.output('a1', 'j1');  s.output('a2', 'j2');
+s.input('tau', 'j1');
+s.output('a1', 'j1');
+s.output('a2', 'j2');
 x = s.equilibrium(Input = 1);  [~, y] = s.simulate([0 1e-4], Initial = x, Step = 1e-4);
 fprintf('hinge angles under 1 N m: %.4f and %.4f rad (tau/k = %.4f)\n', y.a1(1), y.a2(1), 1/k);
 
@@ -86,17 +88,21 @@ fprintf('spherical joint: frequencies %s Hz (three mechanism modes)\n', mat2str(
 % period.
 L = 0.5;  th0 = pi/2;
 s = fmbd.System(Gravity = [0 0 -g]);
-s.add(fmbd.Body.pointMass(1, [0 0 -L], zeros(3), Name = 'bob'));   % hanging down
+s.add(fmbd.Body.pointMass(1, [0 0 -L], zeros(3), Name = 'bob')); % hanging down
 s.joint('ground', 'bob', 'revolute', Point = [0 0 0], Axis = [0 1 0], Position = th0, Name = 'pivot');
 s.output('th', 'pivot');
 [t, y] = s.simulate([0 2], Step = 5e-4, Rho = 1);
-zc = find(diff(sign(y.th)) ~= 0);                     % zero crossings: two per period
-tz = t(zc) - y.th(zc).*(t(zc+1) - t(zc))./(y.th(zc+1) - y.th(zc));   % interpolated
+zc = find(diff(sign(y.th)) ~= 0); % zero crossings: two per period
+tz = t(zc) - y.th(zc).*(t(zc+1) - t(zc))./(y.th(zc+1) - y.th(zc)); % interpolated
 Tsim = 2*mean(diff(tz));
 Texact = 4*sqrt(L/g)*ellipke(sin(th0/2)^2);
 fprintf('period: %.5f s simulated, %.5f s exact (small angle %.5f s)\n', Tsim, Texact, 2*pi*sqrt(L/g));
-figure('Color', 'w');  plot(t, y.th, 'LineWidth', 1.5);  grid on
-xlabel('time (s)');  ylabel('\theta (rad)');  title('Pendulum released from 90 degrees');
+figure('Color', 'w');
+plot(t, y.th, 'LineWidth', 1.5);
+grid on
+xlabel('time (s)');
+ylabel('\theta (rad)');
+title('Pendulum released from 90 degrees');
 
 %% 7. Closed loops: a four-bar linkage
 % Joints may close kinematic loops; the constraints are exact for any
@@ -104,7 +110,7 @@ xlabel('time (s)');  ylabel('\theta (rad)');  title('Pendulum released from 90 d
 % loop. The planar loop is overconstrained in 3D (redundant out-of-plane
 % rows), which is detected automatically. A constant torque turns the
 % crank through a large angle.
-P = {[0 0 0], [0.05 0.1 0], [0.3 0.15 0], [0.25 0 0]};   % O2, A, B, O4
+P = {[0 0 0], [0.05 0.1 0], [0.3 0.15 0], [0.25 0 0]}; % O2, A, B, O4
 mk = [0.2 0.5 0.3];  Jz = [1e-4 4e-4 2e-4];
 s = fmbd.System();
 for i = 1:3
@@ -113,11 +119,17 @@ end
 s.joint('ground', 'link1', 'revolute', Point = P{1}, Position = -0.3, Name = 'crank');
 s.joint('link1',  'link2', 'revolute', Point = P{2});
 s.joint('link2',  'link3', 'revolute', Point = P{3});
-s.joint('ground', 'link3', 'revolute', Point = P{4}, Name = 'rocker');   % closes the loop
-s.input('tau', 'crank');  s.output('crank', 'crank');  s.output('rocker', 'rocker');
+s.joint('ground', 'link3', 'revolute', Point = P{4}, Name = 'rocker'); % closes the loop
+s.input('tau', 'crank');
+s.output('crank', 'crank');
+s.output('rocker', 'rocker');
 [~, y] = s.simulate([0 0.6], Step = 1e-3, Input = @(t, y) 0.02);
-figure('Color', 'w');  plot(y.crank, y.rocker, 'LineWidth', 1.5);  grid on
-xlabel('crank angle (rad)');  ylabel('rocker angle (rad)');  title('Four-bar: rocker vs crank');
+figure('Color', 'w');
+plot(y.crank, y.rocker, 'LineWidth', 1.5);
+grid on
+xlabel('crank angle (rad)');
+ylabel('rocker angle (rad)');
+title('Four-bar: rocker vs crank');
 
 %% 8. Transmissions: belts and gears
 % |s.transmission| relates coordinates of different joints (or absolute
@@ -126,7 +138,10 @@ xlabel('crank angle (rad)');  ylabel('rocker angle (rad)');  title('Four-bar: ro
 % rotor drives an arm through a belt with ratio N = 3 (the motor turns 3x):
 % delta = theta_motor/N - theta_arm. The belt mode is the two inertias
 % oscillating against each other.
-Jm = 2e-4;  Ja = 0.05;  N = 3;  kBelt = 2e4;
+Jm = 2e-4;
+Ja = 0.05;
+N = 3;
+kBelt = 2e4;
 belt = @(stiffness) beltDrive(Jm, Ja, N, stiffness);
 s = belt(kBelt);
 f = s.modes();
@@ -134,7 +149,9 @@ fprintf('belt mode: %.2f Hz, two-inertia formula %.2f Hz\n', f(2), sqrt(kBelt*(1
 % Without Stiffness the belt is rigid (an ideal gear): the arm inertia is
 % reflected to the motor as Ja/N^2. A constant motor torque accelerates
 % the motor at tau/(Jm + Ja/N^2).
-s = belt([]);  s.input('tau', 'motor');  s.output('qm', 'motor');
+s = belt([]);
+s.input('tau', 'motor');
+s.output('qm', 'motor');
 [t, y] = s.simulate([0 0.1], Input = @(t, y) 1e-3);
 fprintf('rigid gear: motor acceleration %.3f rad/s^2, tau/(Jm + Ja/N^2) = %.3f\n', ...
         2*y.qm(end)/t(end)^2, 1e-3/(Jm + Ja/N^2));

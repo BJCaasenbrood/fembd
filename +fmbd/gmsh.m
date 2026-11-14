@@ -1,11 +1,9 @@
 function [status, out] = gmsh(args)
 %GMSH Run the Gmsh executable with a command-line argument string.
 %   [status, out] = fmbd.gmsh(args) uses $GMSH, otherwise 'gmsh' on the PATH
-%   (on macOS also /Applications/Gmsh.app). Examples:
+%   Examples:
 %     setenv('GMSH', 'C:\Program Files\gmsh-4.13.1-Windows64\gmsh.exe')
 %     setenv('GMSH', '/usr/bin/gmsh')
-%   Without output arguments the Gmsh output is printed, and an error is
-%   thrown if Gmsh fails.
 
 exe = strip(getenv('GMSH'), '"');
 if isempty(exe)
@@ -14,13 +12,13 @@ if isempty(exe)
     if ismac && isfile(app), exe = app; end
 end
 cmd = sprintf('"%s" %s', exe, args);
-if isunix && ~ismac      % Linux: hide MATLAB's own (older) libstdc++ from Gmsh
+if isunix && ~ismac % Linux: hide MATLAB's own (older) libstdc++ from Gmsh
     lib = strsplit(getenv('LD_LIBRARY_PATH'), ':');
     lib = lib(~startsWith(lib, matlabroot));
     cmd = sprintf('LD_LIBRARY_PATH="%s" %s', strjoin(lib, ':'), cmd);
 end
-[status, out] = system(cmd);
-out = regexprep(out, '\x1b\[[0-9;]*m', '');      % strip colour codes
+[status, out] = system(cmd); % generate the system command and run it
+out = regexprep(out, '\x1b\[[0-9;]*m', ''); % strip colour codes
 if nargout < 1
     if status ~= 0
         error('fmbd:gmsh', ['Gmsh failed:\n%s\nCheck that "%s" runs from a terminal, ' ...

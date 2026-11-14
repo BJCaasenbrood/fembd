@@ -12,7 +12,7 @@
 % Run it section by section (Ctrl+Enter), or render it with
 % |publish('tut01_firstModel')|.
 
-addpath(fileparts(fileparts(mfilename('fullpath'))));     % toolbox root
+addpath(fileparts(fileparts(mfilename('fullpath')))); % toolbox root
 tmp = tempname;  mkdir(tmp);
 
 %% 1. Geometry and bodies
@@ -40,7 +40,7 @@ s = fmbd.System(Gravity = [0 0 -9.81]);
 s.add(upper);  s.add(forearm);
 s.couple('forearm', @(X) X(:,1) < 0.3 + 1e-6, Name = 'root', Point = [0.3 0 0]);
 s.couple('forearm', @(X) X(:,1) > 0.6 - 1e-6, Name = 'tip');
-s.joint('ground', 'upper', 'revolute', Point = [0 0 0],   Name = 'shoulder');   % about z
+s.joint('ground', 'upper', 'revolute', Point = [0 0 0],   Name = 'shoulder'); % about z
 s.joint('upper',  'root',  'revolute', Point = [0.3 0 0], Name = 'elbow');
 
 % motor torques on the joints, and sensors: joint angles and rates, and the
@@ -54,16 +54,22 @@ s.output('tipz', 'tip', [], 3);
 % |simulate| integrates the nonlinear equations in time: exact joint
 % kinematics for large angles, and the forearm's modes in its moving frame.
 % The controller |Input = @(t, y)| gets the outputs of the previous step.
-ref = [1.0; -1.5];                                     % target angles (rad)
-kp  = [16; 1.5];  kd = [1.8; 0.15];                    % PD gains (about 2 Hz bandwidth)
+ref = [1.0; -1.5]; % target angles (rad)
+kp  = [16; 1.5];  kd = [1.8; 0.15]; % PD gains (about 2 Hz bandwidth)
 pd  = @(t, y) kp.*(ref - [y.th1; y.th2]) - kd.*[y.w1; y.w2];
 [t, y, x] = s.simulate([0 1.5], Step = 5e-4, Input = pd);
 
 figure('Color', 'w');
-subplot(2, 1, 1);  plot(t, [y.th1 y.th2], 'LineWidth', 1.5);  grid on
+subplot(2, 1, 1);
+plot(t, [y.th1 y.th2], 'LineWidth', 1.5);
+grid on
 ylabel('angle (rad)');  legend('shoulder', 'elbow', 'Location', 'east');
-subplot(2, 1, 2);  plot(t, 1e6*y.tipz, 'LineWidth', 1.5);  grid on
-xlabel('time (s)');  ylabel('tip z (\mum)');  title('forearm bending: gravity sag and vibration');
+subplot(2, 1, 2);
+plot(t, 1e6*y.tipz, 'LineWidth', 1.5);
+grid on
+xlabel('time (s)');
+ylabel('tip z (\mum)');
+title('forearm bending: gravity sag and vibration');
 fprintf('final angles %.3f, %.3f rad (targets %.1f, %.1f)\n', y.th1(end), y.th2(end), ref);
 
 %% 4. Energy and animation

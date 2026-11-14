@@ -22,9 +22,9 @@ disp('D of steel (GPa):');  disp(steel.D/1e9);
 % Any symmetric positive-definite D can be used. For an orthotropic
 % material (e.g. a unidirectional composite), build the compliance S from
 % the engineering constants and invert it. Here the fibres run along x.
-E   = [140e9 10e9 10e9];          % E1 E2 E3
-nu  = [0.3 0.3 0.4];              % nu12 nu13 nu23
-G   = [3.5e9 5e9 5e9];            % G23 G13 G12 (Voigt order yz xz xy)
+E   = [140e9 10e9 10e9]; % E1 E2 E3
+nu  = [0.3 0.3 0.4]; % nu12 nu13 nu23
+G   = [3.5e9 5e9 5e9]; % G23 G13 G12 (Voigt order yz xz xy)
 S = [ 1/E(1)       -nu(1)/E(1)  -nu(2)/E(1);
      -nu(1)/E(1)    1/E(2)      -nu(3)/E(2);
      -nu(2)/E(1)   -nu(3)/E(2)   1/E(3)];
@@ -36,8 +36,10 @@ cfrp = struct('D', inv(blkdiag(S, diag(1./G))), 'rho', 1600);
 % beam theory predicts.
 for mat = {steel, cfrp}
     b = fmbd.Body.elastic(file, mat{1}, Size = 25, Scale = 1e-3, Modes = 1);
-    s = fmbd.System();  s.add(b);  s.fix(b, clamp);
-    C = inv(mat{1}.D);  Ex = 1/C(1,1);            % Young's modulus along x
+    s = fmbd.System();
+    s.add(b);
+    s.fix(b, clamp);
+    C = inv(mat{1}.D);  Ex = 1/C(1,1); % Young's modulus along x
     fEB = 1.875104^2/(2*pi)*sqrt(Ex*0.05^4/12/(mat{1}.rho*0.05^2));
     fprintf('f1 = %6.2f Hz (Euler-Bernoulli %6.2f Hz)\n', s.modes([], 1), fEB);
 end
@@ -48,11 +50,13 @@ end
 % rigidly without deforming: K*phi = 0 for its six rigid-body modes.
 b = fmbd.Body.elastic(file, steel, Size = 25, Scale = 1e-3);
 [Kb, Mb] = b.matrices();
-r = b.X - b.Ref;  n = b.nNode;  Phi = zeros(3*n, 6);
-for d = 1:3, Phi(d:3:end, d) = 1; end          % translations
-Phi(2:3:end, 4) = -r(:,3);  Phi(3:3:end, 4) =  r(:,2);   % rotation about x
-Phi(1:3:end, 5) =  r(:,3);  Phi(3:3:end, 5) = -r(:,1);   % rotation about y
-Phi(1:3:end, 6) = -r(:,2);  Phi(2:3:end, 6) =  r(:,1);   % rotation about z
+r = b.X - b.Ref;
+n = b.nNode;
+Phi = zeros(3*n, 6);
+for d = 1:3, Phi(d:3:end, d) = 1; end % translations
+Phi(2:3:end, 4) = -r(:,3);  Phi(3:3:end, 4) =  r(:,2); % rotation about x
+Phi(1:3:end, 5) =  r(:,3);  Phi(3:3:end, 5) = -r(:,1); % rotation about y
+Phi(1:3:end, 6) = -r(:,2);  Phi(2:3:end, 6) =  r(:,1); % rotation about z
 fprintf('rigid-body strain energy: %.1e (relative)\n', norm(Phi'*Kb*Phi)/norm(Kb, 1));
 
 %% 4. Mass properties
@@ -72,9 +76,14 @@ fprintf('inertia %s kg m^2 (exact %s)\n', mat2str(diag(J)', 4), ...
 % rising linearly with frequency; alpha also damps rigid motion (like a
 % drag), so it is usually 0. The modal damping ratio of mode k is then
 % beta*omega_k/2, here 1% at the first mode.
-w1 = 1.875104^2*sqrt(210e9*0.05^4/12/(7850*0.05^2));  beta = 2*0.01/w1;   % steel, mode 1
+w1 = 1.875104^2*sqrt(210e9*0.05^4/12/(7850*0.05^2));  beta = 2*0.01/w1; % steel, mode 1
 b = fmbd.Body.elastic(file, steel, Size = 25, Scale = 1e-3, Modes = 4, Damping = [0 beta]);
-s = fmbd.System();  s.add(b);  s.fix(b, clamp);
-sys = s.statespace();  p = eig(sys.A);  p = p(imag(p) > 0);  [~, i] = sort(abs(p));
+s = fmbd.System();
+s.add(b);
+s.fix(b, clamp);
+sys = s.statespace();
+p = eig(sys.A);
+p = p(imag(p) > 0);
+[~, i] = sort(abs(p));
 fprintf('damping ratios of the first modes: %s (beta*w/2: %s)\n', ...
         mat2str(-real(p(i(1:2)))'./abs(p(i(1:2)))', 3), mat2str(beta*abs(p(i(1:2)))'/2, 3));
