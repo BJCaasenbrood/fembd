@@ -49,8 +49,7 @@ check the setup.
 
 ## Documentation
 - **Tutorials:** [`tutorials/`](tutorials/README.md), eight runnable scripts: a first model, meshing, materials, rigid bodies, joints and transmissions, ties and supports, linear analysis, elastic bodies in motion.
-- **Manual:** [`docs/fmbd.md`](docs/fmbd.md): workflow, model description, analyses, formulation, recipes (operating points, control design, motors and belts) and limitations.
-- **In MATLAB:** `doc fmbd.System`, `doc fmbd.Body`, `help fmbd`. The tutorials, examples and function reference also appear in the Help browser under *Supplemental Software* (prebuilt in `doc/html`; rebuild with `cd doc; buildDocs`, which runs the tutorials and needs Gmsh).
+- **In MATLAB:** `help fmbd`, `help fmbd.System`, `help fmbd.System/simulate`, `doc fmbd.System`, etc.
 - **Examples:** [`examples/`](examples): an STL assembly with a rigid payload, a two-link arm at several poses, and a parallel leaf-spring guide.
 - **Verification:** `tests/testFmbd.m`.
 

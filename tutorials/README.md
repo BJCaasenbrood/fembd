@@ -16,5 +16,4 @@ first (see the main README).
 | 7 | [`tut07_linear`](tut07_linear.m) | Equilibrium under gravity, modes at several operating points, state space (truncation, static correction, acceleration outputs), a controller designed linearly and checked in the nonlinear model. |
 | 8 | [`tut08_elastic`](tut08_elastic.m) | A flexible pendulum: energy exchange, convergence with `Modes`, physical vs numerical damping, the deformation field, limitations. |
 
-The examples in `../examples` combine these features. The reference manual is
-[`../docs/fmbd.md`](../docs/fmbd.md).
+The examples in `../examples` combine these features.
