@@ -23,6 +23,10 @@ function lin = linearize(s, x, opts)
     [F, ~, ~, Mq] = forces(s, q, nu, u0);  nc = size(G, 1);
     sol = lsqminnorm([Mq, G'; G, zeros(nc)], [F; -convective(s, q, nu)]); % constraint forces
     lam = sol(n+1:end); % (dynamic, so also away from equilibrium)
+    if ~any(nu) && norm(Mq*sol(1:n)) > 1e-6*max(norm(F), 1)
+        warning('fmbd:linearize', ['The state is not an equilibrium (e.g. a preloaded spring ' ...
+            'without a holding input); use x = s.equilibrium(Input = u0).']);
+    end
     Kq = stiffness(s, q, u0, lam, nu);
     Cq = zeros(n);  e = 1; % exact: the forces are quadratic in nu
     for j = 1:n
