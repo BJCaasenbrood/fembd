@@ -12,6 +12,7 @@ examples/html/
 # local scripts
 /main_ivr*.m
 
-# documentation, kept local for now
+# documentation and tests, kept local for now
 /doc/
 /docs/
+/tests/

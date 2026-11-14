@@ -51,6 +51,5 @@ check the setup.
 - **Tutorials:** [`tutorials/`](tutorials/README.md), eight runnable scripts: a first model, meshing, materials, rigid bodies, joints and transmissions, ties and supports, linear analysis, elastic bodies in motion.
 - **In MATLAB:** `help fmbd`, `help fmbd.System`, `help fmbd.System/simulate`, `doc fmbd.System`, etc.
 - **Examples:** [`examples/`](examples): an STL assembly with a rigid payload, a two-link arm at several poses, and a parallel leaf-spring guide.
-- **Verification:** `tests/testFmbd.m`.
 
 Requires MATLAB R2022a or later and Gmsh 4.
