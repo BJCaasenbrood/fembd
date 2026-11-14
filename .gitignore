@@ -4,10 +4,14 @@
 *.mex*
 slprj/
 
-# publish() output (except the built documentation in doc/html)
+# publish() output
 /html/
 tutorials/html/
 examples/html/
 
 # local scripts
 /main_ivr*.m
+
+# documentation, kept local for now
+/doc/
+/docs/
