@@ -1,13 +1,9 @@
 %% Tutorial 5 - Couplings, joints and transmissions
-% Joints connect reference points with chosen directions left free, such
-% as hinges, sliders and ball joints. A reference point is a rigid body,
-% or a patch of an elastic body made rigid by a coupling. This tutorial
-% covers:
-%
-% * couplings (RBE2) on elastic bodies
-% * joint types, axes and springs; locking and loading joints
-% * joint positions (|Position|), large motions and closed loops
-% * transmissions: belts and gears
+% Joints connect reference points and leave some directions free: hinges,
+% sliders, ball joints. A reference point is a rigid body, or a patch of an
+% elastic body made rigid by a coupling. We go through the joint types,
+% springs, initial positions and large motions, a closed four-bar loop, and
+% belts and gears.
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'fmbdTutorials');  if ~isfolder(out), mkdir(out); end
@@ -105,7 +101,7 @@ ylabel('\theta (rad)');
 title('Pendulum released from 90 degrees');
 
 %% 7. Closed loops: a four-bar linkage
-% Joints may close kinematic loops; the constraints are exact for any
+% Joints may close kinematic loops; the constraints hold for any
 % motion. Position on the crank sets the initial configuration of the whole
 % loop. The planar loop is overconstrained in 3D (redundant out-of-plane
 % rows), which is detected automatically. A constant torque turns the
@@ -134,7 +130,7 @@ title('Four-bar: rocker vs crank');
 %% 8. Transmissions: belts and gears
 % |s.transmission| relates coordinates of different joints (or absolute
 % coordinates of reference points) through the stretch delta = sum c_i s_i:
-% a spring with Stiffness (and Damping), or exact without. Here a motor
+% a spring with Stiffness (and Damping), or rigid without. Here a motor
 % rotor drives an arm through a belt with ratio N = 3 (the motor turns 3x):
 % delta = theta_motor/N - theta_arm. The belt mode is the two inertias
 % oscillating against each other.

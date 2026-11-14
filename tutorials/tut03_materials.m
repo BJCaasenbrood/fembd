@@ -1,10 +1,8 @@
 %% Tutorial 3 - Materials, body matrices and mass properties
-% This tutorial covers:
-%
-% * isotropic and anisotropic (orthotropic) materials
-% * body matrices: stiffness K and consistent mass M of a meshed body
-% * mass, centre of mass and inertia (|massProperties|)
-% * material damping (|Damping|, Rayleigh)
+% Materials are plain structs with a stiffness D and a density rho, so
+% isotropic and orthotropic materials work the same way. We also look at
+% the matrices of a meshed body, its mass properties, and Rayleigh
+% damping.
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'fmbdTutorials');  if ~isfolder(out), mkdir(out); end
@@ -60,10 +58,10 @@ Phi(1:3:end, 6) = -r(:,2);  Phi(2:3:end, 6) =  r(:,1); % rotation about z
 fprintf('rigid-body strain energy: %.1e (relative)\n', norm(Phi'*Kb*Phi)/norm(Kb, 1));
 
 %% 4. Mass properties
-% |massProperties| gives the mass, centre of mass and inertia (about the
-% centre of mass) from the consistent mass matrix; they are exact for the
-% mesh. In a system, an elastic body's inertia (and how it changes as the
-% body deforms) follows from the same mass matrix.
+% |massProperties| computes the mass, centre of mass and inertia (about
+% the centre of mass) from the consistent mass matrix of the mesh. In a
+% system, the inertia of an elastic body, and how it changes as the body
+% deforms, comes from the same matrix.
 [m, c, J] = b.massProperties();
 mx = 7850*1*0.05*0.05;
 fprintf('mass    %.4f kg (exact %.4f), centre %s m\n', m, mx, mat2str(c, 3));

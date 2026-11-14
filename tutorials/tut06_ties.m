@@ -1,12 +1,8 @@
 %% Tutorial 6 - Ties, elastic interfaces and supports
-% Each body is meshed separately, so the meshes do not match at an
-% interface. This tutorial covers:
-%
-% * bonded ties between non-matching meshes, and elastic groups
-% * choosing master and slave, and the |Tol| and |Select| options
-% * elastic interfaces (distributed springs) with |Stiffness|
-% * ties between elastic and rigid bodies
-% * clamping elastic bodies on nodes
+% Every body is meshed on its own, so meshes do not match where parts
+% touch. Ties connect such parts: bonded, or through a compliant layer.
+% Elastic bodies tied together are reduced as one group. We also clamp
+% bodies on their nodes.
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'fmbdTutorials');  if ~isfolder(out), mkdir(out); end

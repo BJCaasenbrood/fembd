@@ -14,7 +14,7 @@ fmbd.boxSTL(fullfile(out, 'top.stl'), [-25 -25 110], [25 25 116]);
 steel = fmbd.material(210e9, 0.30, 7850);
 alu   = fmbd.material(70e9, 0.33, 2700);
 base   = fmbd.Body.elastic(fullfile(out, 'base.stl'), steel, Size = 8, Scale = 1e-3, Modes = 10);
-pillar = fmbd.Body.elastic(fullfile(out, 'pilar.stl'), alu,   Size = 3, Scale = 1e-3, Modes = 10);
+pillar = fmbd.Body.elastic(fullfile(out, 'pillar.stl'), alu,   Size = 3, Scale = 1e-3, Modes = 10);
 top    = fmbd.Body.rigid(fullfile(out, 'top.stl'), 7850, Scale = 1e-3);
 
 % system: connections and supports
@@ -36,7 +36,7 @@ for k = 1:4
 end
 
 % state space: a vertical force on the plate in, its displacement and
-% acceleration out. A small model (Modes = 6) keeps the exact static gain.
+% acceleration out. A small model (Modes = 6) keeps the static gain.
 s.input('Fz', 'top', [], 3);
 s.output('uz', 'top', [], 3);
 s.output('az', 'top', [], 3, Type = 'acceleration');

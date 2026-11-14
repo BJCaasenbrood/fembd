@@ -1,14 +1,10 @@
-%% Tutorial 1 - Your first model: a two-link arm with an elastic forearm
-% This tutorial goes through the basic workflow:
+%% Tutorial 1 - A two-link arm with an elastic forearm
+% A first model from start to finish. The arm moves in the horizontal plane
+% like a SCARA robot: a rigid upper arm on a shoulder joint and an elastic
+% aluminium forearm on an elbow joint, each driven by a motor torque under
+% PD control. Gravity bends the forearm a little. We build the model,
+% simulate a move, and then look at the linear model at the end pose.
 %
-% # geometry (STL) -> |fmbd.Body|: rigid, or elastic (Gmsh mesh + material)
-% # bodies -> |fmbd.System|: joints, couplings, inputs and outputs
-% # |simulate|: large motion with a controller in the loop
-% # |equilibrium|, |modes|, |statespace|: linear analysis about a pose
-%
-% The arm moves in the horizontal plane (a SCARA arm): a rigid upper arm on
-% a shoulder joint, and an elastic aluminium forearm on an elbow joint, both
-% driven by a motor torque under PD control. Gravity bends the forearm.
 % Run it section by section (Ctrl+Enter), or render it with
 % |publish('tut01_firstModel')|.
 
@@ -51,9 +47,9 @@ s.output('th2', 'elbow');     s.output('w2', 'elbow',    Type = 'velocity');
 s.output('tipz', 'tip', [], 3);
 
 %% 3. Simulation with a controller in the loop
-% |simulate| integrates the nonlinear equations in time: exact joint
-% kinematics for large angles, and the forearm's modes in its moving frame.
-% The controller |Input = @(t, y)| gets the outputs of the previous step.
+% |simulate| integrates the nonlinear equations in time, with large joint
+% angles and the forearm's modes in its moving frame. The controller
+% |Input = @(t, y)| gets the outputs of the previous step.
 ref = [1.0; -1.5]; % target angles (rad)
 kp  = [16; 1.5];  kd = [1.8; 0.15]; % PD gains (about 2 Hz bandwidth)
 pd  = @(t, y) kp.*(ref - [y.th1; y.th2]) - kd.*[y.w1; y.w2];

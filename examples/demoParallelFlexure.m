@@ -27,14 +27,14 @@ s.add(fmbd.Body.rigid(fullfile(out, 'base.stl'),    steel.rho, Scale = 1e-3, Nam
 s.add(fmbd.Body.rigid(fullfile(out, 'shuttle.stl'), steel.rho, Scale = 1e-3, Name = 'shuttle'));
 for leaf = {'leaf1', 'leaf2'}
     s.add(fmbd.Body.elastic(fullfile(out, [leaf{1} '.stl']), steel, Scale = 1e-3, Size = 0.8, ...
-                            Modes = 6, Name = leaf{1}));
+                            Modes = 6, Name = leaf{1}, Order=1));
     s.tie('base', leaf{1});                    % leaves clamped into the rigid parts
     s.tie('shuttle', leaf{1});
 end
 s.fix('base');                                 % ground the base
 
 % 6x6 stiffness at the shuttle: the static gain from forces and moments on
-% the shuttle to its displacements and rotations (exact with the static
+% the shuttle to its displacements and rotations (kept by the static
 % correction), inverted
 s.input('F', 'shuttle');  s.output('u', 'shuttle');
 S = s.statespace();

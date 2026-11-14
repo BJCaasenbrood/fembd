@@ -1,19 +1,11 @@
 %% Tutorial 8 - Elastic bodies in motion
-% An elastic body moves with a floating frame (at its first coupling) and
-% deforms in that frame by Craig-Bampton modes:
-%
-%   x = r + R*(X0 + Phi*eta)
-%
-% Large rotations are exact; the deformation is linear. The mass matrix
-% M(eta), the centrifugal and Coriolis forces and gravity follow from
-% inertia invariants computed once from the mesh, so the cost per step does
-% not depend on the mesh size. This tutorial covers:
-%
-% * a flexible pendulum: energy exchange between motion and deformation
-% * convergence with the number of modes (Modes)
-% * physical (Damping) vs numerical (Rho) damping
-% * the deformation field: modeShapes and node-set signals
-% * what is not modelled: stiffening by centrifugal or gravity preload
+% An elastic body moves with a frame at its first coupling and deforms in
+% that frame by Craig-Bampton modes, x = r + R*(X0 + Phi*eta). Rotations
+% can be large; the deformation stays linear. The terms of the equations
+% of motion are computed once from the mesh, so a time step costs the same
+% for a coarse or a fine mesh. A flexible pendulum shows the exchange of
+% energy, the effect of the number of modes, damping, and how to get the
+% deformation field.
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'fmbdTutorials');  if ~isfolder(out), mkdir(out); end
@@ -60,7 +52,7 @@ title('Convergence with the number of modes');
 %% 3. Damping
 % Damping = [alpha beta] on the body is physical (Rayleigh) damping of the
 % deformation. Rho < 1 in simulate damps only high frequencies, relative
-% to the time step: it keeps the integration robust without changing the
+% to the time step: it keeps the integration stable without changing the
 % slow motion. Here stiffness-proportional damping of 5% at the first
 % bending mode makes the tip vibration decay.
 sc = pend(1, [0 0]);

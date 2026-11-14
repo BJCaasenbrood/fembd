@@ -1,10 +1,8 @@
-%% Tutorial 2 - Meshing: STL, Gmsh, element order and convergence
-% This tutorial covers:
-%
-% * |fmbd.meshSTL| options: |Size|, |Order|, |Remesh|, |FeatureAngle|
-% * Tet4 vs Tet10 elements, and a mesh convergence study
-% * loading meshes made in the Gmsh GUI (|fmbd.readMsh|)
-% * placing parts with |Scale| and |transform|
+%% Tutorial 2 - Meshing with Gmsh
+% Elastic bodies are meshed from STL files with Gmsh. Here we look at the
+% meshing options, compare linear (Tet4) and quadratic (Tet10) elements on
+% a cantilever, read a mesh made in the Gmsh GUI, and place parts with
+% |Scale| and |transform|.
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'fmbdTutorials');  if ~isfolder(out), mkdir(out); end

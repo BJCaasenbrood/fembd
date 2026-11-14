@@ -1,17 +1,13 @@
-%% Tutorial 7 - Linear analysis: equilibrium, modes and state space
-% The nonlinear system gives a linear model about any state at rest:
+%% Tutorial 7 - Equilibrium, modes and state space
+% Around any state at rest the system can be linearised to
 %
 %   M z'' + C z' + K z = B u,   y = Cz z + Cv z' + Ca z''
 %
-% in independent coordinates z (the constraints are eliminated). K includes
-% the stiffness from gravity, constraint forces and preloaded springs. This
-% tutorial covers:
-%
-% * |equilibrium|: the static state under gravity and constant inputs
-% * |modes| at several operating points (configuration-dependent dynamics)
-% * |linearize| and |statespace|: modal state space, static correction,
-%   damping, acceleration outputs
-% * a controller designed on the linear model, checked in the nonlinear one
+% with the constraints eliminated. K contains the stiffness from gravity,
+% constraint forces and preloaded springs, so the model depends on the
+% pose. We compute an equilibrium, follow the modes over several poses,
+% build a state-space model, and check a controller designed on it against
+% the nonlinear simulation.
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'fmbdTutorials');  if ~isfolder(out), mkdir(out); end
@@ -61,7 +57,7 @@ s.plotMode(x0, V(:,3), Amplitude = 0.05, Title = sprintf('Elbow 90 deg: %.1f Hz'
 %% 4. State space
 % |statespace| returns A, B, C, D in modal coordinates [eta; deta] (or an
 % ss object with Format = "ss", Control System Toolbox). Modes truncates
-% the model; the static correction then keeps the DC gain exact. Damping
+% the model; the static correction then keeps the DC gain. Damping
 % adds a modal damping ratio to the physical dampers (here the forearm's
 % Rayleigh damping). Acceleration outputs have a feedthrough D.
 sys = s.statespace(x0, Modes = 6);

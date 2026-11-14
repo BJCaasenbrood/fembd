@@ -1,13 +1,9 @@
 %% Tutorial 4 - Rigid bodies
-% Parts that are much stiffer than the rest of a structure (a link, a
-% payload, a frame) can be modelled as rigid. A rigid body has a frame at
-% its centre of mass that moves with 6 dofs; its geometry only provides
-% its mass, inertia and surface. This tutorial covers:
-%
-% * rigid bodies from a mesh, from an STL surface, or from mass properties
-% * a rigid tip mass on an elastic beam (tie, or coupling + joint)
-% * supporting rigid bodies, and the reference point
-% * mass properties from CAD (|setMass|)
+% Parts that are much stiffer than the rest (a link, a payload, a frame)
+% can be modelled as rigid. A rigid body has 6 dofs at its centre of mass;
+% its geometry only gives the mass, the inertia and the surface for
+% plotting. Rigid bodies can come from a mesh, from an STL surface, or from
+% mass properties alone, e.g. a CAD report.
 
 addpath(fileparts(fileparts(mfilename('fullpath'))));
 out = fullfile(tempdir, 'fmbdTutorials');  if ~isfolder(out), mkdir(out); end
@@ -19,9 +15,9 @@ m = 7850*0.1^3; % block mass
 
 %% 1. Three ways to make a rigid body
 % * |fmbd.Body(file, mat, Rigid = true)|: meshed with Gmsh; a coarse Tet4
-%   mesh is enough, the mass properties come out exact anyway.
+%   mesh is enough for the mass properties.
 % * |fmbd.Body.rigid(file, rho)|: the STL surface only (no Gmsh); mass,
-%   centre of mass and inertia are computed exactly from the closed surface.
+%   centre of mass and inertia follow from the closed surface.
 %   This is the easiest for complex CAD parts.
 % * |fmbd.Body.pointMass(m, c, J)|: mass properties only, e.g. from a CAD
 %   report; it has no surface, so it is attached with a joint.
