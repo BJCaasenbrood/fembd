@@ -55,3 +55,6 @@ assembly with a rigid payload, a two-link arm at several poses, and a parallel l
 All functions have help text, e.g. `help fmbd.System/simulate`.
 
 fmbd needs MATLAB R2022a or later and Gmsh 4.
+
+## License
+MIT, see [`LICENSE`](LICENSE).
