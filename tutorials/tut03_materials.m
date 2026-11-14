@@ -33,7 +33,7 @@ cfrp = struct('D', inv(blkdiag(S, diag(1./G))), 'rho', 1600);
 % CFRP beam is faster; its low shear moduli make it slightly softer than
 % beam theory predicts.
 for mat = {steel, cfrp}
-    b = fmbd.Body.elastic(file, mat{1}, Size = 25, Scale = 1e-3, Modes = 1);
+    b = fmbd.Body.elastic(file, mat{1}, Size = 25, Order = 2, Scale = 1e-3, Modes = 1);
     s = fmbd.System();
     s.add(b);
     s.fix(b, clamp);
@@ -75,7 +75,7 @@ fprintf('inertia %s kg m^2 (exact %s)\n', mat2str(diag(J)', 4), ...
 % drag), so it is usually 0. The modal damping ratio of mode k is then
 % beta*omega_k/2, here 1% at the first mode.
 w1 = 1.875104^2*sqrt(210e9*0.05^4/12/(7850*0.05^2));  beta = 2*0.01/w1; % steel, mode 1
-b = fmbd.Body.elastic(file, steel, Size = 25, Scale = 1e-3, Modes = 4, Damping = [0 beta]);
+b = fmbd.Body.elastic(file, steel, Size = 25, Order = 2, Scale = 1e-3, Modes = 4, Damping = [0 beta]);
 s = fmbd.System();
 s.add(b);
 s.fix(b, clamp);

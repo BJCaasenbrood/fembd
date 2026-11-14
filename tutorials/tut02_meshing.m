@@ -36,10 +36,11 @@ title('Remesh = false');
 
 %% 3. Tet4 vs Tet10: a convergence study
 % Linear tetrahedra (Tet4) are too stiff in bending ("locking") and need
-% very fine meshes. Quadratic Tet10 elements are accurate on coarse meshes
-% and are the default. We compute the first cantilever frequency on
-% increasingly fine meshes and compare with Euler-Bernoulli. The beam is
-% clamped on the nodes of its end face (|fix(body, sel)|).
+% very fine meshes. Quadratic Tet10 elements (Order = 2) are accurate on
+% coarse meshes; Tet4 is the default because it meshes and assembles much
+% faster. We compute the first cantilever frequency on increasingly fine
+% meshes and compare with Euler-Bernoulli. The beam is clamped on the nodes
+% of its end face (|fix(body, sel)|).
 beam = fullfile(out, 'beam.stl');
 fmbd.boxSTL(beam, [0 0 0], [1000 50 50]);
 steel = fmbd.material(210e9, 0.3, 7850);

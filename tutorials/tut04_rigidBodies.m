@@ -31,7 +31,7 @@ fprintf('meshed: m = %.4f kg, Jxx = %.6f; surface: m = %.4f kg, Jxx = %.6f (exac
 %% 2. An elastic beam with a rigid tip mass
 % A tie between an elastic and a rigid body makes the tied nodes of the
 % elastic body a coupling, fixed to the rigid body.
-beam = @() fmbd.Body.elastic(fullfile(out, 'beam.stl'), steel, Size = 25, Scale = 1e-3, Name = 'beam');
+beam = @() fmbd.Body.elastic(fullfile(out, 'beam.stl'), steel, Size = 25, Order = 2, Scale = 1e-3, Name = 'beam');
 s = fmbd.System();
 s.add(beam());
 s.add(blockS);

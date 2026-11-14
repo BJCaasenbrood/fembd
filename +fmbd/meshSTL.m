@@ -1,13 +1,13 @@
 function [X, T] = meshSTL(file, opts)
 %MESHSTL Tetrahedral mesh of a closed STL surface with Gmsh.
 %   [X, T] = fmbd.meshSTL(file) returns nodes X and tetrahedra T (Gmsh order).
-%   Options: Size (STL units), Order (1 = Tet4, 2 = Tet10, default),
+%   Options: Size (STL units), Order (1 = Tet4, default; 2 = Tet10),
 %   Remesh (remesh the surface, default true), FeatureAngle (default 40).
 
 arguments
     file (1,:) char
     opts.Size (1,1) double {mustBePositive} = inf
-    opts.Order (1,1) double {mustBeMember(opts.Order, [1 2])} = 2
+    opts.Order (1,1) double {mustBeMember(opts.Order, [1 2])} = 1
     opts.Remesh (1,1) logical = true
     opts.FeatureAngle (1,1) double = 40
 end

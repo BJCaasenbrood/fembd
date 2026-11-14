@@ -10,11 +10,8 @@ function [t, y, x] = simulate(s, tspan, opts)
 %     Initial  start state, e.g. from equilibrium
 %     Rho      numerical damping, 0..1 (default 0.8; 1 = none)
 %     Tol      Newton tolerance (default 1e-8)
-%
-%   Generalised-alpha on R3 x SO(3) per unit:
-%   Chung, J. and Hulbert, G. M., J. Appl. Mech. 60(2), 1993, 371-375.
-%   Bruls, O., Cardona, A. and Arnold, M., Mech. Mach. Theory 48, 2012, 121-137.
-    arguments
+
+   arguments
         s
         tspan (1,2) double
         opts.Step (1,1) double {mustBePositive} = 1e-3

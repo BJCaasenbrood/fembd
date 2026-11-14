@@ -6,9 +6,10 @@ classdef Body < handle
 %
 %   b = fmbd.Body(src, mat) takes an .stl, an ASCII .msh, or a struct with X
 %   (nodes) and T (Tet4/Tet10 in Gmsh order). mat holds D and rho.
-%   Options: Name, Scale (e.g. 1e-3 for mm), Size, Order, Remesh,
-%   FeatureAngle (meshing), Rigid, RefPoint, Modes (default 10) and
-%   Damping = [alpha beta] (D = alpha*M + beta*K).
+%   Options: Name, Scale (e.g. 1e-3 for mm), Size, Order (1 = Tet4, default;
+%   2 = Tet10, more accurate in bending), Remesh, FeatureAngle, Rigid,
+%   RefPoint, Modes (default 10) and Damping = [alpha beta]
+%   (D = alpha*M + beta*K).
 
 properties
     Name (1,:) char
@@ -36,7 +37,7 @@ methods
             opts.Name (1,:) char = ''
             opts.Scale (1,1) double = 1
             opts.Size (1,1) double = inf
-            opts.Order (1,1) double = 2
+            opts.Order (1,1) double = 1
             opts.Remesh (1,1) logical = true
             opts.FeatureAngle (1,1) double = 40
             opts.Rigid (1,1) logical = false

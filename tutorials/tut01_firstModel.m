@@ -14,8 +14,8 @@ tmp = tempname;  mkdir(tmp);
 %% 1. Geometry and bodies
 % Two boxes as STL files (in m). The upper arm is rigid: its mesh only gives
 % its mass, inertia and surface. The forearm is elastic: Gmsh meshes it with
-% quadratic Tet10 elements, and in the system its deformation is described
-% by |Modes| vibration modes.
+% linear Tet4 elements (the default; Order = 2 gives Tet10), and in the
+% system its deformation is described by |Modes| vibration modes.
 fmbd.boxSTL(fullfile(tmp, 'upper.stl'),   [0 -0.02 -0.01],     [0.3 0.02 0.01]);
 fmbd.boxSTL(fullfile(tmp, 'forearm.stl'), [0.3 -0.015 -0.005], [0.6 0.015 0.005]);
 steel = fmbd.material(210e9, 0.30, 7850);

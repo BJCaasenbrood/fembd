@@ -11,7 +11,7 @@ clamp = @(X) X(:,1) < 1e-6;
 fmbd.boxSTL(fullfile(out, 'beam.stl'),  [0 0 0],   [1000 50 50]);
 fmbd.boxSTL(fullfile(out, 'left.stl'),  [0 0 0],   [500 50 50]);
 fmbd.boxSTL(fullfile(out, 'right.stl'), [500 0 0], [1000 50 50]);
-body = @(name, h) fmbd.Body.elastic(fullfile(out, [name '.stl']), steel, Size = h, ...
+body = @(name, h) fmbd.Body.elastic(fullfile(out, [name '.stl']), steel, Size = h, Order = 2, ...
                                     Scale = 1e-3, Name = name, Modes = 10);
 
 %% 1. Clamping on nodes
